@@ -1,0 +1,30 @@
+# Include/Exclude files and folders from the summaries saved
+
+- *.fastq*
+- .sentinel
+- /*/*_Netcopy_complete*
+
++ */
++ /*/*
+
++ /*/MD5/***
++ /*/InterOp/***
++ /*/Unaligned/Basecall_Stats_*/*
++ /*/Unaligned/Basecall_Stats_*/css/***
++ /*/Excluded/Basecall_Stats_*/*
++ /*/Excluded/Basecall_Stats_*/css/***
++ /*/Data/Status.htm*
++ /*/Data/Status_Files/***
++ /*/Data/reports/**.htm
++ /*/Data/reports/**.css
++ /*/Data/reports/**.xml
++ /*/Data/reports/**.xsl
+
+- /*/Logs/***
+- /*/Data/***
+- /*/Diag/***
+- /*/PeriodicSaveRates/***
+- /*/Sisyphus/***
+- /*/Thumbnail_Images/***
+
+- *

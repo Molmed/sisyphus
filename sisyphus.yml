@@ -1,0 +1,60 @@
+# Example YAML-file for sisyphus configuration
+
+
+# Address for quick report
+MAIL: olof.karlberg@medsci.uu.se
+
+# CASAVA binaries
+CASAVA: /opt/CASAVA/1.8.4/bin/
+
+# The host on which to upload runfolder and execute sbatch jobs
+REMOTE_HOST: biologin.uppmax.uu.se
+
+# The directory on REMOTE_HOST to put the runfolder in
+REMOTE_PATH: /gulo/proj_nobackup/a2009002/private/runfolders
+
+# The directory on REMOTE_HOST to put the data for delivery in
+OUTBOX_PATH: DEFAULT
+
+# The host on which to archive the runfolder
+ARCHIVE_HOST: biologin.uppmax.uu.se
+
+# The directory on ARCHIVE_HOST to put the runfolder in
+# sisyphus will automatically add YYYY-MM to the path
+# Default to nobackup dir as this will only be used while
+# staging the data for transfer to Swestore
+# This way we can hardlink instead of copy fastq-files
+ARCHIVE_PATH: /gulo/proj_nobackup/a2009002/private/archive-tmp
+
+# The iRODS path to SweStore archive
+SWESTORE_PATH: /ssUppnexZone/proj/a2009002
+
+# Root dir of temporary directory to use
+# (eg when verifying the archive copies)
+TEMP_PATH: /gulo/proj_nobackup/a2009002/private/tmp
+
+# The host on which to put the summaries
+SUMMARY_HOST: mm-xlas002
+
+# The directory on ARCHIVE_HOST to put the runfolder in
+SUMMARY_PATH: /mnt/Seq-Summaries/2013/
+
+# The UPPNEX project to use for processing
+UPPNEX_PROJECT: a2009002
+
+# The UPPNEX project qos-flag to use for high priority processing
+UPPNEX_QOS: seqver
+
+# The maximum error in a lane before filtering out bad tiles (%)
+MAX_LANE_ERROR: 2
+
+# The maximum error in a tile in a lane with too high error (%)
+MAX_TILE_ERROR: 2
+
+# Skip delivery of the following lanes
+#SKIP_LANES:
+#        - 1
+#        - 2
+
+
+# END

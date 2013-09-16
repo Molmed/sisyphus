@@ -1,0 +1,2363 @@
+package Molmed::Sisyphus::Common;
+
+use base 'Exporter';
+our @EXPORT_OK = ('mkpath');
+
+use strict;
+use Carp;
+use Cwd qw(abs_path cwd);
+use Digest::MD5;
+use File::Basename;
+use XML::Simple;
+use File::Copy ();
+use PerlIO::gzip;
+use FindBin;
+use YAML::Tiny;
+#use Hash::Util;
+use Fcntl qw(:flock SEEK_END :mode); # Import LOCK_*, mode and SEEK_END constants
+
+our $AUTOLOAD;
+
+=pod
+
+=head1 NAME
+
+Molmed::Sisyphus::Common - Common functions for operating on runfolder data.
+
+=head1 SYNOPSIS
+
+use Molmed::Sisyphus::Common;
+
+my $sisyphus =  Molmed::Sisyphus::Common->new(
+  PATH=>$rfPath,
+  THREADS=>$nThreads,
+  VERBOSE=>$verbose,
+  DEBUG=>$debug
+ );
+
+=head1 DESCRIPTION
+
+This module contains some common functions for scripts in the Sisyphus suite.
+
+=head1 CONSTRUCTORS
+
+=head2 new()
+
+=over 4
+
+=item PATH
+
+The path to the runfolder to work on.
+
+=item THREADS
+
+Number of threads to use for threading applications (pigz).
+
+=item VERBOSE
+
+Print information on what is done.
+
+=item DEBUG
+
+Print debug information.
+
+=back
+
+=cut
+
+sub new{
+    my $proto = shift;
+    my $class = ref($proto) || $proto;
+    my $self  = {@_};
+
+    # Check the path
+    unless(defined $self->{PATH} &&  -e $self->{PATH}){
+	die "Runfolder path must be specified and a valid path\n";
+    }
+    $self->{PATH} = abs_path($self->{PATH});
+    $self->{RUNFOLDER} = basename($self->{PATH});
+
+    if(defined $self->{DEBUG}){
+	$self->{VERBOSE} = 1;
+    }
+
+    if(! exists $self->{THREADS}){
+	$self->{THREADS} = 8;
+    }
+
+    bless ($self, $class);
+    return $self;
+}
+
+sub AUTOLOAD {
+    my $self = shift;
+    my $type = ref($self)
+        or confess "$self is not an object";
+
+    return if $AUTOLOAD =~ /::DESTROY$/;
+
+    my $name = $AUTOLOAD;
+    $name =~ s/.*://;   # strip fully-qualified portion
+    $name =~ tr/a-z/A-Z/; # Use uppercase
+
+    unless ( exists $self->{$name} ) {
+        confess "Can't access `$name' field in class $type";
+    }
+    return $self->{$name};
+}
+
+=head1 SELECTORS
+
+The following selectors are available:
+
+=over
+
+=item PATH - The full path to the runfolder, including the runfolder name
+
+=item RUNFOLDER - The name of the runfolder, excluding the path
+
+=item DEBUG - bool
+
+=item VERBOSE - bool
+
+=back
+
+=cut
+
+
+=pod
+
+=head1 FUNCTIONS
+
+=head2 gzip()
+
+ Title   : gzip
+ Usage   : $sis->gzip($file)
+ Function: Compress the file $file in dir $srcDir with gzip,
+           verify and then delete the old file. The checksum
+           of the compressed file is saved to RF/MD5/sisyphus.md5
+           if the file is located in the runfolder.
+ Example :
+ Returns : new filename of gzipped file (absolute path)
+ Args    : file path (absolute or relative to runfolder)
+
+=cut
+
+sub gzip{
+    my $self = shift;
+    my $file = shift;
+    my $recurse = shift || 0;
+
+    print "gzip: Getting abs path for $file\n" if($self->{DEBUG});
+    my $absFile = abs_path($file);
+    if(-e $absFile){
+	$file = $absFile;
+    }else{
+	$absFile = abs_path($self->PATH . "/$file");
+	if(-e $absFile){
+	    $file=$absFile;
+	}else{
+	    confess "Failed to get abs path for $file\n";
+	}
+    }
+    print "$file\n" if($self->{DEBUG});
+
+    # Get the checksum of original file while it exists
+    my $md5Orig = $self->getMd5($file);
+
+    if(-e "$file.gz"){
+	print "$file.gz already exists\n" if($self->{DEBUG});
+    }else{
+	print STDERR "gzipping '$file'\n" if($self->{DEBUG});
+	my @stat = stat($file);
+	my $pig = system("pigz -n -T -p $self->{THREADS} -c '$file'> '$file.gz'");
+	if($pig){ # pigz failed
+	    unlink("$file.gz") if(! $self->{DEBUG} && -e "$file.gz" && -e "$file");
+	    system("gzip -n -c '$file'> '$file.gz'")==0 or confess "Failed to gzip $file\n";
+	}
+    }
+
+    print STDERR "verifying $file.gz\n" if($self->{DEBUG});
+    open(my $fh, '-|', "zcat '$file.gz'") || die "Failed to read '$file.gz': $!\n";
+    print STDERR "Checksumming $file.gz\n" if($self->{DEBUG});
+    my $md5New = $self->getMd5($fh); # Checksum of uncompressed file
+    close($fh);
+
+    if($md5New eq $md5Orig){
+	# Compress & Uncompress successful
+	# Now we can delete the original file
+#	(my $trashFile = $file) =~ s:/([^/]+)$:/trash.$1:;
+#	rename($file,"$trashFile");
+	print STDERR "Removing original file '$file'\n" if($self->{DEBUG});
+	unlink($file);
+
+	# Get and save the md5 of the compressed file if it is in the runfolder
+	if($file =~ m/^$self->{PATH}/){
+	    # Avoid cache since an old compressed file might linger there
+	    # get with noCache will skip saving, so be explicit about that
+	    my $md5 = $self->getMd5("$file.gz", -noCache=>1);
+	    $self->saveMd5("$file.gz",$md5);
+	}
+
+    }else{
+	print STDERR "Failed to verify '$file' expected '$md5Orig'\n";
+	if($recurse > 1){
+	    die "Failed to verify $file $recurse times. Giving up\n";
+	}
+	$self->gzip($file,$recurse+1);
+    }
+    return("$file.gz");
+}
+
+
+
+
+=pod
+
+=head2 getMd5()
+
+ Title   : getMd5
+ Usage   : $sis->getMd5($file|$fh, -noCache=>0, -skipMissing=>0)
+ Function: Calculates the md5 checksum for a file or open filehandle
+ Example :
+ Returns : md5 checksum
+ Args    : file path (absolute or relative to the runfolder) or filehandle,
+           flag for use of cache: Do not use cache if flag is set.
+           flag for handling of missing files: Do not die if file is missing.
+
+=cut
+
+
+sub getMd5{
+    my $self = shift;
+    my $file = shift;
+    my %args = @_;
+    my $noCache = 0;
+    if($args{'-noCache'}){
+	$noCache = 1;
+    }
+    my $skipMissing = 0;
+    if($args{'-skipMissing'}){
+	$skipMissing = 1;
+    }
+    my $fh;
+
+    unless(defined $file){
+	confess "File not defined\n";
+    }
+
+    if(ref($file) eq 'GLOB'){
+        $fh = $file;
+    }else{
+	print "getMd5: Getting abs path for $file\n" if($self->{DEBUG});
+	my $absFile = abs_path($file) || "";
+	if(-e $absFile || -e "$absFile.gz"){
+	    $file = $absFile;
+	}else{
+	    $absFile = abs_path($self->PATH . "/$file") || "";
+	    if(-e $absFile || -e "$absFile.gz"){
+		$file=$absFile;
+	    }elsif(-e $self->PATH . "/$file" || -e $self->PATH . "/$file.gz" ){
+		$file =~ s:^$self->RUNFOLDER::;
+		$file = $self->PATH . "/$file";
+	    }elsif(-e dirname($self->PATH) . "/$file" || -e dirname($self->PATH) . "/$file.gz"){
+		# Runfolder name was already included in the file path, but not absolute
+		$file = dirname($self->PATH) . "/$file";
+	    }else{
+		warn "Failed to get abs path for $file\n" if($self->{DEBUG});
+		unless($file =~ m:^/:){ # Add runfolder unless it is already absolute
+		    $file = $self->PATH . "/$file";
+		}
+	    }
+	}
+	$file =~ s:/+:/:; # Remove duplicate slashes
+	print "$file\n" if($self->{DEBUG});
+
+	# Check if we already have the md5 in cache
+	unless($noCache){
+	    unless(defined $self->{CHECKSUMS}){
+		$self->readMd5sums();
+	    }
+	    if(defined $self->{CHECKSUMS}->{$file}){
+		return $self->{CHECKSUMS}->{$file};
+	    }
+	}
+	# Otherwise open the file, if it exists
+	if(-e $file){
+	    open($fh, '<', "$file") || die "Failed to read '$file': $!\n";
+	}elsif(-e "$file.gz"){
+	    open($fh, '-|', "zcat $file.gz") || die "Failed to read '$file.gz': $!\n";
+	}else{
+	    if($skipMissing){
+		warn "Failed to get checksum for '$file'\n" if($self->DEBUG);
+		return undef;
+	    }else{
+		confess "Failed to get checksum for '$file'\n";
+	    }
+	}
+    }
+
+    binmode($fh);
+
+    my $sum = Digest::MD5->new->addfile($fh)->hexdigest;
+
+    unless(ref($file) eq 'GLOB'){
+	close($fh);
+	# Write the checksum to file if the file is in the runfolder
+	unless($noCache){
+	    if($file =~ m/^$self->{PATH}/){
+		$self->saveMd5($file,$sum);
+	    }
+	    $self->{CHECKSUMS}->{$file} = $sum;
+	}
+    }
+    return ($sum);
+}
+
+=pod
+
+=head2 saveMd5()
+
+ Title   : saveMd5
+ Usage   : $sis->saveMd5($file,$sum)
+ Function: Writes the checksum of $file to $runfolder/MD5/sisyphus.md5
+ Example :
+ Returns : nothing
+ Args    : Absolute file path, md5 checksum
+
+=cut
+
+
+sub saveMd5{
+    my $self = shift;
+    my $file = shift;
+    my $sum = shift;
+    $file = abs_path($file);
+    my $rfPath = $self->{PATH};
+
+    $file =~ s:^$rfPath/::;
+    my $runfolder = basename($rfPath);
+
+    $self->mkpath("$rfPath/MD5",2770);
+    print STDERR "Writing MD5 for '$file'\n" if($self->{DEBUG});
+    open(my $md5fh, ">>", "$rfPath/MD5/sisyphus.md5") or die "Failed to open $rfPath/MD5/sisyphus.md5:$!\n";
+    flock($md5fh, LOCK_EX) || confess "Failed to lock $rfPath/MD5/sisyphus.md5:$!\n";
+    print $md5fh "$sum  $runfolder/$file\n";
+    flock($md5fh, LOCK_UN);
+    close($md5fh);
+
+    # Update the cache, if used, with the new(?) checksum for this file
+    if(exists $self->{CHECKSUMS}){
+	$self->{CHECKSUMS}->{$file} = $sum;
+    }
+}
+
+=pod
+
+=head2 readMd5sums()
+
+ Title   : readMd5sums
+ Usage   : $sis->readMd5sums()
+ Function: reads files with md5 checksums in $runfolder/MD5/ and stores them in a hash with filename as key.
+ Example :
+ Returns : nothing
+ Args    : none
+
+=cut
+
+sub readMd5sums{
+    my $self = shift;
+    my $rfPath = $self->{PATH};
+    my $rfParent = dirname($rfPath);
+    my %md5data;
+    if(-e "$rfPath/MD5"){
+        opendir(MD5DIR, "$rfPath/MD5/") or die "Failed to open MD5-directory '$rfPath/MD5': $!\n";
+        foreach my $file (readdir(MD5DIR)){
+            if($file=~m/\.md5(\.gz)?$/){
+		my $inFh;
+		if($file =~ m/\.gz/){
+		    open($inFh, '-|', "zcat $rfPath/MD5/$file") or die "Failed to open MD5-file '$rfPath/MD5/$file': $!\n";
+		}else{
+		    open($inFh, '<', "$rfPath/MD5/$file") or die "Failed to open MD5-file '$rfPath/MD5/$file': $!\n";
+		}
+
+                while(<$inFh>){
+                    chomp;
+                    my($key,$path) = split(/\s+/, $_, 2);
+		    # Change the path from relative (including runfolder) to absolute
+                    $md5data{"$rfParent/$path"} = $key;
+                }
+                close($inFh);
+            }
+        }
+    }
+    print STDERR keys(%md5data) + 0, " checksums found\n" if($self->{DEBUG});
+    $self->{CHECKSUMS} = \%md5data;
+}
+
+=pod
+
+=head2 tileCount()
+
+ Title   : tileCount
+ Usage   : $sis->tileCount()
+ Function: Returns the expected number of tiles per lane
+ Example :
+ Returns : number of tiles
+ Args    : none
+
+=cut
+
+sub tileCount{
+    my $self = shift;
+    if( my $runInfo = $self->getRunInfo() ){
+	return($runInfo->{tiles});
+    }
+    return undef;
+}
+
+=pod
+
+=head2 version()
+
+ Title   : version
+ Usage   : $sis->version()
+ Function: Returns the sisyphus version as determined from Git
+ Example :
+ Returns : Version of sisyphus
+ Args    : none
+
+=cut
+
+sub version{
+    my $self = shift;
+
+    if(defined $self->{VERSION}){
+	return $self->{VERSION};
+    }
+    my $class = ref($self);
+    my $version = $class::VERSION;
+
+    if(-e "$FindBin::Bin/.git"){
+	$version = `git --git-dir $FindBin::Bin/.git describe`;
+    }elsif(-e "$FindBin::Bin/SISYPHUS_VERSION"){
+	$version = `cat "$FindBin::Bin/SISYPHUS_VERSION"`;
+    }
+    chomp($version);
+    $self->{VERSION} = $version;
+    return $self->{VERSION};
+}
+
+=pod
+
+=head2 getCSversion()
+
+ Title   : getCSversion
+ Usage   : $sis->getCSversion()
+ Function: Reads the Control Software version from the runfolder
+ Example :
+ Returns : Version of HCS/MCS
+ Args    : none
+
+=cut
+
+sub getCSversion{
+    my $self = shift;
+    my $rfPath = $self->{PATH};
+    if(defined $self->{HCSVERSION}){
+	return $self->{HCSVERSION};
+    }
+
+    my $runParams = $self->runParameters();
+    return undef unless($runParams);
+
+    $self->{CSVERSION} = $runParams->{Setup}->{ApplicationVersion};
+    return $self->{CSVERSION};
+}
+
+=pod
+
+=head2 getRTAversion()
+
+ Title   : getRTAversion
+ Usage   : $sis->getRTAversion()
+ Function: Reads the RTA version from the runfolder
+ Example :
+ Returns : Version of RTA
+ Args    : none
+
+=cut
+
+sub getRTAversion{
+    my $self = shift;
+    my $rfPath = $self->{PATH};
+    if(defined $self->{RTAVERSION}){
+	return $self->{RTAVERSION};
+    }
+
+    my $runParams = $self->runParameters();
+    return undef unless($runParams);
+
+    if(exists $runParams->{RTAVersion}){
+	$self->{RTAVERSION} = $runParams->{RTAVersion};
+    }elsif(exists $runParams->{Setup}->{RTAVersion}){
+	$self->{RTAVERSION} = $runParams->{Setup}->{RTAVersion};
+    }else{
+	$self->{RTAVERSION} = '';
+    }
+    return $self->{RTAVERSION};
+}
+
+=pod
+
+=head2 getCasavaVersion()
+
+ Title   : getCasavaVersion
+ Usage   : $sis->getCasavaVersion()
+ Function: Reads the CASAVA version from the runfolder
+ Example :
+ Returns : Version of CASAVA
+ Args    : none
+
+=cut
+
+sub getCasavaVersion{
+    my $self = shift;
+    my $rfPath = $self->{PATH};
+    if(defined $self->{CASAVAVERSION}){
+	return $self->{CASAVAVERSION};
+    }
+
+    my $xml = "$rfPath/Unaligned/DemultiplexConfig.xml";
+    my $dmConfig;
+    if(-e $xml){
+	$dmConfig = XMLin($xml) || confess "Failed to read $xml\n";
+    }elsif(-e "$xml.gz"){
+#	my $fh = IO::File->new();
+#	$fh->open("$xml.gz", ':gzip') || confess "Failed to open $xml.gz\n";
+#	$dmConfig = XMLin($fh);
+	open(my $xfh, '<:gzip', "$xml.gz") || confess "Failed to open $xml.gz\n";
+	local $/='';
+	my $str = <$xfh>;
+	local $/="\n";
+	$dmConfig = XMLin($str);
+    }
+    if(defined $dmConfig){
+	$self->{CASAVAVERSION} = $dmConfig->{Software}->{Version};
+	return $self->{CASAVAVERSION};
+    }
+    return undef;
+}
+
+
+=pod
+
+=head2 getFlowCellVersion()
+
+ Title   : getFlowCellVersion()
+ Usage   : $sis->getFlowCellVersion()
+ Function: Reads the flow cell version from the runfolder
+ Example :
+ Returns : Flow cell version string
+ Args    : none
+
+=cut
+
+sub getFlowCellVersion{
+    my $self = shift;
+    my $rfPath = $self->{PATH};
+    if(defined $self->{FCVERSION}){
+	return $self->{FCVERSION};
+    }
+
+    my $runParams = $self->runParameters();
+    return undef unless($runParams);
+
+    $self->{FCVERSION} = $runParams->{Setup}->{Flowcell};
+    return $self->{FCVERSION};
+}
+
+
+=pod
+
+=head2 getSBSversion()
+
+ Title   : getSBSversion()
+ Usage   : $sis->getSBSversion()
+ Function: Reads the SBS version from the runfolder
+ Example :
+ Returns : SBS version string
+ Args    : none
+
+=cut
+
+sub getSBSversion{
+    my $self = shift;
+    my $rfPath = $self->{PATH};
+    if(defined $self->{SBSVERSION}){
+	return $self->{SBSVERSION};
+    }
+
+    my $runParams = $self->runParameters();
+    return undef unless($runParams);
+
+    $self->{SBSVERSION} = $runParams->{Setup}->{Sbs};
+    return $self->{SBSVERSION};
+}
+
+=pod
+
+=head2 getClusterKitVersion()
+
+ Title   : getClusterKitVersion()
+ Usage   : $sis->getClusterKitVersion()
+ Function: Reads the cluster kit version from the runfolder
+ Example :
+ Returns : Cluster kit version string
+ Args    : none
+
+=cut
+
+sub getClusterKitVersion{
+    my $self = shift;
+    my $rfPath = $self->{PATH};
+    if(defined $self->{CKVERSION}){
+	return $self->{CKVERSION};
+    }
+
+    my $runParams = $self->runParameters();
+    return undef unless($runParams);
+
+    if(defined $runParams->{Setup}->{Pe}){
+	$self->{CKVERSION} = $runParams->{Setup}->{Pe};
+    }else{
+	$self->{CKVERSION} = "Unknown";
+    }
+    return $self->{CKVERSION};
+}
+
+=pod
+
+=head2 getRunInfo()
+
+ Title   : getRunInfo
+ Usage   : $sis->getRunInfo($rfPath)
+ Function: Reads data from $rfPath/RunInfo.xml
+ Example :
+ Returns : hashref with info
+ Args    : none
+
+=cut
+
+sub getRunInfo{
+    my $self = shift;
+    my $rfPath = $self->{PATH};
+
+    if(defined $self->{RUNINFO}){
+	return $self->{RUNINFO};
+    }
+
+    my $cycles = 0;
+    my $surfaces = 0;
+    my $swaths = 0;
+    my $tiles = 0;
+    my $indexed = 0;
+    my @reads;
+
+    if(! -e "$rfPath/RunInfo.xml" && -e "$rfPath/RunInfo.xml.gz"){
+        `gunzip -N "$rfPath/RunInfo.xml.gz"`;
+    }
+
+    my $runInfo = XMLin("$rfPath/RunInfo.xml", ForceArray=>['Read']) || confess "Failed to read RunInfo\n";
+    return undef unless($runInfo);
+
+    if(ref $runInfo->{Run}->{Reads}->{Read} eq 'ARRAY'){
+	my $i=0;
+        foreach my $read (@{$runInfo->{Run}->{Reads}->{Read}}){
+	    $i++;
+	    if(exists $read->{NumCycles}){ # HiSeq
+		push @reads, { 'id'=>$i,'first'=>$cycles, 'last'=>$cycles + $read->{NumCycles}-1, 'index'=>$read->{IsIndexedRead} }; #Change to 0 based index
+		$cycles += $read->{NumCycles};
+		$indexed = 1 if($read->{IsIndexedRead} eq 'Y');
+	    }else{
+		confess "Failed to get NumCycles for read from RunInfo.xml\n";
+	    }
+        }
+    }
+
+    if(exists $runInfo->{Run}->{FlowcellLayout}->{SurfaceCount}){
+        $surfaces = $runInfo->{Run}->{FlowcellLayout}->{SurfaceCount};
+    }elsif($runInfo->{Run}->{Instrument} eq 'HWI-EAS178'){
+	$surfaces = 1; # GA
+    }else{
+        die "SurfaceCount missing from $rfPath/RunInfo.xml\n";
+    }
+
+    if(exists $runInfo->{Run}->{FlowcellLayout}->{SwathCount}){
+        $swaths = $runInfo->{Run}->{FlowcellLayout}->{SwathCount};
+    }elsif($runInfo->{Run}->{Instrument} eq 'HWI-EAS178'){
+	$swaths = 1; # GA
+    }else{
+        die "SwathCount missing from $rfPath/RunInfo.xml\n";
+    }
+
+    if(exists $runInfo->{Run}->{FlowcellLayout}->{TileCount}){
+        $tiles = $runInfo->{Run}->{FlowcellLayout}->{TileCount};
+    }elsif($runInfo->{Run}->{Instrument} eq 'HWI-EAS178'){
+	$tiles = 120; # GA
+    }else{
+        die "TileCount missing from $rfPath/RunInfo.xml\n";
+    }
+
+    my $totalTiles = $surfaces * $swaths * $tiles;
+
+    # If no info found, set value unreachable
+    unless($cycles>0){
+        $cycles = 10000;
+    }
+    unless($totalTiles>0){
+        $totalTiles = 10000;
+    }
+
+    if($self->{DEBUG}){
+        print STDERR "Expecting $cycles cycles\n";
+        print STDERR "Expecting $surfaces surfaces/lane\n";
+        print STDERR "Expecting $swaths swaths/lane\n";
+        print STDERR "Expecting $tiles tiles/swath\n";
+        print STDERR "Expecting $totalTiles tiles/lane\n";
+        print STDERR "Indexed: $indexed\n";
+	print STDERR "Reads: \n";
+	  for(my $i=0; $i<@reads; $i++){
+	      my $read = $reads[$i];
+	      print STDERR "\t Read " . ($i+1). "\n";
+	      foreach my $k (sort keys %{$read}){
+		  print STDERR "\t\t $k: $read->{$k}\n"
+	      }
+	  }
+    }
+
+    my $retval = {cycles=>$cycles,tiles=>$totalTiles, indexed=>$indexed, reads=>\@reads, xml=>$runInfo};
+    # Only cache if all info is present
+    unless($totalTiles==10000 || $cycles==10000){
+	$self->{RUNINFO}=$retval;
+    }
+    return($retval);
+}
+
+=pod
+
+=head2 copy()
+
+ Title   : copy
+ Usage   : my($target, $md5) = $sis->copy($file,$dir,{VERIFY=>1,RELATIVE=>1})
+ Function: Copies $file in runfolder to $dir while preserving folder structure
+ Example : $sis->copy("Data/Intensities/config.xml", "outdir")
+ Returns : array with the absolute path and verified md5 checksum of the written file
+ Args    : the source file absolute or relative to source runfolder,
+           root of target directory,
+           hashref with options:
+           VERIFY: bool, if true verify the copy with md5 checksums [1]
+           RELATIVE: bool, if true preserve path relative to source dir [0]
+           LINK: bool, try creating a hard link instead of copy, fall back to copy if link fails [0]
+
+=cut
+
+sub copy{
+    my $self = shift;
+    my $file = shift;
+    my $tDir = shift;
+    my $verify = 1;
+    my $keepPath = 0;
+    my $link = 0;
+
+    if(@_){
+	my $options = shift;
+	$verify = $options->{VERIFY} if(defined $options->{VERIFY});
+	$keepPath = $options->{RELATIVE} if(defined $options->{RELATIVE});
+	$link = $options->{LINK} if(defined $options->{LINK});
+    }
+
+    $self->mkpath($tDir,2770) unless(-e $tDir);
+
+    $tDir = abs_path($tDir);
+    my $src = $file;
+    my $rfPath = $self->PATH;
+    if($file =~ m/^$rfPath/){
+	$file =~ s/^$rfPath//;
+	$file =~ s:^/+::;
+    }elsif($file !~ m:^/:){ # Assume relative path to be relative to runfolder
+	$src = $rfPath . "/$file";
+    }
+
+    $file =~ s:/+:/:;
+
+    unless(-e $src){
+	confess "Sourcefile does not exist: '$src'\n";
+    }
+
+    my $target = "$tDir/" . basename($src);
+    if($keepPath){
+	my $runfolder = $self->RUNFOLDER;
+	$target = $src;
+	if($target =~ m/$rfPath/){
+	    $target =~ s/^.*$rfPath/$tDir/;
+	}elsif($target =~ m/$runfolder\//){
+	    $target =~ s/^.*$runfolder/$tDir/;
+	}elsif( $target =~ s:/.*/(Config|Data|Diag|InterOp|Logs|PeriodicSaveRates|Recipe|Sisyphus)/:$tDir/$1/: ){
+	    # Try to use the dirnames at the first level of the runfolder to remove the leading dirs
+	}else{
+	    $target = "$tDir/" . basename($src);
+	}
+    }
+
+    $self->clonePath(dirname($src),dirname($target));
+
+    my $copy = 1;
+    my $md5sum;
+    if($link){
+	$copy = system('ln',$src,$target);
+	# If link succeeds, copy will be set to zero
+	if($copy==0){ # If link was successful, src and target are the same file
+	    $md5sum=$self->getMd5($src);
+	}
+    }
+    if($copy){ # If link failed, copy is still true
+	File::Copy::cp($src,$target) || confess "Failed to copy $src to $target: $!\n";
+	# Preserve timestamps
+	my @sStat = stat($src);
+	utime @sStat[8,9], $target;
+	if($verify){
+	    $md5sum = $self->getMd5($target);
+	    unless($self->getMd5($src) eq $md5sum){
+		my $msg = "Failed to verify copy" . "\n  $src " . $self->getMd5($src) . "\n  $target " . $md5sum . "\n";
+		confess $msg;
+	    }
+	}
+    }
+    return($target,$md5sum);
+}
+
+=pod
+
+=head2 clonePath()
+
+ Title   : clonePath
+ Usage   : $sis->clonePath($dir1,$dir2)
+ Function: Recursively creates the directory path dir2, using the permissions of dir1.
+           The permissions will be copied from dir1 to dir2 for the sub path
+           that is identical between the two paths.
+ Example :
+ Returns : true on success
+ Args    : none
+
+=cut
+
+sub clonePath{
+    my $self = shift;
+    my $src = shift;
+    my $target = shift;
+    my $srcParent = dirname($src);
+    my $targetParent = dirname($target);
+
+    unless(-e $target){
+	# Recurse until the paths differ
+	unless(-e $targetParent){
+	    if(basename($srcParent) eq basename($targetParent)){
+		$self->clonePath($srcParent,$targetParent);
+	    }
+	}
+
+	my @dStat = stat($src);
+	my $dPerm = sprintf('%05o', S_IMODE($dStat[2]));
+	system("mkdir", '-p', '-m', $dPerm, $target)==0 || confess "Failed to create dir $target: $!\n";
+    }
+    return 1;
+}
+
+=pod
+
+=head2 readSampleSheet()
+
+ Title   : readSampleSheet
+ Usage   : $sis->readSampleSheet()
+ Function: Reads data from $rfPath/Samples.csv
+ Example :
+ Returns : hashref with info
+ Args    : none
+
+=cut
+
+sub readSampleSheet{
+    my $self = shift;
+    my $rfPath = $self->PATH;
+    # Boldly assuming CASAVA 1.8, skipping legacy cruft from old demultiplexing
+    my $sheetPath = "$rfPath/SampleSheet.csv";
+    my %sampleSheet;
+
+    # Get the flowcell id
+    my $fcId = $self->fcId();
+
+    #Expected file format is
+    #FCID,Lane,SampleID,SampleRef,Index,Description,Control,Recipe,Operator,SampleProject
+    my $sheet;
+    if(-e "$sheetPath.gz" && ! -e $sheetPath){
+	open($sheet, '<:gzip', "$sheetPath.gz") or die "Failed to open $sheetPath.gz: $!\n";
+    }else{
+	open($sheet, '<', $sheetPath) or die "Failed to open $sheetPath: $!\n";
+    }
+    while(<$sheet>){
+	if(m/^$fcId,/i){
+	    next if(m/^#/); # Skip comments
+	    $_=~ s/[\012\015]*$//; # Strip CR & LF
+	    my $row = $_;
+	    my @r = split /,/, $row;
+	    $r[4] = 'Undetermined' unless($r[4] =~ m/\S/); # Use 'Undetermined' for unspecified index tags
+	    unless($r[6] =~ m/^y/i){ # Skip the controls
+		# Use project + lane + index tag as keys
+		$sampleSheet{$r[9]}->{$r[1]}->{$r[4]} = {'SampleID'=>$r[2],'SampleRef'=>$r[3],'Index'=>$r[4],
+						'Description'=>$r[5],'Control'=>$r[6], 'Lane'=>$r[1],
+						'SampleProject'=>$r[9], 'Row'=>$row};
+		# Extract some extras from the description
+		# The format used is KEY1:value1;KEY2:value2...
+		while($r[5] =~ m/([^:]*):([^;]*)[;\s]*/g){
+		    $sampleSheet{$r[9]}->{$r[1]}->{$r[4]}->{$1} = $2;
+		}
+	    }
+	}
+    }
+    return(\%sampleSheet);
+}
+
+=pod
+
+=head2 tmpdir()
+
+ Title   : tmpdir
+ Usage   : $sis->tmpdir($size)
+ Function: Returns the absolute path of a temporary directory with $size free space
+ Example :
+ Returns : a path
+ Args    : required space in bytes
+
+=cut
+
+sub tmpdir{
+    my $self = shift;
+    my $size = shift;
+
+    if( defined($ENV{TMPDIR}) && -e $ENV{TMPDIR} ){
+	my $df = $self->df($ENV{TMPDIR});
+	if($df > $size){
+	    $self->mkpath("$ENV{TMPDIR}/sisyphus/$$", 2770);
+	    return("$ENV{TMPDIR}/sisyphus/$$");
+	}
+    }
+    foreach my $scratch ('/proj/a2009002/nobackup/private/scratch', '/data/local/scratch', '/data/scratch', '/scratch', '/tmp'){
+	if(-e $scratch){
+	    $scratch = abs_path($scratch);
+	}
+	if(-w "$scratch"){
+	    my $df = $self->df("$scratch");
+	    if($df > $size){
+		$self->mkpath("$scratch/sisyphus/$$",2770);
+		return("$scratch/sisyphus/$$");
+	    }
+	}
+    }
+    confess "Failed to find a temporary directory with $size bytes free\n";
+}
+
+=pod
+
+=head2 df()
+
+ Title   : df
+ Usage   : $sis->df($path)
+ Function: Returns the free space in $path
+ Example :
+ Returns : number of bytes free space
+ Args    : path to check
+
+=cut
+
+sub df{
+    my $self = shift;
+    my $path = shift;
+    if(-e $path){
+	my @df = split /\n/, `df -k -P "$path"`;
+	my @r = split /\s+/, $df[1];
+	return $r[3]*1024;  # bytes
+    }
+    return 0;
+}
+
+
+=pod
+
+=head2 complete()
+
+ Title   : complete
+ Usage   : $sis->complete()
+ Function: Checks if the runfolder is completed (the run is finished)
+ Example :
+ Returns : true if completed
+ Args    : none
+
+=cut
+
+sub complete{
+    my $self = shift;
+    my $rfPath = $self->PATH;
+    my $runInfo = $self->getRunInfo();
+    my $runParams = $self->runParameters();
+    my ($expectedCycles,$expectedTiles) = ($runInfo->{cycles}, $runInfo->{tiles});
+    my $numLanes = $self->laneCount();
+    foreach my $lane (1..$numLanes){
+        my $ldir = "$rfPath/Data/Intensities/BaseCalls/L00${lane}";
+        if( opendir(LANE, $ldir) ){
+            my @cycles = grep /^C\d+\.1/, readdir(LANE);
+	    if(@cycles < $expectedCycles){
+		print STDERR "Too few cycles for lane $lane. Found " , @cycles + 0, ", expected $expectedCycles\n" if($self->{DEBUG});
+		return 0;
+	    }
+            foreach my $c (@cycles){
+                if( opendir(CYCLE, "$ldir/$c") ){
+                    my @tiles = grep /s.*\.(bcl|stats)/, readdir(CYCLE);
+		    my $nTiles = (@tiles + 0)/2;
+		    if($nTiles < $expectedTiles){
+			print STDERR "Too few tiles for lane $lane, cycle $c. Found $nTiles, expected $expectedTiles.\n" if($self->{DEBUG});
+			return 0;
+		    }
+                    close(CYCLE);
+                }else{
+                    warn "Failed to open '$ldir/$c'\n";
+                    return 0;
+                }
+            }
+            close(LANE);
+        }else{
+            warn "Failed to open '$ldir'\n";
+            return 0;
+        }
+    }
+    if(-e "$rfPath/RTAComplete.txt"){
+	print STDERR "Runfolder complete\n" if($self->{DEBUG});
+	return 1;
+    }
+    print STDERR "Waiting for RTAComplete.txt\n" if($self->{DEBUG});
+    return 0;
+}
+
+=pod
+
+=head2 readConfig()
+
+ Title   : readConfig
+ Usage   : $sis->readConfig()
+ Function: Reads and returns the contents of sisyphus.yml, blocks until the file is readable
+ Example :
+ Returns : Hash ref with config information
+ Args    : none
+
+=cut
+
+sub readConfig{
+    my $self = shift;
+    until(-e $self->PATH . '/sisyphus.yml'){
+	print STDERR "Waiting for config file " . $self->PATH . "/sisyphus.yml\n";
+	if(-e $self->PATH . '/sisyphus.yml.gz'){
+	    system('gunzip' , '-N',  $self->PATH . '/sisyphus.yml.gz');
+	}
+	sleep 5;
+    }
+    my $conf = YAML::Tiny->read($self->PATH . '/sisyphus.yml') || confess "Failed to read '" . $self->PATH . "/sisyphus.yml'\n";
+    return $conf->[0];
+}
+
+=pod
+
+=head2 runParameters()
+
+ Title   : runParameters
+ Usage   : $sis->runParameters()
+ Function: returns the runParameters.xml as a XML::Simple object
+ Example :
+ Returns : XML::Simple object
+ Args    : none
+
+=cut
+
+sub runParameters{
+    my $self = shift;
+    if(defined $self->{RUNPARAMS}){
+	return $self->{RUNPARAMS};
+    }
+    my $rfPath = $self->{PATH};
+    if(! -e "$rfPath/runParameters.xml" && -e "$rfPath/runParameters.xml.gz"){
+        `gunzip -N "$rfPath/runParameters.xml.gz"`;
+    }
+    my $runParams;
+    if(-e "$rfPath/runParameters.xml"){
+	$runParams = XMLin("$rfPath/runParameters.xml") || confess "Failed to read runParameters.xml\n";
+    }
+    unless(defined $runParams){
+	confess "Failed to read runParameters.xml\n";
+    }
+
+    $self->{RUNPARAMS}=$runParams;
+    return $runParams;
+}
+
+=pod
+
+=head2 reads()
+
+ Title   : reads()
+ Usage   : $sis->reads()
+ Function: Returns the reads from RunInfo.xml
+ Example :
+ Returns : Array of reads
+ Args    : none
+
+=cut
+
+sub reads{
+    my $self = shift;
+    my $runInfo = $self->getRunInfo();
+    return( @{$runInfo->{reads}} );
+}
+
+=pod
+
+=head2 createReadMask()
+
+ Title   : createReadMask()
+ Usage   : $sis->createReadMask()
+ Function: Creates a read mask for demultiplexing, skipping the last base in each read (except the index read on MiSeq)
+ Example :
+ Returns : String in the form Y*n,I*n,Y*n as described in the CASAVA documentation
+ Args    : none
+
+=cut
+
+sub createReadMask{
+    my $self = shift;
+    my @readMask;
+    my @reads = $self->reads();
+    foreach my $read (@reads){
+	if($read->{index} eq 'Y'){
+	    if($self->machineType eq 'miseq'){
+		push @readMask, 'I*';
+	    }else{
+		push @readMask, 'I*n';
+	    }
+	}else{
+	    push @readMask, 'Y*n';
+	}
+    }
+    return(join(',',@readMask));
+}
+
+=head2 qType
+
+ Title   : qType
+ Usage   : $sisyphus->qType($fastqFile)
+ Function: Determine the quality value encoding of the fastq file
+ Example :
+ Returns : The offset value used.
+ Args    : The path to a (gzipped or plain) fastq file
+
+=cut
+
+sub qType{
+    # This version of sisyphus only works with CASAVA 1.8+ anyway,
+    # so just return sanger format
+    return(33);
+
+    # Old code
+    my $self = shift;
+    my $fastqFile = shift;
+    my $fq;
+    if($fastqFile =~ m/\.gz/){
+	open($fq, '-|', "zcat $fastqFile") or die "Failed to read $fastqFile with zcat: $!\n";
+    }else{
+	open($fq, $fastqFile) or die "Failed to read $fastqFile: $!\n";
+    }
+    while(<$fq>){
+	my $name1 = $_;
+	my $read = <$fq>;
+	my $name2 = <$fq>;
+	my $qual  = <$fq>;
+	chomp($qual);
+	# Illumina 1.0:  ASCII 59 = Q -5
+	# Illumina 1.3+: ASCII 64 = Q  0
+	# Illumina 1.0+: ASCII 94 = Q  30
+	# Sanger:        ASCII 33 = Q  0
+	# Sanger:        ASCII 80 = Q  47
+	foreach(split //, $qual){
+	    if(ord($_)<59){
+		print STDERR "Found Q-value < 59. Assuming Phred/Sanger.\n" if($self->{DEBUG});
+		close($fq);
+		return(33);
+	    }
+	    if(ord($_)>80){
+		print STDERR "Found Q-value > 80. Assuming Illumina 1.3+.\n" if($self->{DEBUG});
+		close($fq);
+		return(64);
+	    }
+	}
+    }
+    close($fq);
+    die "Failed to determine Q-value type\n";
+}
+
+
+=pod
+
+=head2 GenerateRgId
+
+Generate a unique readgroup id.
+
+=cut
+
+sub GenerateRgId {
+    my $self = shift;
+    unless(exists $self->{RGSEED} && $self->{RGSEED}){
+	my $t = time;
+	$t=~s/^\d\d//;
+	$self->{RGSEED} = $t - $$;
+    }
+    $self->{RGSEED}--;
+    return($self->GenerateBase62($self->{RGSEED}));
+}
+
+=pod
+
+=head2 GenerateBase
+
+Change the base representation of a non-negative integer into base 62
+
+Adopted from http://www.perlmonks.org/?node_id=27148
+
+=cut
+
+sub GenerateBase62 {
+    my $self = shift;
+    my $number = shift;
+    my $base = 62;
+
+    my @nums = (0..9,'a'..'z','A'..'Z')[0..$base-1];
+    my $index = 0;
+    my %nums = map {$_,$index++} @nums;
+
+    return $nums[0] if $number == 0;
+    my $rep = ""; # this will be the end value.
+    while( $number > 0 )
+      {
+	  $rep = $nums[$number % $base] . $rep;
+	  $number = int( $number / $base );
+      }
+    return $rep;
+}
+
+=pod
+
+=head2 sampleSize()
+
+ Title   : sampleSize($lane, $project, $sample, $tag)
+ Usage   : $sis->sampleSize($lane, $project, $sample, $tag)
+ Function: Returns the estimated number of sequences
+           from a specific sample in a lane.
+           Requires that demultiplexing has been done by CASAVA 1.8
+ Example :
+ Returns : Integer
+ Args    : Lane number, project name, sample name, index tag
+
+=cut
+
+sub sampleSize{
+    my $self = shift;
+    my $lane = shift;
+    my $proj = shift;
+    my $sample = shift;
+    my $tag = shift;
+
+    if($proj eq 'Undetermined_indices'){
+	$tag = 'Undetermined';
+    }elsif($tag eq ''||!defined $tag){
+	$tag = 'NoIndex';
+    }
+    my ($laneData,$sampleData) = $self->resultStats();
+    # All reads should have the same number of clusters
+    if(exists $sampleData->{$sample}->{$lane}->{1}->{$tag}->{PF}){
+	return($sampleData->{$sample}->{$lane}->{1}->{$tag}->{PF});
+    }
+    confess "Failed to get number of clusters from SAMPLE $sample, LANE $lane, TAG $tag\n";
+}
+
+=pod
+
+=head2 resultStats()
+
+ Title   : resultStats
+ Usage   : my $resultStats = $sis->resultStats()
+ Function: Returns summary statistics for each sample and lane
+           extracted from the InterOp folder and
+           Unaligned/Basecall_Stats_X/Flowcell_demux_summary.xml
+           Requires that demultiplexing has been done by CASAVA 1.8
+ Returns : Two hashrefs with the following structure:
+           LANE_ID => {
+                       READ_ID => {
+                                   QscoreSum  => Sum of all Q-scores,
+                                   DensityRaw => Number of raw clusters/mm2,
+                                   ErrRateSD  => Standard dev of ErrRate,
+                                   YieldPF    => Yield Pass Filter,
+                                   DensityPF  => Number of raw clusters/mm2,
+                                   PF         => Number of PF clusters,
+                                   ErrRate    => Error rate for phiX,
+                                   Raw        => Number of raw clusters,
+                                   AvgQ       => Average Q score,
+                                   YieldQ30   => Yield with Q>=30,
+                                   PctQ30     => Percent bases with Q>=30,
+                                   PctPF      => Percent clusters PF,
+                                  }
+                       }
+
+           SAMPLE_ID => {
+                  LANE_ID => {
+                       READ_ID => {
+                            BARCODE => {
+                                        QscoreSum  => Sum of all Q-scores,
+                                        PctLane    => Percent of lane with this tag,
+                                        YieldPF    => Yield Pass Filter,
+                                        PF         => Number of PF clusters,
+                                        mismatchCnt1 => Number of clusters with index mismatch,
+                                        AvgQ       => Average Q score,
+                                        YieldQ30   => Yield with Q>=30,
+                                        PctQ30     => Percent bases with Q>=30
+                                        TagErr     => Percent tags with an error,
+                                       }
+                                  }
+                             }
+                       }
+
+ Args    : none
+
+=cut
+
+sub resultStats{
+    my $self = shift;
+    my $fc = $self->fcId();
+
+    if(exists $self->{RESULTSTATS}->{LANEDATA} &&
+       exists $self->{RESULTSTATS}->{SAMPLEDATA}){
+	return($self->{RESULTSTATS}->{LANEDATA},$self->{RESULTSTATS}->{SAMPLEDATA});
+    }
+
+    my %laneData;
+    my %sampleData;
+    my $runInfo = $self->getRunInfo();
+    my $numLanes = $self->laneCount();
+    my $rId = 0;
+    my %nCycles; # get number of cycles and subtract 1 since the last cycle is not included in input
+    my $clusterMetrics = $self->readTileMetrics(); #These are the same for all reads
+    my @reads = @{$runInfo->{reads}};
+    foreach my $read (@reads){
+	next if($read->{index} eq 'Y');
+	$rId++; # Do not count index reads
+	$nCycles{$rId} = $read->{last} - $read->{first}; # Do not add 1 here, as the last cycle is not used
+	foreach my $lane (1..$numLanes){
+	    if(exists $clusterMetrics->{$lane}){
+		$laneData{$lane}->{$rId}->{Raw} = exists $clusterMetrics->{$lane}->{Raw} ? $clusterMetrics->{$lane}->{Raw}: 0;
+		$laneData{$lane}->{$rId}->{PF} = exists $clusterMetrics->{$lane}->{PF} ? $clusterMetrics->{$lane}->{PF} : 0;
+		$laneData{$lane}->{$rId}->{PctPF} = exists $clusterMetrics->{$lane}->{PF} && exists $clusterMetrics->{$lane}->{Raw} ?
+		  sprintf('%.1f', $clusterMetrics->{$lane}->{PF} / $clusterMetrics->{$lane}->{Raw} * 100) : 0;
+		$laneData{$lane}->{$rId}->{DensityRaw} = exists $clusterMetrics->{$lane}->{DensityRaw} ? $clusterMetrics->{$lane}->{DensityRaw} : 0;
+		$laneData{$lane}->{$rId}->{DensityPF} = exists $clusterMetrics->{$lane}->{DensityPF} ? $clusterMetrics->{$lane}->{DensityPF} : 0;
+		$laneData{$lane}->{$rId}->{ExcludedTiles} = $clusterMetrics->{$lane}->{ExcludedTiles};
+	    }else{
+		$laneData{$lane}->{$rId}->{Raw} = 0;
+		$laneData{$lane}->{$rId}->{PF} = 0;
+		$laneData{$lane}->{$rId}->{PctPF} = 0;
+		$laneData{$lane}->{$rId}->{DensityRaw} = 0;
+		$laneData{$lane}->{$rId}->{DensityPF} = 0;
+		# All tiles excluded
+		$laneData{$lane}->{$rId}->{ExcludedTiles} = $runInfo->{tiles};
+	    }
+	}
+	# Get the error rate at the last (used) cycle, using 1-based cycle numbering
+	my $errorMetrics = $self->readErrorMetrics($read->{first}+1, $read->{last}, 0);
+	# Get the error rate of excluded tiles at the last (used) cycle, using 1-based cycle numbering
+	my $errorMetricsExcl = $self->readErrorMetrics($read->{first}+1, $read->{last}, 1);
+	foreach my $lane (keys %{$errorMetrics}){
+	    $laneData{$lane}->{$rId}->{ErrRate} = sprintf('%.2f', $errorMetrics->{$lane}->{ErrRate});
+	    $laneData{$lane}->{$rId}->{ErrRateSD} = sprintf('%.2f', $errorMetrics->{$lane}->{ErrRateSD});
+	    if(exists($clusterMetrics->{$lane}) && exists($clusterMetrics->{$lane}->{ExcludedTiles})){
+		$laneData{$lane}->{$rId}->{Excluded}->{ErrRate} = sprintf('%.2f', $errorMetricsExcl->{$lane}->{ErrRate});
+		$laneData{$lane}->{$rId}->{Excluded}->{ErrRateSD} = sprintf('%.2f', $errorMetricsExcl->{$lane}->{ErrRateSD});
+	    }
+	}
+    }
+
+    my $sampleData = $self->readDemultiplexStats($self->{PATH} . '/Unaligned/Basecall_Stats_' . $fc .'/Flowcell_demux_summary.xml', \%nCycles, \%laneData);
+
+    $self->{RESULTSTATS}->{LANEDATA} = \%laneData;
+    $self->{RESULTSTATS}->{SAMPLEDATA} = $sampleData;
+#    {
+#	no warnings;
+#	Hash::Util::lock_hashref($self->{RESULTSTATS}->{LANEDATA});
+#	Hash::Util::lock_hashref($self->{RESULTSTATS}->{SAMPLEDATA});
+#    }
+    return(\%laneData,$sampleData);
+}
+
+
+
+sub readDemultiplexStats{
+    my $self = shift;
+    my $xmlDemFile = shift;
+    my $nCycles = shift;
+    my $laneData = shift;
+
+    my %sampleData;
+    my $laneDataTmp;
+
+    if(-e "$xmlDemFile.gz" && !-e $xmlDemFile){
+	system("gunzip", "$xmlDemFile.gz")==0 or die "Failed to gunzip $xmlDemFile.gz:$!\n";
+    }
+    if(-e $xmlDemFile){
+	my $summary = XMLin($xmlDemFile,ForceArray=>['Read','Lane','Sample','Tile','Barcode']) || confess "Failed to read $xmlDemFile\n";
+	foreach my $lane (@{$summary->{Lane}}){
+	    my $lid = $lane->{index};
+	    foreach my $sample (@{$lane->{Sample}}){
+		my $name = $sample->{index};
+		foreach my $barcode (@{$sample->{Barcode}}){
+		    my $tag = $barcode->{index};
+		    $tag = '' if($tag eq 'NoIndex');
+		    foreach my $tile (@{$barcode->{Tile}}){
+			foreach my $read (@{$tile->{Read}}){
+			    my $rId = $read->{index};
+			    $sampleData{$name}->{$lid}->{$rId}->{$tag}->{YieldQ30} += $read->{Pf}->{YieldQ30};
+			    $sampleData{$name}->{$lid}->{$rId}->{$tag}->{QscoreSum} += $read->{Pf}->{QualityScoreSum};
+			    $sampleData{$name}->{$lid}->{$rId}->{$tag}->{PF} += $read->{Pf}->{ClusterCount};
+			    $sampleData{$name}->{$lid}->{$rId}->{$tag}->{YieldPF} += $read->{Pf}->{Yield};
+			    $sampleData{$name}->{$lid}->{$rId}->{$tag}->{mismatchCnt1} += $read->{Pf}->{ClusterCount1MismatchBarcode};
+			    $laneDataTmp->{$lid}->{$rId}->{YieldQ30} += $read->{Pf}->{YieldQ30};
+			    $laneDataTmp->{$lid}->{$rId}->{QscoreSum} += $read->{Pf}->{QualityScoreSum};
+			}
+		    }
+		}
+	    }
+	}
+    }else{
+	confess "Failed to extract data from $xmlDemFile: file does not exist\n";
+    }
+
+    # Calculate per lane metrics
+    foreach my $lid (keys %{$laneDataTmp}){
+	foreach my $rId (keys %{$laneDataTmp->{$lid}}){
+	    my $lane = $laneDataTmp->{$lid};
+	    if(exists $laneData->{$lid}){
+		$lane->{$rId}->{YieldPF} = exists($laneData->{$lid}->{$rId}->{PF}) ? $laneData->{$lid}->{$rId}->{PF} * $nCycles->{$rId} : 0;
+		$lane->{$rId}->{PctQ30} = exists($lane->{$rId}->{YieldQ30}) && exists($lane->{$rId}->{YieldPF}) && $lane->{$rId}->{YieldPF} > 0 ?
+		  $lane->{$rId}->{YieldQ30} / $lane->{$rId}->{YieldPF} : 0;
+		$lane->{$rId}->{AvgQ} = exists($lane->{$rId}->{QscoreSum}) && exists($lane->{$rId}->{YieldPF}) && $lane->{$rId}->{YieldPF} > 0 ?
+		  $lane->{$rId}->{QscoreSum} / $lane->{$rId}->{YieldPF} : 0;
+	    }else{
+		$lane->{$rId}->{YieldQ30} = 0;
+		$lane->{$rId}->{QscoreSum} = 0;
+		$lane->{$rId}->{YieldQPF} = 0;
+		$lane->{$rId}->{PctQ30} = 0;
+		$lane->{$rId}->{AvgQ} = 0;
+	    }
+	}
+    }
+
+    # And some more per sample metrics
+    foreach my $name (keys %sampleData){
+        foreach my $lid (keys %{$sampleData{$name}}){
+            foreach my $rId (keys %{$sampleData{$name}->{$lid}}){
+                foreach my $tag (keys %{$sampleData{$name}->{$lid}->{$rId}}){
+		    if(exists $sampleData{$name}->{$lid}->{$rId}->{$tag}->{PF} &&
+		       $sampleData{$name}->{$lid}->{$rId}->{$tag}->{PF} > 0){
+
+			$sampleData{$name}->{$lid}->{$rId}->{$tag}->{TagErr} =
+			  $sampleData{$name}->{$lid}->{$rId}->{$tag}->{mismatchCnt1} /
+			    $sampleData{$name}->{$lid}->{$rId}->{$tag}->{PF}*100;
+
+			$sampleData{$name}->{$lid}->{$rId}->{$tag}->{PctLane} =
+			  $sampleData{$name}->{$lid}->{$rId}->{$tag}->{PF} /
+			    $laneData->{$lid}->{$rId}->{PF} * 100;
+		    }
+		    if(exists $sampleData{$name}->{$lid}->{$rId}->{$tag}->{YieldPF} &&
+		       $sampleData{$name}->{$lid}->{$rId}->{$tag}->{YieldPF} > 0){
+
+			$sampleData{$name}->{$lid}->{$rId}->{$tag}->{AvgQ} =
+			  $sampleData{$name}->{$lid}->{$rId}->{$tag}->{QscoreSum} /
+			    $sampleData{$name}->{$lid}->{$rId}->{$tag}->{YieldPF};
+
+			$sampleData{$name}->{$lid}->{$rId}->{$tag}->{PctQ30} =
+			  $sampleData{$name}->{$lid}->{$rId}->{$tag}->{YieldQ30} /
+			    $sampleData{$name}->{$lid}->{$rId}->{$tag}->{YieldPF} * 100;
+		    }
+		}
+	    }
+	}
+    }
+
+
+    # Set sample info for failed lanes
+    my $sampleSheet = $self->readSampleSheet();
+    foreach my $proj (keys %{$sampleSheet}){
+	foreach my $lid (keys %{$sampleSheet->{$proj}}){
+	    foreach my $tag (keys %{$sampleSheet->{$proj}->{$lid}}){
+		my $name = $sampleSheet->{$proj}->{$lid}->{$tag}->{SampleID};
+		unless(exists $sampleData{$name}->{$lid}){
+		    foreach my $rId (keys %{$laneData->{$lid}}){
+			$sampleData{$name}->{$lid}->{$rId}->{$tag}->{YieldQ30} = 0;
+			$sampleData{$name}->{$lid}->{$rId}->{$tag}->{QscoreSum} = 0;
+			$sampleData{$name}->{$lid}->{$rId}->{$tag}->{PF} = 0;
+			$sampleData{$name}->{$lid}->{$rId}->{$tag}->{YieldPF} = 0;
+			$sampleData{$name}->{$lid}->{$rId}->{$tag}->{mismatchCnt1} = 0;
+			$sampleData{$name}->{$lid}->{$rId}->{$tag}->{TagErr} = 0;
+			$sampleData{$name}->{$lid}->{$rId}->{$tag}->{PctLane} = 0;
+			$sampleData{$name}->{$lid}->{$rId}->{$tag}->{AvgQ} = 0;
+			$sampleData{$name}->{$lid}->{$rId}->{$tag}->{PctQ30} = 0;
+		    }
+		}
+	    }
+	}
+    }
+
+
+
+
+
+
+
+    # Copy data from $laneDataTmp to $laneData
+    foreach my $lane (keys %{$laneDataTmp}){
+	foreach my $rId (keys %{$laneDataTmp->{$lane}}){
+	    foreach my $key (keys %{$laneDataTmp->{$lane}->{$rId}}){
+		$laneData->{$lane}->{$rId}->{$key} = $laneDataTmp->{$lane}->{$rId}->{$key};
+	    }
+	}
+   }
+
+    return \%sampleData;
+}
+
+=pod
+
+=head2 readTileMetrics()
+
+ Title   : readTileMetrics()
+ Usage   : readTileMetrics(bool $excludedOnly)
+ Function: Reads the tile metrics (clusters) from InterOp/TileMetricsOut.bin.
+           If excludedOnly is set, then only include excluded tiles in the metrics.
+ Example :
+ Returns : A hash ref with the lane as key, and hashrefs with the following keys as value
+   Raw - Number of raw
+   PF  - Number of pass filter clusters
+   DensityRaw - Mean raw tile density (clusters/mm2)
+   DensityPF - Mean pass filter density (clusters/mm2)
+   TileData - Hash ref with per tile values with keys Density, DensityPF, Raw, PF, Aligned
+              Where the value of Aligned is a hash ref with the percent aligned reads of the
+              tile as value and the read number as key
+ Args    : none
+
+ File formats according to RTA theory of operation (RTA 1.12) Pub. No. 770-2009-020, current as of 9 May 11
+
+=cut
+
+sub readTileMetrics{
+    my $self = shift;
+    my $excludedOnly = shift || 0;
+    my $rfPath = $self->{PATH};
+    my $interOp="$rfPath/InterOp";
+
+    # Return cached version if it exists
+    return $self->{TILEMETRICS}->{$excludedOnly} if(defined $self->{TILEMETRICS}->{$excludedOnly});
+
+    my $excludedTiles = $self->excludedTiles();
+
+    print STDERR "Reading data from $interOp/TileMetricsOut.bin\n" if($self->{DEBUG});
+    my $tmfh;
+    if(-e "$interOp/TileMetricsOut.bin" ){
+	open($tmfh, "$interOp/TileMetricsOut.bin") or croak "Failed to open TileMetricsOut.bin";
+    }elsif(-e "$interOp/TileMetricsOut.bin.gz"){
+	open($tmfh, '-|', "zcat $interOp/TileMetricsOut.bin") or croak "Failed to open TileMetricsOut.bin.gz";
+    }else{
+	confess "Failed to find $interOp/TileMetricsOut.bin";
+    }
+
+    binmode($tmfh);
+    my $buf;
+
+    # Read and check file format version
+    read($tmfh, $buf, 1);
+    print STDERR "Format version: " . unpack('C',$buf) . "\n" if($self->{DEBUG});
+    confess "Unexpected file version of TileMetricsOut.bin" unless( unpack('C',$buf)==2 );
+
+    # Get the record length
+    read($tmfh, $buf, 1);
+    my $rlen = unpack('C', $buf);
+    print STDERR "Record length: $rlen\n" if($self->{DEBUG});
+    confess "Unexpected record length in TileMetricsOut.bin" unless( $rlen==10 );
+
+    # Iterate over each record
+    my %tileMetrics;
+    my %laneMetrics;
+    while(read($tmfh,$buf,$rlen)){
+	my($lane,$tile,$code,$val) = unpack('SSSf',$buf);
+	print STDERR "Lane: $lane\n" if($self->{DEBUG});
+	print STDERR "Tile: $tile\n" if($self->{DEBUG});
+	if(! $excludedOnly && exists $excludedTiles->{$lane}->{$tile}){
+	    print STDERR "Tile $lane $tile excluded\n" if($self->{DEBUG});
+	    next;
+	}elsif($excludedOnly && ! exists $excludedTiles->{$lane}->{$tile}){
+	    print STDERR "Tile $lane $tile included\n" if($self->{DEBUG});
+	    next;
+	}
+
+	print STDERR "Code: $code\n" if($self->{DEBUG});
+	print STDERR "Val: $val\n" if($self->{DEBUG});
+	if($code==100){ # Tile denstiy raw
+	    $tileMetrics{$lane}->{Density}->{$tile} = $val;
+	}elsif($code==101){# Tile density PF
+	    $tileMetrics{$lane}->{DensityPF}->{$tile} = $val;
+	}elsif($code==102){ # Tile clusters raw
+	    $laneMetrics{$lane}->{Raw} += $val;
+	    $tileMetrics{$lane}->{Raw}->{$tile} = $val;
+	}elsif($code==103){# Tile clusters PF
+	    $laneMetrics{$lane}->{PF} += $val;
+	    $tileMetrics{$lane}->{PF}->{$tile} = $val;
+	}elsif($code>=300 && $code<400){ # Tile % aligned for read N
+	    $tileMetrics{$lane}->{Aligned}->{$tile}->{$code-299} = $val;
+	}
+    }
+    close($tmfh);
+    foreach my $lane (keys %laneMetrics){
+	$laneMetrics{$lane}->{DensityRaw} = $self->mean(values %{$tileMetrics{$lane}->{Density}});
+	$laneMetrics{$lane}->{DensityPF} = $self->mean(values %{$tileMetrics{$lane}->{DensityPF}});
+	$laneMetrics{$lane}->{TileData} = $tileMetrics{$lane};
+	unless($excludedOnly){
+	    $laneMetrics{$lane}->{ExcludedTiles} = (defined $excludedTiles->{$lane} && keys %{$excludedTiles->{$lane}} > 0 ) ?
+	      scalar( keys %{$excludedTiles->{$lane}} ) - 2 : 0; # Two keys are for metadata
+	}
+    }
+
+    $self->{TILEMETRICS}->{$excludedOnly} = \%laneMetrics;
+#    {
+#	no warnings;
+#	Hash::Util::lock_hashref($self->{TILEMETRICS}->{$excludedOnly});
+#    }
+    return $self->{TILEMETRICS}->{$excludedOnly};
+}
+
+
+=pod
+
+=head2 readErrorMetrics()
+
+ Title   : readErrorMetrics()
+ Usage   : readErrorMetrics($first,$last)
+ Function: Reads the error metrics from InterOp/ErrorMetricsOut.bin and calculates the lane mean and average
+ Example :
+ Returns : A hash ref with the lane as key, and hashrefs with the following keys as value
+   ErrorRate - Mean Error rate over all tiles from the first to the last cycle
+   ErrorRateSD - Standard Dev of error rate over all tiles from the first to the last cycle
+ Args    : none
+
+=cut
+
+sub readErrorMetrics{
+    my $self = shift;
+    my $first = shift;
+    my $last = shift;
+    my $excludedOnly = shift || 0;
+
+    my $errMetrics = $self->readRawErrorMetrics($first,$last);
+    my $excludedTiles = $self->excludedTiles();
+    my %filteredMetrics;
+    my %metrics;
+
+    foreach my $lane (keys %{$errMetrics}){
+	# Now calculate errors over aligned for each tile
+	foreach my $tile (keys %{$errMetrics->{$lane}}){
+	    if(! $excludedOnly && exists $excludedTiles->{$lane}->{$tile}){
+		next;
+	    }elsif($excludedOnly && ! exists $excludedTiles->{$lane}->{$tile}){
+		next;
+	    }
+	    $filteredMetrics{$lane}->{$tile} = $errMetrics->{$lane}->{$tile};
+	}
+
+	# And finally calculate tile mean and stddev
+	$metrics{$lane}->{ErrRate} = $self->mean(grep {$_<100} values %{$filteredMetrics{$lane}});
+	$metrics{$lane}->{ErrRateSD} = $self->stddev(grep {$_<100} values %{$filteredMetrics{$lane}});
+    }
+    return \%metrics;
+}
+
+
+=pod
+
+=head2 readRawErrorMetrics()
+
+ Title   : readRawErrorMetrics()
+ Usage   : readRawErrorMetrics($first,$last)
+ Function: Reads the error metrics from InterOp/ErrorMetricsOut.bin
+ Example :
+ Returns : A hash ref with the following structure
+           $errMetrics->{$lane}->{$tile} = number of errors / number aligned
+ Args    : first and last cycle in the read to calculate the error for
+
+ File formats according to RTA theory of operation (RTA 1.12) Pub. No. 770-2009-020, current as of 9 May 11
+
+=cut
+
+sub readRawErrorMetrics{
+    my $self = shift;
+    my $first = shift;
+    my $last = shift;
+    my $rfPath = $self->{PATH};
+    my $interOp="$rfPath/InterOp";
+    my $read = $self->cycleToRead($first);
+    unless($read == $self->cycleToRead($last)){
+	confess "Cycles $first and $last belong to different reads!";
+    }
+
+    if(exists $self->{RAW_ERROR_METRICS}->{$first}->{$last}){
+	return $self->{RAW_ERROR_METRICS}->{$first}->{$last};
+    }
+
+    my $tileMetrics = $self->readTileMetrics();
+    my $tileMetricsEx = $self->readTileMetrics(1);
+    my %metrics;
+
+    print STDERR "Reading data from $interOp/ErrorMetricsOut.bin\n" if($self->{DEBUG});
+    my $fh;
+    if(-e "$interOp/ErrorMetricsOut.bin" ){
+	open($fh, "$interOp/ErrorMetricsOut.bin") or croak "Failed to open ErrorMetricsOut.bin";
+    }elsif(-e "$interOp/ErrorMetricsOut.bin.gz"){
+	open($fh, '-|', "zcat $interOp/ErrorMetricsOut.bin") or croak "Failed to open ErrorMetricsOut.bin.gz";
+    }else{
+	# A run can be done without phiX
+	carp "Failed to find $interOp/ErrorMetricsOut.bin";
+	return \%metrics;
+    }
+
+    binmode($fh);
+    my $buf;
+
+    # Read and check file format version
+    read($fh, $buf, 1);
+    print STDERR "Format version: " . unpack('C',$buf) . "\n" if($self->{DEBUG});
+    confess "Unexpected file version of ErrorMetricsOut.bin" unless( unpack('C',$buf)==3 );
+
+    # Get the record length
+    read($fh, $buf, 1);
+    my $rlen = unpack('C', $buf);
+    print STDERR "Record length: $rlen\n" if($self->{DEBUG});
+    confess "Unexpected record length in TileMetricsOut.bin" unless( $rlen==30 );
+
+    # Iterate over each record
+    my %errMetrics;
+    while(read($fh,$buf,$rlen)){
+	# We only use the error rate now, but parse the rest if we need it in the future
+	my($lane,$tile,$cycle,$err,$nPerf,$n1err,$n2err,$n3err,$n4err) = unpack('SSSfLLLLL',$buf);
+
+	print STDERR "Lane: $lane\n" if($self->{DEBUG});
+	print STDERR "Tile: $tile\n" if($self->{DEBUG});
+	print STDERR "Cycle: $cycle\n" if($self->{DEBUG});
+	print STDERR "Err: $err\n" if($self->{DEBUG});
+#	print STDERR "nPerf: $nPerf\n" if($self->{DEBUG});
+#	print STDERR "n1err: $n1err\n" if($self->{DEBUG});
+#	print STDERR "n2err: $n2err\n" if($self->{DEBUG});
+#	print STDERR "n3err: $n3err\n" if($self->{DEBUG});
+#	print STDERR "n4err: $n4err\n" if($self->{DEBUG});
+
+	# The error rate is defined as the number of errors/number of aligned bases
+	# So we have to sum up all errors from first to last cycle,
+	# and the total number of aligned bases in the same cycles
+
+	# Only look at data for the requested cycles
+	if($cycle >= $first && $cycle <= $last){
+	    # Get number of aligned clusters
+	    my $n;
+	    if(exists($tileMetrics->{$lane}) && exists($tileMetrics->{$lane}->{TileData}->{PF}->{$tile})){
+		$n = $tileMetrics->{$lane}->{TileData}->{PF}->{$tile} *
+		  $tileMetrics->{$lane}->{TileData}->{Aligned}->{$tile}->{$read}/100;
+	    }elsif(exists($tileMetricsEx->{$lane}) && exists($tileMetricsEx->{$lane}->{TileData}->{PF}->{$tile})){
+		$n = $tileMetricsEx->{$lane}->{TileData}->{PF}->{$tile} *
+		  $tileMetricsEx->{$lane}->{TileData}->{Aligned}->{$tile}->{$read}/100;
+	    }
+	    # Sum errors over all cycles for each tile
+	    $errMetrics{$lane}->{ERRORS}->{$tile} += $err*$n;
+	    # Sum total number of aligned bases
+	    $errMetrics{$lane}->{ALIGNED}->{$tile} += $n;
+	}
+    }
+    close($fh);
+
+    # Now we can divide the number of errors with the number of aligned bases
+    my %errors;
+    my $runInfo = $self->getRunInfo() || croak "Failed to read RunInfo.xml\n";
+
+    # As only tiles with aligned phiX is represented, some tiles will be missing if the
+    # error is too high.
+    # We cannot discriminate lanes without phiX from lanes with too high error, but a
+    # lane without any aligned read is unlikely
+    # Lanes without phiX should not be a key in the errMetrics, so there should be
+    # no risk with setting a very high error on tiles without phiX
+    foreach my $lane (keys %errMetrics){
+	foreach my $tile (keys %{$errMetrics{$lane}->{ERRORS}}){
+	    my $flowcellLayot = $runInfo->{xml}->{Run}->{FlowcellLayout};
+	    for(my $surf=1; $surf<=$flowcellLayot->{SurfaceCount}; $surf++){
+		for(my $swath=1; $swath<=$flowcellLayot->{SwathCount}; $swath++){
+		    for(my $t=1; $t<=$flowcellLayot->{TileCount}; $t++){
+			my $tile = sprintf("$surf$swath%02d", $t);
+			if(exists $errMetrics{$lane}->{ERRORS}->{$tile} && exists $errMetrics{$lane}->{ALIGNED}->{$tile}){
+			    $errors{$lane}->{$tile} = $errMetrics{$lane}->{ERRORS}->{$tile} / $errMetrics{$lane}->{ALIGNED}->{$tile};
+			}else{
+			    $errors{$lane}->{$tile} = 100;
+			}
+		    }
+		}
+	    }
+	}
+    }
+    $self->{RAW_ERROR_METRICS}->{$first}->{$last} = \%errors;
+    return \%errors;
+}
+
+=pod
+
+=head2 mkpath()
+
+ Title   : mkpath()
+ Usage   : mkpath($path,$mode)
+ Function: Creates a directory, with parents
+ Example :
+ Returns : True on success
+ Args    : A path to create and optionally permissions (as used in the system call mkdir), permissions defaults to the system default.
+
+=cut
+
+sub mkpath{
+    my($self,$mode,$path);
+    if(ref($_[0]) =~ m/Sisyphus::Common/){
+	$self = shift;
+    }
+    $path = shift;
+    $mode = shift if(@_);
+    unless($path=~m:^/:){
+	$path = cwd() . "/$path";
+    }
+#    print STDERR "Creating path $path\n";
+    my $retval = 1;
+    if($mode){
+	my $parent = '/';
+	foreach my $dir (split '/', $path){
+	    next if(length($dir)<1);
+	    unless(-e "$parent$dir"){
+#		print STDERR "mkdir $parent$dir\n";
+		$retval = system('mkdir', '-m', $mode, "$parent$dir");
+		if($retval != 0){
+		    carp "Failed to create dir '$parent$dir' with mode mode $mode: $!\n";
+		}
+	    }
+	    $parent .= "$dir/";
+	}
+    }else{
+	$retval = system('mkdir', '-p', $path);
+	if($retval != 0){
+	    croak "Failed to create dir '$path': $!\n";
+	}
+    }
+    if($retval==0){
+	return 1;
+    }
+    return 0;
+}
+
+
+=pod
+
+=head2 fixSampleSheet()
+
+ Title   : fixSampleSheet()
+ Usage   : $sisyphus->fixSampleSheet($path)
+ Function: Fixes common problems in the sample sheet and warns about errors. Also converts MiSeq samplesheet to the format expected by CASAVA.
+ Example :
+ Returns : True if sample sheet is OK.
+ Args    : Sample sheet path
+
+=cut
+
+sub fixSampleSheet{
+    my $self = shift;
+    my $sampleSheet = shift || $self->PATH . '/SampleSheet.csv';
+
+    unless(-e $sampleSheet){
+	print STDERR "SampleSheet '$sampleSheet' does not exist\n";
+	return 0;
+    }
+
+    # What type of run is this
+    my $type = $self->machineType;
+
+    my $output;
+
+    # Check that the SampleSheet contains info about the correct flowcell
+    # and that no tag is present more than once in each lane
+    my $rfPath = $self->PATH;
+    my $fcId = $self->fcId();
+    my $ok = 1;
+    my $l=0;
+    my %lanes;
+    open(my $ssfh, $sampleSheet);
+    my $test = <$ssfh>;
+    seek($ssfh,0,0); # Rewind filehandle again
+
+    if($test =~ m/^FCID/){
+	# Sample sheet already in hiseq format
+	$type = 'hiseq';
+    }
+
+    if($type eq 'hiseq'){
+	while(<$ssfh>){
+	    chomp;
+	    $l++;
+	    # Clean up empty rows and carrige return
+	    next unless(m/\w/);
+	    s/[\s\r\n]//g; # Remove any whitespaces (incl newline)
+	    $_ .= "\n"; # Add proper newline
+	    if(m/^FCID/ && $l==1){ # Skip header
+		$output .= $_;
+	    }elsif(m/^#/){ # Skip comments
+		$output .= $_; # or should we rather delete them?
+	    }else{
+		my @r = split /,/, $_;
+		# remove unallowed characters from sample name
+		$r[2] =~ s/[\?\(\)\[\]\/\\\=\+\<\>\:\;\"\'\,\*\^\|\&\.]/_/g;
+		if($r[0] !~ m/^$fcId$/){
+		    print STDERR "Flowcell mismatch at line $l (expected '$fcId', got '$r[0]')\n";
+		    $ok=0;
+		}
+		$output .= join ',', @r;
+		$lanes{$r[1]}->{$r[4]}++;
+	    }
+	}
+	close($ssfh);
+    }elsif($type eq 'miseq'){
+	my $dataStart=0;
+	my $projName='MiSeq';
+	my @header;
+	while(<$ssfh>){
+	    chomp;
+	    if(m/^Project Name,([^,]*),?/){
+		$projName=$1;
+	    }
+	    if(m/^\[Data\]/){
+		$dataStart = 1;
+		@header = split /,/, <$ssfh>;
+		# expected MiSeq header
+		#Sample_ID,Sample_Name,Sample_Plate,Sample_Well,Sample_Project,index,I7_Index_ID,Description,GenomeFolder
+
+
+
+                #Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description,Manifest,GenomeFolder
+		# Check that the columns we want to use are the ones we expect
+
+		foreach my $head (qw(Sample_ID Sample_Project index Description)){
+		    unless(grep /^$head$/, @header){
+			croak "Missing column header '$head' in SampleSheet\n";
+		    }
+		}
+		# Add the Casava compatible header to output
+		$output = "FCID,Lane,SampleID,SampleRef,Index,Description,Control,Recipe,Operator,SampleProject\n";
+		next;
+	    }
+	    next unless($dataStart);
+	    my %vals;
+	    @vals{@header} = split /,/, $_;
+	    $vals{Sample_Project} = $projName unless(defined $vals{Sample_Project} && length($vals{Sample_Project})>0);
+	    # remove unallowed characters from sample name
+	    $vals{Sample_ID} =~ s/[\?\(\)\[\]\/\\\=\+\<\>\:\;\"\'\,\*\^\|\&\.]/_/g;
+
+	    if(exists $vals{index2} && defined $vals{index2}){
+		$output .= join(',', ($fcId,1,$vals{Sample_ID},'',"$vals{index}-$vals{index2}",$vals{Description},'','','',$vals{Sample_Project})) . "\n";
+		$lanes{1}->{"$vals{index}-$vals{index2}"}++;
+	    }else{
+		$output .= join(',', ($fcId,1,$vals{Sample_ID},'',$vals{index},$vals{Description},'','','',$vals{Sample_Project})) . "\n";
+		$lanes{1}->{$vals{index}}++;
+	    }
+	}
+    }else{
+	croak "Unknown instrument type";
+    }
+
+    foreach my $lane (keys %lanes){
+	foreach my $tag (keys %{$lanes{$lane}}){
+	    if($lanes{$lane}->{$tag} > 1){
+		print STDERR "Tag $tag has multiple entries for lane $lane\n";
+		$ok = 0;
+	    }
+	}
+    }
+    # Replace the old sample sheet with a fixed up version if all tests passed
+    if($ok){
+	my $i = 1;
+	while(-e "$sampleSheet.org.$i"){
+	    $i++;
+	}
+	rename($sampleSheet, "$sampleSheet.org.$i") or die "Failed to move $sampleSheet to $sampleSheet.org.$i";
+	open(my $fhOut, '>', $sampleSheet) or die "Failed to create new samplesheet in $sampleSheet\n";
+	print $fhOut $output;
+	close($fhOut);
+    }
+    return($ok);
+}
+
+
+=pod
+
+=head2 fcId()
+
+ Title   : fcId()
+ Usage   : $sisyphus->fcId
+ Function: Returns the flowcell ID of the run
+ Example :
+ Returns : Flowcell ID
+ Args    : none
+
+=cut
+
+sub fcId{
+    my $self = shift;
+    my $runInfo = $self->getRunInfo();
+    return $runInfo->{xml}->{Run}->{Flowcell};
+}
+
+=pod
+
+=head2 laneCount()
+
+ Title   : laneCount()
+ Usage   : $sisyphus->laneCount
+ Function: Returns the number of lanes in the run
+ Example :
+ Returns : number of lanes
+ Args    : none
+
+=cut
+
+sub laneCount{
+    my $self = shift;
+    my $runInfo = $self->getRunInfo();
+    my $runParams = $self->runParameters();
+    my $numLanes = 8; # Default to 8
+    if(exists $runParams->{Setup}->{NumLanes}){
+	# This works on MiSeq
+	$numLanes = $runParams->{Setup}->{NumLanes};
+    }elsif(exists $runInfo->{xml}->{Run}->{FlowcellLayout}->{LaneCount}){
+	# And this on HiSeq2000
+	$numLanes = $runInfo->{xml}->{Run}->{FlowcellLayout}->{LaneCount};
+    }
+    return $numLanes
+}
+
+=pod
+
+=head2 machineType()
+
+ Title   : machineType()
+ Usage   : $sisyphus->machineType
+ Function: Returns the machine type used for the run
+ Example :
+ Returns : miseq or hiseq
+ Args    : none
+
+=cut
+
+sub machineType{
+    my $self = shift;
+    my $type = "hiseq"; # Default to hiseq
+    my $runParams = $self->runParameters();
+    if($runParams->{Setup}->{ApplicationName} =~ m/miseq/i){
+	$type = "miseq";
+    }
+    return $type;
+}
+
+=pod
+
+=head2 cycleToRead()
+
+ Title   : cycleToRead()
+ Usage   : $sisyphus->cycleToRead($cycle)
+ Function: Returns the read number of $cycle
+ Example :
+ Returns : 1 based read number
+ Args    : a cycle number
+
+=cut
+
+sub cycleToRead{
+    my $self = shift;
+    my $cycle = shift;
+    $cycle--; # Adjust to zero based
+    my $runInfo = $self->getRunInfo();
+    foreach my $read (@{$runInfo->{reads}}){
+	return( $read->{id} ) if($cycle >= $read->{first} && $cycle<=$read->{last});
+    }
+    confess "Failed to determine read number for cycle $cycle";
+}
+
+=pod
+
+=head2 positionsFormat()
+
+ Title   : positionsFormat
+ Usage   : $sisyphus->positionsFormat()
+ Function: Returns the positions format used in the runfolder
+ Example :
+ Returns : .locs, .clocs or .pos.txt
+ Args    : none
+
+=cut
+
+sub positionsFormat{
+    my $self = shift;
+    my $rfPath = $self->{PATH};
+    # Force glob into list context using a funny reference/dereference structure
+    if( @{[glob "$rfPath/Data/Intensities/*/*.clocs"]} > 0){
+	return '.clocs';
+    }
+    if( @{[glob "$rfPath/Data/Intensities/*/*.locs"]} > 0){
+	return '.locs';
+    }
+    if( @{[glob "$rfPath/Data/Intensities/*/*.pos.txt"]} > 0){
+	return '.pos.txt';
+    }
+    croak "Failed to determine positions format\n";
+}
+
+
+=head2 excludeTiles()
+
+ Title   : excludeTiles()
+ Usage   : $sisyphus->excludeTiles()
+ Function: Identify tiles with too high error
+ Example :
+ Returns : A two dimensional hashref with excluded tiles, lane as fist key and tile as second key
+ Args    : none
+
+=cut
+
+sub excludeTiles{
+    my $self = shift;
+    my $rfPath = $self->{PATH};
+
+    my $exFile = "$rfPath/excludedTiles.yml";
+    if(-e $exFile){
+	my $i = 1;
+	while(-e "$exFile.$i"){
+	    $i++;
+	}
+	system('mv', $exFile, "$exFile.$i")==0 or croak "Failed to rename existing $exFile to $exFile.$i\n";
+    }
+
+    my %excluded;
+    my $runInfo = $self->getRunInfo();
+    my $rId = 0;
+
+    my $config = $self->readConfig;
+    my $laneLimit = defined($config->{MAX_LANE_ERROR}) ? $config->{MAX_LANE_ERROR} : 2;
+    my $tileLimit = defined($config->{MAX_TILE_ERROR}) ? $config->{MAX_TILE_ERROR} : 2.5;
+
+    my $rawErrMetrics;
+    # First identify any lanes where any of the reads has an error > 2%
+    my %failedLanes;
+    my @reads = @{$runInfo->{reads}};
+    foreach my $read (@reads){
+	next if($read->{index} eq 'Y');
+	$rId++; # Do not count index reads
+	# Get the error rate at the last (used) cycle, using 1-based cycle numbering
+	my $errMetrics = $self->readErrorMetrics($read->{first}+1, $read->{last}, 0);
+	$rawErrMetrics->{$rId} = $self->readRawErrorMetrics($read->{first}+1, $read->{last});
+	foreach my $lane (keys %{$errMetrics}){
+	    if($errMetrics->{$lane}->{ErrRate} > $laneLimit){
+		push @{$failedLanes{$lane}}, $rId;
+	    }
+	}
+    }
+
+    # First exclude tiles with an error > 2.5%
+    foreach my $lane (keys %failedLanes){
+	foreach my $rId (@{$failedLanes{$lane}}){
+	    foreach my $tile (keys %{$rawErrMetrics->{$rId}->{$lane}}){
+		if($rawErrMetrics->{$rId}->{$lane}->{$tile} > $tileLimit){
+		    $excluded{$lane}->{$tile}->{$rId} = $rawErrMetrics->{$rId}->{$lane}->{$tile};
+		}
+	    }
+	}
+    }
+
+    # Then exclude the tile with most error until the mean tile error is < 2%
+    foreach my $lane (keys %failedLanes){
+	foreach my $rId (@{$failedLanes{$lane}}){
+	    my @included = grep { ! exists($excluded{$lane}->{$_}) } keys %{$rawErrMetrics->{$rId}->{$lane}};
+	    while(@included > 0 && $self->mean(@{$rawErrMetrics->{$rId}->{$lane}}{@included}) > $laneLimit){
+		my @tiles = sort( {$rawErrMetrics->{$rId}->{$lane}->{$b} <=> $rawErrMetrics->{$rId}->{$lane}->{$a} } @included );
+		$excluded{$lane}->{$tiles[0]}->{$rId} = $rawErrMetrics->{$rId}->{$lane}->{$tiles[0]};
+		@included = grep { ! exists($excluded{$lane}->{$_}) } keys %{$rawErrMetrics->{$rId}->{$lane}};
+	    }
+	    $excluded{$lane}->{BEFORE}->{$rId} = $self->mean(grep {$_<100} values %{$rawErrMetrics->{$rId}->{$lane}});
+	    $excluded{$lane}->{AFTER}->{$rId} = $self->mean(grep {$_<100} @{$rawErrMetrics->{$rId}->{$lane}}{@included});
+	}
+    }
+
+    YAML::Tiny::DumpFile("$rfPath/excludedTiles.yml", \%excluded) || confess "Failed to write '$rfPath/excludedTiles.yml'\n";
+    return \%excluded;
+}
+
+=head2 excludedTiles()
+
+ Title   : excludedTiles()
+ Usage   : $sisyphus->excludedTiles()
+ Function: List tiles with too high error. Reads the info from excludedTiles.yml in the runfolder.
+           If the file does not exist, returns an empty hashref.
+           The file excludedTiles.yml is created by excludeTiles()
+ Example :
+ Returns : A two dimensional hashref with excluded tiles, lane as fist key and tile as second key
+ Args    : none
+
+=cut
+
+sub excludedTiles{
+    my $self = shift;
+    my $rfPath = $self->{PATH};
+    my $excluded = {};
+    if(-e "$rfPath/excludedTiles.yml.gz"){
+	system('gunzip' , '-N',  "$rfPath/excludedTiles.yml.gz");
+    }
+    if(-e "$rfPath/excludedTiles.yml"){
+	$excluded = YAML::Tiny::LoadFile("$rfPath/excludedTiles.yml") || confess "Failed to read '$rfPath/excludedTiles.yml'\n";
+    }
+    return $excluded;
+}
+
+=pod
+
+=head2 mean()
+
+ Title   : mean()
+ Usage   : $sisyphus->mean(@values)
+ Function: Returns the mean value of @values, or zero if list is empty
+ Example :
+ Returns : mean value
+ Args    : Values to take mean of
+
+=cut
+
+sub mean{
+    my $self = shift;
+    return 0 if(@_ == 0);
+    my $sum=0;
+    my $n=0;
+    foreach my $v (@_){
+	$sum += $v;
+	$n++;
+    }
+    return($sum/$n);
+}
+
+=pod
+
+=head2 stddev()
+
+ Title   : stddev()
+ Usage   : $sisyphus->stddev(@values)
+ Function: Returns the standard deviation of @values or zero if list is empty
+ Example :
+ Returns : standard deviation
+ Args    : Array of values
+
+=cut
+
+sub stddev{
+    my $self = shift;
+    return 0 if(@_ == 0);
+    my $mean = $self->mean(@_);
+    my $sum=0;
+    my $n=-1;
+    foreach my $v (@_){
+	$sum += ($v-$mean)**2;
+	$n++;
+    }
+    if($n>0){
+	return( sqrt($sum/$n) );
+    }
+    return 0;
+}
+
+=pod
+
+=head2 excludeLane()
+
+ Title   : excludeLane()
+ Usage   : $sisyphus->excludeLane($lane)
+ Function: Excludes a lane from delivery by adding it to the excluded lanes in the configuration
+ Example :
+ Returns : nothing
+ Args    : a lane number
+
+=cut
+
+sub excludeLane{
+    my $self = shift;
+    my $lane = shift;
+
+    my $config = $self->readConfig();
+    if( defined $config->{SKIP_LANES} ){
+	unless(grep {$_==$lane} @{$config->{SKIP_LANES}} ){
+	    open(my $confh, '+<', $self->PATH . '/sisyphus.yml') or die "Failed to open " . $self->PATH . "/sisyphus.yml\n";
+#	    local $/=undef;
+#	    my $confTxt = <$confh>;
+#	    $confTxt =~ s/^SKIP_LANES:$/SKIP_LANES:\n - $lane/m;
+	    my $confTxt;
+	    my $skipLanes = '';
+	    my $flag = 0;
+	    while(<$confh>){
+		if($flag && (m/^#/||m/^\s*$/)){
+		    $flag = 0;
+		}elsif(m/^SKIP_LANES:/ || $flag){
+		    if($flag){
+			s/^\s+/ /;
+		    }else{
+			$confTxt .= "SKIP_LANES_HERE\n";
+			$flag = 1;
+		    }
+		    $skipLanes .= $_;
+		}
+		$confTxt .= $_ unless($flag);
+	    }
+	    $skipLanes .= " - $lane\n";
+	    $confTxt =~ s/^SKIP_LANES_HERE$/$skipLanes/m;
+	    seek($confh,0,0);
+	    print $confh $confTxt;
+	    close($confh);
+	}
+    }else{
+	open(my $confh, '>>', $self->PATH . '/sisyphus.yml') or die "Failed to open " . $self->PATH . "/sisyphus.yml\n";
+	print $confh "SKIP_LANES:\n - $lane\n";
+	close($confh);
+    }
+}
+
+
+
+1;
