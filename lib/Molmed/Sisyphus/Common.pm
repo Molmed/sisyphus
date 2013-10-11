@@ -1146,11 +1146,7 @@ sub createReadMask{
     my @reads = $self->reads();
     foreach my $read (@reads){
 	if($read->{index} eq 'Y'){
-	    if($self->machineType eq 'miseq'){
-		push @readMask, 'I*';
-	    }else{
-		push @readMask, 'I*n';
-	    }
+	    push @readMask, 'I*';
 	}else{
 	    push @readMask, 'Y*n';
 	}

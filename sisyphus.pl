@@ -132,6 +132,7 @@ my $sHost = "localhost";
 my $sPath = dirname($rfPath) . '/summaries';
 my $uProj = "a2009002";
 my $fastqPath = undef;
+my $mismatches = '1:1:1:1:1:1:1:1';
 
 # Read the sisyphus configuration and override the defaults
 my $config = $sisyphus->readConfig();
@@ -320,9 +321,20 @@ cd $rfPath
 check_errs \$? "Failed to cd to $rfPath"
 
 echo "Setting up demultiplexing"
-# --mismatches 1 applies to all index reads,
-# setting it to 1,1 will fail if there is only one index read
-configureBclToFastq.pl --input-dir '$rfPath/Data/Intensities/BaseCalls' --output-dir '$fastqPath/Unaligned' --sample-sheet '$rfPath/SampleSheet.csv' --use-bases-mask '$readMask' --mismatches 1 ${ignore} --positions-format $posFormat --fastq-cluster-count 0 --tiles $includeTiles &> $rfPath/setupBclToFastq.err
+
+EOF
+
+# Configure the per lane allowed barcode mismatch
+if(exists $config->{MISMATCH}){
+    my @mismatches = split /:/, $mismatches; # Init array with defaults
+    foreach my $lane (keys %{$config->{MISMATCH}}){
+        $mismatches[$lane-1]=$config->{MISMATCH}->{$lane};
+    }
+    $mismatches = join ':', @mismatches;
+}
+
+print $scriptFh <<EOF;
+configureBclToFastq.pl --input-dir '$rfPath/Data/Intensities/BaseCalls' --output-dir '$fastqPath/Unaligned' --sample-sheet '$rfPath/SampleSheet.csv' --use-bases-mask '$readMask' --mismatches '$mismatches' ${ignore} --positions-format $posFormat --fastq-cluster-count 0 --tiles $includeTiles &> $rfPath/setupBclToFastq.err
 check_errs \$? "configureBclToFastq.pl failed"
 
 if [ ! -e "$rfPath/Unaligned" ]; then
@@ -371,24 +383,27 @@ cp -a $FindBin::Bin/ $rfPath/Sisyphus/
 check_errs \$? "FAILED"
 echo OK
 
-# Save the sisyphus version before removing .git
+# Save the sisyphus version
 if [ -e "$rfPath/Sisyphus/.git" ]; then
    git --git-dir "$rfPath/Sisyphus/.git" describe > "$rfPath/Sisyphus/SISYPHUS_VERSION"
    check_errs \$? "Failed to get sisyphus version from $rfPath/Sisyphus/.git"
 fi
 
-rm -rf $rfPath/Sisyphus/.git
-check_errs \$? "Failed to clean out .git from $rfPath/Sisyphus"
-
 # Transfer files to UPPMAX
 cd $rfRoot
 check_errs \$? "Failed to cd to $rfRoot"
-rm -f $rfName/rsync.log
+
+# First make a list of all the files that will be transferred,
+# without actually doing it, for use by the checksumming
+rsync -vrktp --dry-run --chmod=Dg+sx,ug+w,o-rwx --prune-empty-dirs --include-from '$FindBin::Bin/hiseq.rsync' '$rfName' /tmp/ > '$rfName/rsync.log'
+
+# Now do the actual transfer, loop until successful
+rm -f $rfName/rsync-real.log
 RSYNC_OK=1
 SLEEP=300
 until [ \$RSYNC_OK = 0 ]; do
     echo -n "rsync $rfPath $targetPath  "
-    rsync -vrktp --chmod=Dg+sx,ug+w,o-rwx --prune-empty-dirs --include-from '$FindBin::Bin/hiseq.rsync' '$rfName' '$targetPath' >> '$rfName/rsync.log'
+    rsync -vrktp --chmod=Dg+sx,ug+w,o-rwx --prune-empty-dirs --include-from '$FindBin::Bin/hiseq.rsync' '$rfName' '$targetPath' >> '$rfName/rsync-real.log'
     RSYNC_OK=\$?
     if [ \$RSYNC_OK -gt 0 ]; then
        echo "FAILED will retry in \$SLEEP seconds"
