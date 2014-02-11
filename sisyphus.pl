@@ -123,14 +123,14 @@ my $rfName = basename($rfPath);
 my $rfRoot = dirname($rfPath);
 
 # Set defaults
-my $rHost = "biologin.uppmax.uu.se";
-my $rPath = "/bubo/nobackup/a2009002/runfolders";
-my $oPath = "/bubo/nobackup/a2009002/OUTBOX";
-my $aHost = "biologin.uppmax.uu.se";
-my $aPath = "/bubo/proj/a2009002/";
+my $rHost = "milou-b.uppmax.uu.se";
+my $uProj = "a2009002";
+my $rPath = "/proj/$uProj/private/nobackup/runfolders";
+my $oPath = "/proj/$uProj/private/nobackup/OUTBOX";
+my $aHost = "milou-b.uppmax.uu.se";
+my $aPath = "/proj/$uProj/private/";
 my $sHost = "localhost";
 my $sPath = dirname($rfPath) . '/summaries';
-my $uProj = "a2009002";
 my $fastqPath = undef;
 my $mismatches = '1:1:1:1:1:1:1:1';
 
@@ -151,7 +151,17 @@ if(defined $config->{FASTQ_PATH}){
     $fastqPath = "$rfPath";
 }
 
+# Get extra library path from config and save to a separate file
+`touch $FindBin::Bin/PERL5LIB`;
+if(defined $config->{PERL5LIB}){
+    open(my $LIB, ">$FindBin::Bin/PERL5LIB") or die "Failed to write $FindBin::Bin/PERL5LIB: $!";
+    foreach my $libPath (@{$config->{PERL5LIB}}){
+	print $LIB "$libPath\n";
+    }
+    close($LIB);
+}
 
+# Set paths from config
 if(defined $config->{REMOTE_HOST}){
     $rHost = $config->{REMOTE_HOST};
 }
@@ -365,6 +375,9 @@ EOF
 
 }
 
+# Random string used for rsync dry-run.
+my $rnd = time() . '.' . rand(1);
+
 print $scriptFh <<EOF;
 
 echo "Demultiplexing/Converting to FastQ"
@@ -395,7 +408,7 @@ check_errs \$? "Failed to cd to $rfRoot"
 
 # First make a list of all the files that will be transferred,
 # without actually doing it, for use by the checksumming
-rsync -vrktp --dry-run --chmod=Dg+sx,ug+w,o-rwx --prune-empty-dirs --include-from '$FindBin::Bin/hiseq.rsync' '$rfName' /tmp/ > '$rfName/rsync.log'
+rsync -vrktp --dry-run --chmod=Dg+sx,ug+w,o-rwx --prune-empty-dirs --include-from '$FindBin::Bin/hiseq.rsync' '$rfName' '/$rnd' > '$rfName/rsync.log'
 
 # Now do the actual transfer, loop until successful
 rm -f $rfName/rsync-real.log

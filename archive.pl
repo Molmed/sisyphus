@@ -2,6 +2,7 @@
 
 use FindBin;                # Find the script location
 use lib "$FindBin::Bin/lib";# Add the script libdir to libs
+use Molmed::Sisyphus::Libpath;
 
 use strict;
 use Getopt::Long;
@@ -315,21 +316,21 @@ sub verifyTarFiles{
 	die "$rfTar does not exist";
     }
 
-    print STDERR "$rfTar\t";
+    print STDERR "Verifying $rfTar ...\n";
     if(verifyTar($rfTar,undef,\%fileSums, $archiveMd5, $rfName)){
-      print STDERR "OK\n";
+      print STDERR "$rfTar\tOK\n";
     }else{
-	print STDERR "FAILED\n";
+	print STDERR "$rfTar\tFAILED\n";
 	$ok = 0;
     }
 
     opendir(my $projDir, "$archDir/Projects/");
     foreach my $proj ( grep {!/^\.{1,2}$/} readdir($projDir) ){
-	print STDERR "$archDir/Projects/$proj/$rfName.tar\t";
+	print STDERR "Verifying $archDir/Projects/$proj/$rfName.tar ...\n";
 	if(verifyTar("$archDir/Projects/$proj/$rfName.tar", "$rfName/Projects", \%fileSums, $archiveMd5, $rfName)){
-	    print STDERR "OK\n";
+	    print STDERR "$archDir/Projects/$proj/$rfName.tar\tOK\n";
 	}else{
-	    print STDERR "FAILED\n";
+	    print STDERR "$archDir/Projects/$proj/$rfName.tar\tFAILED\n";
 	    $ok = 0;
 	}
     }
@@ -451,7 +452,7 @@ sub verifyFileList{
     if(@skipped){
       print STDERR "The following files are skipped from the archive\n";
       print join "\n", @skipped;
-      print "\n";
+      print "\n---END SKIPPED---\n\n";
     }
 
 }
@@ -615,7 +616,7 @@ sub addFile{
   # Compress files if necessary, skip compressing the reports and checksums and README in the project dir
   if($file =~ m/\.(png|jpg|jpeg|zip)$/i ||
      $file =~ m/(summary)?report.(htm|xm|xs)l/i ||
-     "$inDir/$file"=~m:Projects/.*/(checksums|README):){
+     "$inDir/$file"=~m:Projects/.*/(checksums|README|.*\.md5):){
     $checksums->{ORIGINAL}->{"$inDir/$file"} = $sisyphus->getMd5("$inDir/$file");
     $checksums->{COMPRESSED}->{"$inDir/$file"} = $sisyphus->getMd5("$inDir/$file");
   }elsif($file =~ m/\.(gz|bz2)$/i){
@@ -630,8 +631,8 @@ sub addFile{
   }elsif(! -l "$inDir/$file"){ # Do not checksum symlinks
     $checksums->{ORIGINAL}->{"$inDir/$file"} = $sisyphus->getMd5("$inDir/$file");
     $file = $sisyphus->gzip("$inDir/$file"); # Gzip returns abs path
-    $checksums->{COMPRESSED}->{"$file"} = $sisyphus->getMd5("$file");
     $file =~ s:^$inDir/::; # Make $file relative again
+    $checksums->{COMPRESSED}->{"$inDir/$file"} = $sisyphus->getMd5("$inDir/$file");
   }
 
   my $path = "$inDir/$file";
@@ -685,7 +686,7 @@ sub recurseProjectReports{
   my $sisyphus = shift;
   my $dirMask = shift;
 
-  opendir(my $dh, $dir) or die;
+  opendir(my $dh, $dir) or die "Failed to open $dir: $!";
   foreach my $file ( grep {!/^\.{1,2}$/} readdir($dh) ){
 
     # Skip fastq files

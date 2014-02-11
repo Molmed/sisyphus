@@ -1,6 +1,7 @@
-package Molmed::Sisyphus::Kalkyl::SlurmJob;
+package Molmed::Sisyphus::Uppmax::SlurmJob;
 
 use strict;
+use Molmed::Sisyphus::Libpath;
 use Carp;
 use Molmed::Sisyphus::Common qw(mkpath);
 
@@ -10,13 +11,13 @@ our $AUTOLOAD;
 
 =head1 NAME
 
-Molmed::Sisyphus::Kalkyl::SlurmJob - Common functions for handling jobs at the UPPMAX kluster kalkyl
+Molmed::Sisyphus::Uppmax::SlurmJob - Common functions for handling jobs at the UPPMAX clusters
 
 =head1 SYNOPSIS
 
-use Molmed::Sisyphus::Kalkyl::SlurmJob;
+use Molmed::Sisyphus::Uppmax::SlurmJob;
 
-my $job =  Molmed::Sisyphus::Kalkyl::SlurmJob->new(
+my $job =  Molmed::Sisyphus::Uppmax::SlurmJob->new(
   DEBUG=>$debug,    # bool
   SCRIPTDIR=>$scriptDir, # Directory for writing the script
   EXECDIR=>$wd,     # Directory from which to run the script
@@ -182,7 +183,7 @@ sub addCode{
  Function: Adds a dependency on another slurmjob
  Example :
  Returns : nothing
- Args    : one or more Kalkyl::SlurmJob objects or slurm job ids
+ Args    : one or more Uppmax::SlurmJob objects or slurm job ids
 
 =cut
 
@@ -218,9 +219,9 @@ sub jobId{
 
  Title   : dependencies
  Usage   : $job->dependiencies();
- Function: returns the Kalkyl::SlurmJobs that this job depends upon
+ Function: returns the Uppmax::SlurmJobs that this job depends upon
  Example :
- Returns : array of Kalkyl::SlurmJobs
+ Returns : array of Uppmax::SlurmJobs
  Args    : none
 
 =cut
@@ -269,6 +270,7 @@ sub status{
       or confess "Failed to open pipe from $squeueProg: $!\n";
     while(<$sqFh>){
 	chomp;
+	s/^\s+//;
         my @r = split /\s+/, $_;
         if($r[0]=~ m/^(\d+)$/ && $1==$job){
 	    close($sqFh);
@@ -278,8 +280,8 @@ sub status{
     close($sqFh);
 
     # Too old for the slurm db, check accounting files
-    if(-d "/bubo/sw/share/slurm/kalkyl/accounting"){
-      my $accountDir = "/bubo/sw/share/slurm/kalkyl/accounting";
+    if(-d "/sw/share/slurm/$ENV{SNIC_RESOURCE}/accounting"){
+      my $accountDir = "/sw/share/slurm/$ENV{SNIC_RESOURCE}/accounting";
       opendir(my $aDir, $accountDir)
 	or confess("Failed to open dir '$accountDir'");
       my @files = sort( {sortAccountFiles($a,$b)} grep(/^[^.]/, readdir($aDir)));
@@ -307,6 +309,21 @@ sub sortAccountFiles{
   $a=~s/-//g;
   $b=~s/-//g;
   return($b<=>$a);
+}
+
+=head2 scriptFile()
+
+ Title   : scriptFile
+ Usage   : $job->scriptFile()
+ Function: Returns the path to the slurmscript created for the job
+ Example :
+ Returns : string
+ Args    : none
+
+=cut
+sub scriptFile{
+  my $self = shift;
+  return("$self->{SCRIPTDIR}/$self->{NAME}.sh");
 }
 
 =head2 submit()
@@ -381,14 +398,20 @@ sub submit{
     my $logName = "$self->{SCRIPTDIR}/logs/$self->{NAME}.\%j.log";
     my $part = $self->{PARTITION};
     my $n = 1;
-    if($part eq 'node'){
-	$n = 8;
+    if(exists($self->{CORES})){
+	$n = $self->{CORES};
+    }elsif($self->{PARTITION} eq 'node'){
+	$n=undef;
+	warn("The number of required cores was not specifed for nodejob $logName\n");
+    }
+    if(defined $n){
+	$part .= " -n $n"
     }
 
-    print $scriptFh <<EOF;
+print $scriptFh <<EOF;
 #!/bin/bash -l
 #SBATCH -A $project
-#SBATCH -p $part -n $n
+#SBATCH -p $part
 #SBATCH -t $time
 #SBATCH -J $name
 #SBATCH -o $logName

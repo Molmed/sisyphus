@@ -2,6 +2,7 @@
 
 use FindBin;                # Find the script location
 use lib "$FindBin::Bin/lib";# Add the script libdir to libs
+use Molmed::Sisyphus::Libpath;
 
 use strict;
 
@@ -37,6 +38,10 @@ Opens the manpage.
 
 The runfolder to process.
 
+=item -force
+
+Download even if it already exists locally.
+
 =head1 DESCRIPTION
 
 getSummary.pl reads the config files sisyphus.yml from a runfolder and copies the
@@ -53,11 +58,13 @@ in the local runfolder.
 =cut
 
 my $rfPath = undef;
+my $force = 0;
 my ($help,$man) = (0,0);
 
 GetOptions('help|?'=>\$help,
            'man'=>\$man,
            'runfolder=s' => \$rfPath,
+	   'force', \$force,
           ) or pod2usage(-verbose => 0);
 pod2usage(-verbose => 1)  if ($help);
 pod2usage(-verbose => 2)  if ($man);
@@ -72,13 +79,14 @@ my $sisyphus = Molmed::Sisyphus::Common->new(PATH=>$rfPath, DEBUG=>0);
 $rfPath = $sisyphus->PATH;
 my $rfName = basename($rfPath);
 
-
-if(-e "$rfPath/Summary"){
-    print "$rfPath/Summary already exists\n";
+unless($force){
+    if(-e "$rfPath/Summary"){
+	print "$rfPath/Summary already exists\n";
+	exit;
+    }elsif(-e "$rfPath/noSummary"){
+	print "$rfPath/noSummary already exists\n";
     exit;
-}elsif(-e "$rfPath/noSummary"){
-    print "$rfPath/noSummary already exists\n";
-    exit;
+    }
 }
 
 my $config = $sisyphus->readConfig();
@@ -139,7 +147,7 @@ sub gunzip{
 	if(-d "$dir/$f"){
 	    gunzip("$dir/$f");
 	}elsif($f =~ m/\.(ht|x)ml.gz/){
-	    `gunzip "$dir/$f"`;
+	    `gunzip -f "$dir/$f"`;
 	}
     }
     closedir($dFh);

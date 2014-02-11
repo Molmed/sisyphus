@@ -2,6 +2,7 @@
 
 use FindBin;                # Find the script location
 use lib "$FindBin::Bin/lib";# Add the script libdir to libs
+use Molmed::Sisyphus::Libpath;
 
 use strict;
 use Getopt::Long;
@@ -136,6 +137,8 @@ if(@lanesLeft > 0){
     mkdir($statDir) unless(-e $statDir);
     print STDERR "No lanes left to process\n";
     system("touch $statDir/extractProject.complete") == 0 or die $!;
+    # Calc & store the checksum for the file
+    $sisyphus->saveMd5("$statDir/extractProject.complete", $sisyphus->getMd5("$statDir/extractProject.complete", -noCache=>1));
     exit;
 }
 
@@ -270,7 +273,8 @@ foreach my $sampleDir (readdir($sDirFh)){
     next unless (-d "$statDir/$sampleDir");
     opendir(my $saDirFh, "$statDir/$sampleDir") or die "Failed to open '$statDir/$sampleDir': $!\n";
     foreach my $statfile (grep /\.statdump\.zip$/, readdir($saDirFh)){
-	if($statfile =~ m/(.*)_(Undetermined|NoIndex|[ACGT]+)_L00(\d)_R(\d)\.statdump.zip/){
+	# Dual index tags contains a hyphen
+	if($statfile =~ m/(.*)_(Undetermined|NoIndex|[ACGT]+-?[ACGT]*)_L00(\d)_R(\d)\.statdump.zip/){
 	    push @samples, {SAMPLE=>$1, TAG=>$2, LANE=>$3, READ=>$4, PATH=>"$statDir/$sampleDir/$statfile"};
 	}
     }
@@ -432,12 +436,15 @@ close($htmlFhDel);
 # Link the report to the outdir & calc checksums
 link("$statDir/reportDel.xml", "$outDir/report.xml") || die "Failed to link '$statDir/reportDel.xml' to '$outDir/report.xml': $!\n";
 $checksums{"report.xml"} = $sisyphus->getMd5("$statDir/reportDel.xml", -noCache=>1);
+$sisyphus->saveMd5("$statDir/reportDel.xml", $checksums{"report.xml"});
 
 link("$statDir/report.xsl", "$outDir/report.xsl") || die "Failed to link '$statDir/report.xsl' to '$outDir/report.xsl': $!\n";
 $checksums{"report.xsl"} = $sisyphus->getMd5("$statDir/report.xsl", -noCache=>1);
+$sisyphus->saveMd5("$statDir/report.xsl", $checksums{"report.xsl"});
 
 link("$statDir/reportDel.html", "$outDir/report.html") || die "Failed to link '$statDir/reportDel.html' to '$outDir/report.html': $!\n";
 $checksums{"report.html"} = $sisyphus->getMd5("$statDir/reportDel.html", -noCache=>1);
+$sisyphus->saveMd5("$statDir/reportDel.html", $checksums{"report.html"});
 
 # Copy the plots from temporary dir into Stats dir
 if(-e "$statDir/Plots"){
@@ -454,7 +461,7 @@ foreach my $sample (grep /^[^\.]/, readdir($plotDirFh1)){
     next unless(-d "$plotDir/$sample");
     opendir(my $samplePlotDirFh1, "$plotDir/$sample") or die "Failed to open dir '$plotDir/$sample': $!\n";
     foreach my $plot (grep /^[^\.]/, readdir($samplePlotDirFh1)){
-	my $checksum = $sisyphus->getMd5("$plotDir/$sample/$plot", -skipMissing=>1);
+	my $checksum = $sisyphus->getMd5("$plotDir/$sample/$plot", -skipMissing=>1, -noCache=>1);
 	if(defined $checksum){
 	    $sisyphus->saveMd5("$statDir/Plots/$sample/$plot", $checksum);
 	    $checksumCache{"Plots/$sample/$plot"} = $checksum;
@@ -487,6 +494,7 @@ foreach my $sample (grep /^[^\.]/, readdir($plotDirFh)){
 	}
 	die "Failed to link '$statDir/Plots/$sample/$plot' to '$outDir/Plots/$sample/$plot': $!\n" unless($linkSuccess);
 
+	$sisyphus->saveMd5("$outDir/Plots/$sample/$plot", $checksumCache{"Plots/$sample/$plot"});
 	$checksums{"Plots/$sample/$plot"} = $checksumCache{"Plots/$sample/$plot"};
     }
 }
@@ -497,10 +505,15 @@ open(my $fhMd5, ">", "$outDir/checksums.md5") or die "Failed to create '$outDir/
 foreach my $file (sort keys %checksums){
     print $fhMd5 "$checksums{$file}  $rfName/$file\n";
 }
+close($fhMd5);
+$sisyphus->saveMd5("$outDir/checksums.md5", $sisyphus->getMd5("$outDir/checksums.md5", -noCache=>1));
 
 # Copy the README
 cp("$FindBin::Bin/README.1", "$statDir/README") or die "Failed to copy '$FindBin::Bin/README.1' to '$statDir/README': $!\n";
 link("$statDir/README", "$outDir/README") || die "Failed to link '$statDir/README' to '$outDir/README': $!\n";
+
+# Calculate all checksums in the statdir, just to make sure there are no old cached checksums
+$sisyphus->md5Dir($statDir, -noCache=>1, -save=>1);
 
 # All complete
 `touch $statDir/extractProject.complete`;

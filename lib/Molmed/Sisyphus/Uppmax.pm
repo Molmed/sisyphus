@@ -1,6 +1,7 @@
-package Molmed::Sisyphus::Kalkyl;
+package Molmed::Sisyphus::Uppmax;
 
 use strict;
+use Molmed::Sisyphus::Libpath;
 use Carp;
 
 our $AUTOLOAD;
@@ -9,13 +10,13 @@ our $AUTOLOAD;
 
 =head1 NAME
 
-Molmed::Sisyphus::Kalkyl - Common functions for use at the UPPMAX kluster kalkyl
+Molmed::Sisyphus::Uppmax - Common functions for use at the UPPMAX clusters
 
 =head1 SYNOPSIS
 
-use Molmed::Sisyphus::Kalkyl;
+use Molmed::Sisyphus::Uppmax;
 
-my $kalkyl =  Molmed::Sisyphus::Kalkyl->new(
+my $uppmax =  Molmed::Sisyphus::Uppmax->new(
   DEBUG=>$debug
  );
 
@@ -49,7 +50,7 @@ sub new{
 =head2 checkJobs()
 
  Title   : checkJobs
- Usage   : $kalkyl->checkJobs(@jobids)
+ Usage   : $uppmax->checkJobs(@jobids)
  Function: Checks the status of the listed slurm job ids.
  Example :
  Returns : 1 if all jobs are completed
@@ -115,7 +116,7 @@ sub checkJobs{
 =head2 startJob()
 
  Title   : startJob
- Usage   : $kalkyl->startJob($command,$wd)
+ Usage   : $uppmax->startJob($command,$wd)
  Function: submits a new batch job to slurm
  Example :
  Returns : returns the slurm job id for the new job
@@ -127,10 +128,12 @@ sub checkJobs{
 =head2 sbatchHeader()
 
  Title   : startJob
- Usage   : $kalkyl->startJob($command,$wd)
+ Usage   : $uppmax->startJob($command,$wd)
  Function: submits a new batch job to slurm
  Example :
  Returns : returns the slurm job id for the new job
  Args    : the command to submit and, optionally, a directory to run the command from
 
 =cut
+
+1;

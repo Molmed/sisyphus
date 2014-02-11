@@ -1,0 +1,511 @@
+INSTALL_BASE=/proj/a2009002/perl
+export PERL5LIB="$INSTALL_BASE/lib/perl5/"
+echo "export PERL5LIB=$INSTALL_BASE/lib/perl5/:$PERL5LIB" >> ~/.bash_profile
+
+mkdir -p $INSTALL_BASE
+cd $INSTALL_BASE
+mkdir -p build src
+
+cd src
+wget http://search.cpan.org/CPAN/authors/id/B/BI/BINGOS/ExtUtils-MakeMaker-6.86.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/K/KG/KGB/ExtUtils-F77-1.17.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/A/AN/ANDK/Convert-UU-0.5201.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/L/LE/LEONT/File-Map-0.61.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/L/LE/LEONT/Module-Build-0.4203.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/D/DA/DAGOLDEN/Perl-OSType-1.006.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/J/JP/JPEACOCK/version-0.9906.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/E/ET/ETHER/Module-Metadata-1.000019.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/C/CO/CORION/parent-0.228.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/A/AM/AMBS/ExtUtils/ExtUtils-CBuilder-0.280212.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/B/BI/BINGOS/IPC-Cmd-0.90.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/J/JE/JESSE/Locale-Maketext-Simple-0.21.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/B/BI/BINGOS/Module-Load-Conditional-0.58.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/B/BI/BINGOS/Params-Check-0.38.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/B/BI/BINGOS/Module-CoreList-3.03.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/B/BI/BINGOS/Module-Load-0.28.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/R/RJ/RJBS/Test-Simple-1.001002.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/B/BI/BINGOS/Archive-Tar-1.96.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/T/TO/TOMHUGHES/IO-Zlib-1.10.tar.gz
+wget http://www.cpan.org/authors/id/P/PM/PMQS/IO-Compress-2.063.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/P/PM/PMQS/Compress-Raw-Bzip2-2.063.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/P/PM/PMQS/Compress-Raw-Zlib-2.063.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/B/BI/BIGPRESH/Pod-Readme-0.11.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/A/AB/ABIGAIL/Regexp-Common-2013031301.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/L/LE/LEONT/PerlIO-Layers-0.010.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/F/FR/FREW/Sub-Exporter-Progressive-0.001011.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/R/RJ/RJBS/Sub-Exporter-0.987.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/R/RJ/RJBS/Data-OptList-0.109.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/A/AD/ADAMK/Params-Util-1.07.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/R/RJ/RJBS/Sub-Install-0.927.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/R/RJ/RJBS/Test-Fatal-0.013.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/D/DO/DOY/Try-Tiny-0.18.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/E/ET/ETHER/Test-Warnings-0.013.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/L/LE/LEONT/Module-Build-Tiny-0.030.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/L/LE/LEONT/ExtUtils-Config-0.007.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/L/LE/LEONT/ExtUtils-Helpers-0.021.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/L/LE/LEONT/ExtUtils-InstallPaths-0.010.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/L/LE/LEONT/Test-Harness-3.30.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/F/FD/FDALY/Test-Tester-0.109.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/R/RJ/RJBS/Test-Deep-0.112.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/A/AD/ADAMK/Test-NoWarnings-1.04.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/Z/ZE/ZEFRAM/Time-HiRes-1.9726.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/S/SM/SMUELLER/Filter-Simple-0.88.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/S/SI/SISYPHUS/Inline-0.53.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/J/JT/JTBRAUN/Parse-RecDescent-1.967009.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/C/CH/CHORNY/Test-Warn-0.24.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/Z/ZE/ZEFRAM/Carp-1.32.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/D/DA/DAGOLDEN/Sub-Uplevel-0.24.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/R/RS/RSAVAGE/Tree-DAG_Node-1.18.tgz
+wget http://search.cpan.org/CPAN/authors/id/U/UR/URI/File-Slurp-9999.19.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/S/SM/SMUELLER/PathTools-3.40.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/D/DA/DAGOLDEN/File-Temp-0.2304.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/I/IN/INGY/Module-Compile-0.23.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/G/GA/GAAS/Digest-SHA1-2.13.tar.gz
+wget http://search.cpan.org/CPAN/authors/id/T/TJ/TJENNESS/Astro-FITS-Header-3.07.tar.gz
+
+
+cd ../build/
+tar xvzf ../src/ExtUtils-MakeMaker-6.86.tar.gz 
+cd ExtUtils-MakeMaker-6.86/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/ExtUtils-F77-1.17.tar.gz
+cd ExtUtils-F77-1.17/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Convert-UU-0.5201.tar.gz 
+cd Convert-UU-0.5201/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Perl-OSType-1.006.tar.gz
+cd Perl-OSType-1.006/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/parent-0.228.tar.gz
+cd parent-0.228/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/version-0.9906.tar.gz 
+cd version-0.9906/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Module-Metadata-1.000019.tar.gz 
+cd Module-Metadata-1.000019/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Locale-Maketext-Simple-0.21.tar.gz
+cd Locale-Maketext-Simple-0.21/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Params-Check-0.38.tar.gz
+cd Params-Check-0.38/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Test-Simple-1.001002.tar.gz
+cd Test-Simple-1.001002
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Module-Load-0.28.tar.gz 
+cd Module-Load-0.28/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Module-CoreList-3.03.tar.gz
+cd Module-CoreList-3.03/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Module-Load-Conditional-0.58.tar.gz
+cd Module-Load-Conditional-0.58/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/IPC-Cmd-0.90.tar.gz 
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/ExtUtils-CBuilder-0.280212.tar.gz
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Compress-Raw-Zlib-2.063.tar.gz
+cd Compress-Raw-Zlib-2.063/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Compress-Raw-Bzip2-2.063.tar.gz
+cd Compress-Raw-Bzip2-2.063/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/IO-Compress-2.063.tar.gz
+cd IO-Compress-2.063/
+makeperl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make test
+make install
+
+cd ../
+tar xvzf ../src/IO-Zlib-1.10.tar.gz
+cd IO-Zlib-1.10/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Archive-Tar-1.96.tar.gz
+cd Archive-Tar-1.96
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Regexp-Common-2013031301.tar.gz
+cd Regexp-Common-2013031301/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Pod-Readme-0.11.tar.gz
+cd Pod-Readme-0.11/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Module-Build-0.4203.tar.gz
+cd Module-Build-0.4203/
+perl Build.PL --install-base=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/PerlIO-Layers-0.010.tar.gz 
+cd PerlIO-Layers-0.010
+perl Build.PL --install-base=$INSTALL_BASE
+./Build
+./Build test
+./Build install
+
+cd ../
+tar xvzf ../src/Params-Util-1.07.tar.gz 
+cd Params-Util-1.07/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Sub-Install-0.927.tar.gz 
+cd Sub-Install-0.927/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Data-OptList-0.109.tar.gz
+cd Data-OptList-0.109
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Sub-Exporter-0.987.tar.gz
+cd Sub-Exporter-0.987
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Sub-Exporter-Progressive-0.001011.tar.gz 
+cd Sub-Exporter-Progressive-0.001011/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Try-Tiny-0.18.tar.gz
+cd Try-Tiny-0.18
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Test-Fatal-0.013.tar.gz
+cd Test-Fatal-0.013
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/ExtUtils-Config-0.007.tar.gz 
+cd ExtUtils-Config-0.007/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/ExtUtils-Helpers-0.021.tar.gz 
+cd ExtUtils-Helpers-0.021/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/ExtUtils-InstallPaths-0.010.tar.gz 
+cd ExtUtils-InstallPaths-0.010/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Test-Harness-3.30.tar.gz
+cd Test-Harness-3.30/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Module-Build-Tiny-0.030.tar.gz 
+cd Module-Build-Tiny-0.030/
+perl Build.PL --install_base=$INSTALL_BASE
+./Build
+./Build test
+./Build install
+
+cd ../
+tar xvzf ../src/Test-Tester-0.109.tar.gz
+cd Test-Tester-0.109/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Test-NoWarnings-1.04.tar.gz
+cd Test-NoWarnings-1.04/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Test-Deep-0.112.tar.gz 
+cd Test-Deep-0.112/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Test-Warnings-0.013.tar.gz 
+cd Test-Warnings-0.013/
+perl Build.PL --install_base=$INSTALL_BASE
+./Build
+./Build test
+./Build install
+
+cd ../
+tar xvzf ../src/Time-HiRes-1.9726.tar.gz 
+cd Time-HiRes-1.9726/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/File-Map-0.61.tar.gz
+cd File-Map-0.61/
+perl Build.PL --install_base=$INSTALL_BASE
+./Build
+./Build test
+./Build install
+
+cd ../
+tar xvzf ../src/Filter-Simple-0.88.tar.gz 
+cd Filter-Simple-0.88/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Parse-RecDescent-1.967009.tar.gz 
+cd Parse-RecDescent-1.967009
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Carp-1.32.tar.gz
+cd Carp-1.32/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Sub-Uplevel-0.24.tar.gz 
+cd Sub-Uplevel-0.24/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/File-Slurp-9999.19.tar.gz 
+cd File-Slurp-9999.19/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/PathTools-3.40.tar.gz 
+cd PathTools-3.40/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/File-Temp-0.2304.tar.gz 
+cd File-Temp-0.2304/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Tree-DAG_Node-1.18.tgz 
+cd Tree-DAG_Node-1.18
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Test-Warn-0.24.tar.gz
+cd Test-Warn-0.24
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Inline-0.53.tar.gz 
+cd Inline-0.53/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+y
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Digest-SHA1-2.13.tar.gz
+cd Digest-SHA1-2.13/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Module-Compile-0.23.tar.gz 
+cd Module-Compile-0.23/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install
+
+cd ../
+tar xvzf ../src/Astro-FITS-Header-3.07.tar.gz 
+cd Astro-FITS-Header-3.07
+perl Build.PL --install_base=$INSTALL_BASE
+./Build
+./Build test
+./Build install
+
+cd ../
+tar xvzf ../src/PDL-2.007.tar.gz
+cd PDL-2.007/
+perl Makefile.PL INSTALL_BASE=$INSTALL_BASE
+make
+make test
+make install

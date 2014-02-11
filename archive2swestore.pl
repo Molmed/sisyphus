@@ -2,6 +2,7 @@
 
 use FindBin;
 use lib "$FindBin::Bin/lib";# Add the script libdir to libs
+use Molmed::Sisyphus::Libpath;
 
 use strict;
 use Getopt::Long;
@@ -11,7 +12,7 @@ use Digest::MD5;
 use YAML::Tiny;
 use Cwd qw(abs_path cwd);
 
-use Molmed::Sisyphus::Kalkyl::SlurmJob;
+use Molmed::Sisyphus::Uppmax::SlurmJob;
 
 =head1 NAME
 
@@ -198,7 +199,7 @@ unless($verifyOnly){
     my $sTime = sprintf('%02d:%02d %02d/%02d/%02d', $sTime[2],$sTime[1],$sTime[4],$sTime[3], ($sTime[5] - 100));
 
     my $job =
-	Molmed::Sisyphus::Kalkyl::SlurmJob->new(
+	Molmed::Sisyphus::Uppmax::SlurmJob->new(
 	    DEBUG=>$debug,         # bool
 	    SCRIPTDIR=>$scriptDir, # Directory for writing the script
 	    EXECDIR=>$execPath,    # Directory from which to run the script

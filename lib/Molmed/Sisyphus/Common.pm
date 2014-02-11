@@ -4,6 +4,7 @@ use base 'Exporter';
 our @EXPORT_OK = ('mkpath');
 
 use strict;
+use Molmed::Sisyphus::Libpath;
 use Carp;
 use Cwd qw(abs_path cwd);
 use Digest::MD5;
@@ -13,6 +14,7 @@ use File::Copy ();
 use PerlIO::gzip;
 use FindBin;
 use YAML::Tiny;
+use File::Find;
 #use Hash::Util;
 use Fcntl qw(:flock SEEK_END :mode); # Import LOCK_*, mode and SEEK_END constants
 
@@ -316,6 +318,62 @@ sub getMd5{
 
 =pod
 
+=head2 md5Dir()
+
+ Title   : md5Dir
+ Usage   : $sis->md5Dir($dir, -noCache=>1, -save=>1)
+ Function: Recursively calculates the md5 checksums for all files in a directory 
+ Example :
+ Returns : hash with md5 checksums, filename relative to $dir as key, checksum as value
+ Args    : directory path (absolute or relative to the runfolder),
+           flag for use of cache: Do not use cache if flag is set.
+           flag for saving to cache: Save the calculated checksums to cache if flag is set.
+
+=cut
+
+
+sub md5Dir{
+  my $self = shift;
+  my $dir = shift;
+  my %args = @_;
+  my $noCache = 0;
+  if($args{'-noCache'}){
+    $noCache = 1;
+  }
+  my $save = 0;
+  if($args{'-save'}){
+    $save = 1;
+  }
+
+  unless(defined $dir){
+    confess "File not defined\n";
+  }
+  my $absDir;
+  if($dir =~ m(^/) ){
+    $absDir = $dir;
+  }elsif(-e $self->PATH . "/$dir"){
+    $absDir = $self->PATH . "/$dir";
+  }else{
+    die "'$dir' not absolute and not relative to the runfolder '" . $self->PATH . "'";
+  }
+
+  my %checksums;
+  opendir(my $dfh, $absDir) or die "Failed to open '$absDir': $!";
+  foreach my $file (grep /^[^\.]/, readdir($dfh)){
+    if(-d "$absDir/$file"){
+      my $chks = $self->md5Dir("$absDir/$file", -noCache=>$noCache, -save=>$save);
+      @checksums{keys %{$chks}} = values %{$chks};
+    }else{
+      my $md5 = $self->getMd5("$absDir/$file", -noCache=>$noCache);
+      $self->saveMd5("$absDir/$file", $md5) if($save);
+      $checksums{"$absDir/$file"} = $md5;
+    }
+  }
+  return \%checksums;
+}
+
+=pod
+
 =head2 saveMd5()
 
  Title   : saveMd5
@@ -335,6 +393,7 @@ sub saveMd5{
     $file = abs_path($file);
     my $rfPath = $self->{PATH};
 
+    my $absFile = $file;
     $file =~ s:^$rfPath/::;
     my $runfolder = basename($rfPath);
 
@@ -348,7 +407,7 @@ sub saveMd5{
 
     # Update the cache, if used, with the new(?) checksum for this file
     if(exists $self->{CHECKSUMS}){
-	$self->{CHECKSUMS}->{$file} = $sum;
+	$self->{CHECKSUMS}->{$absFile} = $sum;
     }
 }
 
@@ -908,8 +967,9 @@ sub readSampleSheet{
     while(<$sheet>){
 	if(m/^$fcId,/i){
 	    next if(m/^#/); # Skip comments
-	    $_=~ s/[\012\015]*$//; # Strip CR & LF
 	    my $row = $_;
+	    chomp($row);
+	    $row=~ s/[\012\015]*$//; # Strip CR & LF
 	    my @r = split /,/, $row;
 	    $r[4] = 'Undetermined' unless($r[4] =~ m/\S/); # Use 'Undetermined' for unspecified index tags
 	    unless($r[6] =~ m/^y/i){ # Skip the controls
@@ -952,7 +1012,8 @@ sub tmpdir{
 	    return("$ENV{TMPDIR}/sisyphus/$$");
 	}
     }
-    foreach my $scratch ('/proj/a2009002/nobackup/private/scratch', '/data/local/scratch', '/data/scratch', '/scratch', '/tmp'){
+    foreach my $scr ('/proj/a2009002/nobackup/private/scratch', '/data/local/scratch', '/data/scratch', '/scratch', '/tmp'){
+	my $scratch = $scr;
 	if(-e $scratch){
 	    $scratch = abs_path($scratch);
 	}
@@ -1093,15 +1154,15 @@ sub runParameters{
 	return $self->{RUNPARAMS};
     }
     my $rfPath = $self->{PATH};
-    if(! -e "$rfPath/runParameters.xml" && -e "$rfPath/runParameters.xml.gz"){
-        `gunzip -N "$rfPath/runParameters.xml.gz"`;
+    my $runParName = glob("$rfPath/[rR]unParameters.xml*");
+    if($runParName =~ m/\.gz$/){
+        `gunzip -N "$runParName"`;
+	$runParName =~ s/\.gz$//;
     }
-    my $runParams;
-    if(-e "$rfPath/runParameters.xml"){
-	$runParams = XMLin("$rfPath/runParameters.xml") || confess "Failed to read runParameters.xml\n";
-    }
+
+    my $runParams = XMLin($runParName) || confess "Failed to read runParameters.xml ($runParName)\n";
     unless(defined $runParams){
-	confess "Failed to read runParameters.xml\n";
+	confess "Failed to read runParameters.xml ($runParName)\n";
     }
 
     $self->{RUNPARAMS}=$runParams;
@@ -1925,6 +1986,7 @@ sub fixSampleSheet{
     if($type eq 'hiseq'){
 	while(<$ssfh>){
 	    chomp;
+	    s/\xA0//g; # Clean up some Windows/Excel copy paste remnant
 	    $l++;
 	    # Clean up empty rows and carrige return
 	    next unless(m/\w/);
@@ -1958,7 +2020,9 @@ sub fixSampleSheet{
 	    }
 	    if(m/^\[Data\]/){
 		$dataStart = 1;
-		@header = split /,/, <$ssfh>;
+		my $r = <$ssfh>;
+		chomp($r);
+		@header = split /,/, $r;
 		# expected MiSeq header
 		#Sample_ID,Sample_Name,Sample_Plate,Sample_Well,Sample_Project,index,I7_Index_ID,Description,GenomeFolder
 

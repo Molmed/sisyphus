@@ -2,6 +2,7 @@
 
 use FindBin;                # Find the script location
 use lib "$FindBin::Bin/lib";# Add the script libdir to libs
+use Molmed::Sisyphus::Libpath;
 
 use strict;
 use Getopt::Long;
@@ -9,7 +10,7 @@ use Pod::Usage;
 use Cwd qw(abs_path cwd);
 use File::Basename;
 
-use Molmed::Sisyphus::Kalkyl::SlurmJob;
+use Molmed::Sisyphus::Uppmax::SlurmJob;
 use Molmed::Sisyphus::Common;
 
 =pod
@@ -49,7 +50,7 @@ The rest of the configuration is read from RUNFOLDER/sisyphus.yml. See example i
 
 =head1 DESCRIPTION
 
-aeacus.pl submits postprocessing batchjobs to the Kalkyl cluster at UPPMAX. Which jobs to submit is
+aeacus.pl submits postprocessing batchjobs to the cluster at UPPMAX. Which jobs to submit is
 determined from the sisyphus.yml configuration file.
 
 aeacus.pl is normally started remotely as the last step performed by sisyphus.pl
@@ -107,10 +108,10 @@ my $rfShort = join('-', @{[split(/_/, $rfName)]}[0,3]);
 # Set some defaults
 my $uProj = 'a2009002';
 my $uQos = undef;
-my $aPath = "/bubo/proj/$uProj";
+my $aPath = "/proj/$uProj";
 my $iPath = "/ssUppnexZone/proj/$uProj";
 my $oPath = "$rfPath/Projects";
-my $tmpdir = "/gulo/proj_nobackup/a2009002/private/tmp/$$";
+my $tmpdir = "/proj/a2009002/private/nobackup/tmp/$$";
 my $scriptDir = "$rfPath/slurmscripts";
 my $skipLanes = [];
 
@@ -161,7 +162,7 @@ my %projJobs;
 foreach my $proj (keys %{$sampleSheet}){
     # Create a slurm job handler
     my $projJob =
-      Molmed::Sisyphus::Kalkyl::SlurmJob->new(
+      Molmed::Sisyphus::Uppmax::SlurmJob->new(
 					       DEBUG=>$debug,         # bool
 					       SCRIPTDIR=>$scriptDir, # Directory for writing the script
 					       EXECDIR=>$rfPath,      # Directory from which to run the script
@@ -174,6 +175,8 @@ foreach my $proj (keys %{$sampleSheet}){
     foreach my $lane (keys (%{$sampleSheet->{$proj}})){
 	$projJob->addDep($ffJobs{$lane}) if exists($ffJobs{$lane});
     }
+    $projJob->addCommand("module load uppmax");
+    $projJob->addCommand("module load gnuplot");
     $projJob->addCommand("umask 007");
     my $cmd = "$FindBin::Bin/extractProject.pl -runfolder $rfPath -project '$proj' -outdir '$oPath/$proj' $debugFlag";
     foreach my $lane (@{$skipLanes}){
@@ -184,13 +187,20 @@ foreach my $proj (keys %{$sampleSheet}){
     $projJob->submit({queue=>1});
     $projJobs{$proj} = $projJob;
     print STDERR $projJob->jobId(), "\n";
+    # Make sure to get the script md5 into the sisyphus cache,
+    # otherwise any old checksum from a failed run might fail the
+    # archiving
+    my $scriptFile = $projJob->scriptFile();
+    print STDERR "$scriptFile\n";
+    # If an old script was created the MD5 might be saved, so make sure to overwrite that
+    $sisyphus->saveMd5($scriptFile, $sisyphus->getMd5($scriptFile, -noCache=>1));
 }
 
 # Global report
 # Depend on all other jobs
 # Create a slurm job handler
 my $repJob =
-  Molmed::Sisyphus::Kalkyl::SlurmJob->new(
+  Molmed::Sisyphus::Uppmax::SlurmJob->new(
                                            DEBUG=>$debug,         # bool
                                            SCRIPTDIR=>$scriptDir, # Directory for writing the script
                                            EXECDIR=>$rfPath,      # Directory from which to run the script
@@ -203,11 +213,20 @@ my $repJob =
 foreach my $job (values %projJobs){
     $repJob->addDep($job);
 }
+$repJob->addCommand("module load uppmax");
+$repJob->addCommand("module load gnuplot");
 $repJob->addCommand("umask 007");
 $repJob->addCommand("$FindBin::Bin/generateReport.pl -runfolder $rfPath $debugFlag", "generateReport.pl on $rfPath FAILED");
 print STDERR "Submitting Rep-$rfShort\t";
 $repJob->submit({queue=>1});
 print STDERR $repJob->jobId(), "\n";
+# Make sure to get the script md5 into the sisyphus cache,
+# otherwise any old checksum from a failed run might fail the
+# archiving
+my $scriptFile = $repJob->scriptFile();
+print STDERR "$scriptFile\n";
+# If an old script was created the MD5 might be saved, so make sure to overwrite that
+$sisyphus->saveMd5($scriptFile, $sisyphus->getMd5($scriptFile, -noCache=>1));
 
 
 
@@ -215,16 +234,19 @@ print STDERR $repJob->jobId(), "\n";
 # Depend on report generation
 # Create a slurm job handler
 my $archJob =
-  Molmed::Sisyphus::Kalkyl::SlurmJob->new(
+  Molmed::Sisyphus::Uppmax::SlurmJob->new(
 					   DEBUG=>$debug,         # bool
 					   SCRIPTDIR=>$scriptDir, # Directory for writing the script
 					   EXECDIR=>$rfPath,      # Directory from which to run the script
                                            NAME=>"Arch-$rfShort", # Name of job, also used in script name
 					   PROJECT=>$uProj,       # project for resource allocation
 					   TIME=>"2-00:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
-					   PARTITION=>'node'      # core or node (or devel));
+					   PARTITION=>'core',      # core or node (or devel))
+					   CORES=>'2'
 					  );
 $archJob->addDep($repJob);
+$archJob->addCommand("module load uppmax");
+$archJob->addCommand("module load irods/swestore");
 $archJob->addCommand("umask 007");
 
 # Add year and month to outdir if not already included
@@ -243,7 +265,13 @@ $archJob->addCommand("$FindBin::Bin/archive.pl -runfolder $rfPath -outdir '$aPat
 print STDERR "Submitting Arch-$rfShort\t";
 $archJob->submit({queue=>1});
 print STDERR $archJob->jobId(), "\n";
-
+# Make sure to get the script md5 into the sisyphus cache,
+# otherwise any old checksum from a failed run might fail the
+# archiving
+$scriptFile = $archJob->scriptFile();
+print STDERR "$scriptFile\n";
+# If an old script was created the MD5 might be saved, so make sure to overwrite that
+$sisyphus->saveMd5($scriptFile, $sisyphus->getMd5($scriptFile, -noCache=>1));
 
 
 print STDERR "Done\n";

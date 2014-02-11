@@ -7,7 +7,7 @@ use Getopt::Long;
 
 =head1 NAME
 
-checkJobs.pl - Checks the status of one or more jobs run on the cluster Kalkyl
+checkJobs.pl - Checks the status of one or more jobs run on the cluster
 
 =head1 SYNOPSIS
 

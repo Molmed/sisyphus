@@ -2,6 +2,7 @@
 
 use FindBin;                # Find the script location
 use lib "$FindBin::Bin/lib";# Add the script libdir to libs
+use Molmed::Sisyphus::Libpath;
 
 use strict;
 use Getopt::Long;
@@ -144,7 +145,9 @@ foreach my $project(keys %files){
 	    print STDERR "IN: $file\n";
 
 	    my($lane,$read,$tag) = (0,0,'');
-	    if($file =~ m/_([ACTG]+)_L(\d{3})_R(\d)_\d{3}/){
+#	    if($file =~ m/_([ACTG]+)_L(\d{3})_R(\d)_\d{3}/){
+	    # Dual index tags contains a hyphen
+	    if($file =~ m/_([ACTG]+-?[ACGT]*)_L(\d{3})_R(\d)_\d{3}/){
 		$tag = $1;
 		$lane = $2 + 0;
 		$read = $3;
@@ -220,7 +223,8 @@ foreach my $project(keys %files){
 		    print STDERR "$dumpFile\n" if($debug);
 		    $stat->saveData("$dumpFile.zip");
 		    # Calc & store the checksum for the dump
-		    my $foo = $sisyphus->getMd5("$dumpFile.zip");
+		    my $sum = $sisyphus->getMd5("$dumpFile.zip", -noCache=>1);
+		    $sisyphus->saveMd5("$dumpFile.zip", $sum);
 		}
 	    }
 	}
@@ -233,13 +237,17 @@ foreach my $file (keys %checkSums){
     # This checksum is for the uncompressed data
     my $md5 = $checkSums{$file}->hexdigest();
     $sisyphus->saveMd5($file,$md5);
-    # Also calc&store the checksum for the compressed file if not already done
+    # Also calc&store the checksum for the compressed file if not already done as it should be
     my $foo = $sisyphus->getMd5("$file.gz") if(-e "$file.gz");;
 }
 
 mkdir("$rfPath/Statistics") unless(-e "$rfPath/Statistics");
 foreach my $l (@{$lane}){
-    `touch "$rfPath/Statistics/fastqStats-L$l.complete"`;
+    my $file = "$rfPath/Statistics/fastqStats-L$l.complete";
+    `touch $file`;
+    # Calc & store the checksum for the file
+    my $sum = $sisyphus->getMd5($file, -noCache=>1);
+    $sisyphus->saveMd5($file, $sum);
 }
 print STDERR "Filtering complete\n";
 

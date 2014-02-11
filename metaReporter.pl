@@ -1,5 +1,9 @@
 #!/usr/bin/perl -w
 
+use FindBin;                # Find the script location
+use lib "$FindBin::Bin/lib";# Add the script libdir to libs
+use Molmed::Sisyphus::Libpath;
+
 use strict;
 use XML::Simple;
 use XML::LibXSLT;

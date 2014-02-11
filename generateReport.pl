@@ -2,6 +2,7 @@
 
 use FindBin;                # Find the script location
 use lib "$FindBin::Bin/lib";# Add the script libdir to libs
+use Molmed::Sisyphus::Libpath;
 
 use strict;
 use Getopt::Long;
@@ -399,6 +400,9 @@ close($htmlFh);
 foreach my $project (@projects){
     linkDir("$rfPath/Statistics/Project_$project", "$outDir/$project");
 }
+
+# Calculate checksums for all summary files
+$sisyphus->md5Dir($outDir, -noCache=>1, -save=>1);
 
 sub linkDir{
     my $srcDir = shift;

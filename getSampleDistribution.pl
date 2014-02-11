@@ -1,5 +1,8 @@
 #!/usr/bin/perl -w
 
+use FindBin;                # Find the script location
+use lib "$FindBin::Bin/lib";# Add the script libdir to libs
+
 use strict;
 use XML::Simple;
 use Carp;

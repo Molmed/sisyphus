@@ -1,6 +1,7 @@
 package Molmed::Sisyphus::QStat;
 
 use strict;
+use Molmed::Sisyphus::Libpath;
 use Carp;
 use PDL;
 use Data::Dumper;
