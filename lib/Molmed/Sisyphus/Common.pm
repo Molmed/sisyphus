@@ -2022,7 +2022,7 @@ sub fixSampleSheet{
 		$dataStart = 1;
 		my $r = <$ssfh>;
 		chomp($r);
-		@header = split /,/, $r;
+		@header = split /,/, $r, -1;
 		# expected MiSeq header
 		#Sample_ID,Sample_Name,Sample_Plate,Sample_Well,Sample_Project,index,I7_Index_ID,Description,GenomeFolder
 
@@ -2042,7 +2042,7 @@ sub fixSampleSheet{
 	    }
 	    next unless($dataStart);
 	    my %vals;
-	    @vals{@header} = split /,/, $_;
+	    @vals{@header} = split /,/, $_, -1;
 	    $vals{Sample_Project} = $projName unless(defined $vals{Sample_Project} && length($vals{Sample_Project})>0);
 	    # remove unallowed characters from sample name
 	    $vals{Sample_ID} =~ s/[\?\(\)\[\]\/\\\=\+\<\>\:\;\"\'\,\*\^\|\&\.]/_/g;
