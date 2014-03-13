@@ -1962,6 +1962,10 @@ sub fixSampleSheet{
 	return 0;
     }
 
+    # Make sure sample sheet has Unix format
+    print STDERR "Convering '$sampleSheet' to unix format.";
+    system('dos2unix', $sampleSheet)==0 or croak "Failed to convert sample sheet to unix format.\n";
+
     # What type of run is this
     my $type = $self->machineType;
 
