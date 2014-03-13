@@ -1963,7 +1963,7 @@ sub fixSampleSheet{
     }
 
     # Make sure sample sheet has Unix format
-    print STDERR "Convering '$sampleSheet' to unix format.";
+    print STDERR "Convering '$sampleSheet' to unix format.\n";
     system('dos2unix', $sampleSheet)==0 or croak "Failed to convert sample sheet to unix format.\n";
 
     # What type of run is this
