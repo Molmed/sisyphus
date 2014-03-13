@@ -426,21 +426,6 @@ done
 check_errs \$RSYNC_OK "FAILED"
 echo OK
 
-echo "Setting permissions on remote copy"
-PERM_OK=1
-SLEEP=300
-until [ \$PERM_OK = 0 ]; do
-    echo -n "ssh $rHost chgrp -R --reference '$rPath' '$rPath/$rfName'; find '$rPath/$rfName' -type d -exec chmod 2770 {} \\; ";
-    ssh $rHost "chgrp -R --reference '$rPath' '$rPath/$rfName'; find '$rPath/$rfName' -type d -exec chmod 2770 {} \\;"
-    PERM_OK=\$?
-    if [ \$PERM_OK -gt 0 ]; then
-       echo "FAILED will retry in \$SLEEP seconds"
-       sleep \$SLEEP
-    fi
-done
-check_errs \$PERM_OK "FAILED"
-echo OK
-
 EOF
 
 # Calculate md5 checksums of the transferred files
@@ -473,6 +458,21 @@ until [ \$RSYNC_OK = 0 ]; do
     fi
 done
 check_errs \$RSYNC_OK "FAILED"
+echo OK
+
+echo "Setting permissions on remote copy"
+PERM_OK=1
+SLEEP=300
+until [ \$PERM_OK = 0 ]; do
+    echo -n "ssh $rHost chgrp -R --reference '$rPath' '$rPath/$rfName'; find '$rPath/$rfName' -type d -exec chmod 2770 {} \\; ";
+    ssh $rHost "chgrp -R --reference '$rPath' '$rPath/$rfName'; find '$rPath/$rfName' -type d -exec chmod 2770 {} \\;"
+    PERM_OK=\$?
+    if [ \$PERM_OK -gt 0 ]; then
+       echo "FAILED will retry in \$SLEEP seconds"
+       sleep \$SLEEP
+    fi
+done
+check_errs \$PERM_OK "FAILED"
 echo OK
 
 # Extract the information to put in Seq-Summaries
