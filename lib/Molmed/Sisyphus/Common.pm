@@ -16,6 +16,7 @@ use FindBin;
 use YAML::Tiny;
 use File::Find;
 #use Hash::Util;
+use File::Path 'rmtree';
 use Fcntl qw(:flock SEEK_END :mode); # Import LOCK_*, mode and SEEK_END constants
 
 our $AUTOLOAD;
@@ -211,7 +212,99 @@ sub gzip{
     return("$file.gz");
 }
 
+=pod
 
+=head2 gzipFolder()
+
+ Title   : gzipFolder
+ Usage   : $sis->gzipFolder($file)
+ Function: Compress the folder $file in dir $srcDir with gzip,
+           verify and then delete the old folder. The checksum
+           of the compressed file is saved to RF/MD5/sisyphus.md5.
+ Example :
+ Returns : new filename of gzipped file (absolute path)
+ Args    : file path (absolute or relative to runfolder)
+
+=cut
+
+
+sub gzipFolder{
+    my $self = shift;
+    my $file = shift;
+    my $md5sumFile = shift;
+
+    print "gzip: Getting abs path for $file\n" if($self->{DEBUG});
+    my $dirPath = dirname(abs_path($file));
+    print "File abs path for $file: $dirPath\n" if($self->{DEBUG});
+    unless(-e "$dirPath/$file"){
+	$dirPath = $self->PATH;
+	print "Self dir path for $file: $dirPath\n" if($self->{DEBUG});
+	unless(-e "$dirPath/$file"){
+	    confess "Failed to get abs path for $file\n";
+	}
+    }
+    print "$dirPath/$file\n" if($self->{DEBUG});
+
+    if(-e "$dirPath/$file.tar.gz"){
+	print "$dirPath/$file.tar.gz already exists\n" if($self->{DEBUG});
+    }else{
+	die "$dirPath/$file is not a folder!\n" if(! -d "$dirPath/$file");
+	my @stat = stat("$dirPath/$file");
+	my $pig = system("tar -cC $dirPath/$file . | pigz -n -T -p $self->{THREADS} -c > '$dirPath/$file.tar.gz'");
+	if($pig){ # pigz failed
+	    unlink("$dirPath/$file.tar.gz") if(! $self->{DEBUG} && -e "$$dirPath/$file.tar.gz" && -e "$dirPath/$file");
+	    system("tar -zcf '$dirPath/$file.tar.gz' -C '$dirPath' '$file'")==0 or confess "Failed to gzip $dirPath/$file\n";
+	}
+    }
+
+    print "verifying $dirPath/$file.tar.gz\n" if($self->{DEBUG});
+
+    my $md5Hash = $self->getMd5ForArchiveContent($file);
+    open(MD5SUM, $md5sumFile) or die "Couldn't open md5 file for $md5sumFile!\n";
+
+    print "Validating MD5 for each file in the compressed archive '$dirPath/$file'\n" if($self->{DEBUG});
+    while(<MD5SUM>)
+    {
+	if(!/^\n/)
+	{
+		chomp;
+		my ($md5, $path) = split(/\t|\s+/,$_,2);
+
+		if(!defined($md5Hash->{$path}))
+		{
+			die "MD5 path not found in org file ($path)!\n";
+		}
+		elsif(!($md5Hash->{$path} eq $md5))
+		{
+			die "MD5 doesn't match org file ($path), $md5!=$md5Hash->{$path}!\n";
+		}
+		delete $md5Hash->{$path};
+	}
+    }
+    close(MD5SUM);
+    if((scalar keys %{$md5Hash}) > 0) {
+        if($self->{DEBUG}) {
+		print "Extra files in provided md5 list:\n";
+		foreach (keys  %{$md5Hash}) {
+			print "$_\t$md5Hash->{$_}\n";
+		}
+	}
+    	die "Provided md5 checklist file contains more files than the compressed archive!\n" if((scalar keys %{$md5Hash}) > 0);
+    }
+   
+    # Compress & Uncompress successful
+    # Now we can delete the original folder
+    print STDERR "Removing original file '$dirPath/$file'\n" if($self->{DEBUG});
+    rmtree  "$dirPath/$file" or die "Couldn't remove folder $dirPath/$file!\n";
+
+    # Get and save the md5 of the compressed file if it is in the runfolder
+    # Avoid cache since an old compressed file might linger there
+    # get with noCache will skip saving, so be explicit about that
+    my $md5 = $self->getMd5("$file.tar.gz", -noCache=>1);
+    $self->saveMd5("$file.tar.gz",$md5);
+
+    return("$file.tar.gz");
+}
 
 
 =pod
@@ -314,6 +407,56 @@ sub getMd5{
 	}
     }
     return ($sum);
+}
+
+=pod
+
+=head2 getMd5ForArchiveContent()
+
+ Title   : getMd5ForArchiveContent
+ Usage   : $sis->getMd5ForArchiveContent($file|$fh, -noCache=>0, -skipMissing=>0)
+ Function: Calculates the md5 checksum for all files found inside archive (tar.gz)
+ Example :
+ Returns : hash ref with path as key and md5 as value
+ Args    : file path (absolute or relative to the runfolder) or filehandle,
+
+=cut
+
+
+sub getMd5ForArchiveContent{
+    my $self = shift;
+    my $file = shift;
+    my %args = @_;
+
+    my $fh;
+
+    unless(defined $file){
+	confess "File not defined\n";
+    }
+  
+    my $tempfolder = "tmp." . time;
+    mkdir $tempfolder;	
+	
+    my $tar = system("tar -zxf  $file.tar.gz -C $tempfolder");
+    if($tar){ # pigz failed
+       rmtree $tempfolder or die "Couldn't remove folder: $tempfolder!\n";
+       die "Couldn't extract archive content $file into $tempfolder!\n";
+    }
+    
+    my $md5sumList;
+	
+    open($fh, '-|', "find $tempfolder -type f -print0 | xargs -0 md5sum") || die "Failed archive read '$tempfolder': $!\n";	    
+    while(<$fh>)
+    {
+	chomp;
+	my ($md5,$path) = split(/\t|\s+/,$_,2);
+	$path =~ s/$tempfolder\///g;
+	$md5sumList->{$path} = $md5;
+    }
+    close($fh);
+    rmtree $tempfolder or die "Couldn't remove folder: $tempfolder!\n";
+    print "md5 calculated for all files in archive $file!\n" if($self->{DEBUG});
+    return $md5sumList;
 }
 
 =pod
@@ -1168,6 +1311,133 @@ sub runParameters{
     $self->{RUNPARAMS}=$runParams;
     return $runParams;
 }
+
+=pod
+
+=head2 getRunMode()
+
+ Title   : getRunMode
+ Usage   : $sis->getRunMode()
+ Function: returns the used RunMode
+ Example :
+ Returns : RunType string or undef
+ Args    : none
+
+=cut
+
+sub getRunType{
+    my $self = shift;
+    if(!defined $self->{RUNPARAMS}){
+	confess "RunParameters haven't been loaded\n";
+    }
+    return $self->{RUNPARAMS}->{Setup}->{RunMode} eq "" ? return : $self->{RUNPARAMS}->{Setup}->{RunMode};
+}
+
+=pod
+
+=head2 getApplicationName()
+
+ Title   : getApplicationName
+ Usage   : $sis->getApplicationName()
+ Function: returns Application Name (MiSeq Control Software or HiSeq Control Software)
+ Example :
+ Returns : Application Name string or undef
+ Args    : none
+
+=cut
+
+sub getApplicationName {
+    my $self = shift;
+    if(!defined $self->{RUNPARAMS}){
+        confess "RunParameters haven't been loaded\n";
+    }
+    return $self->{RUNPARAMS}->{Setup}->{ApplicationName} eq "" ? return : $self->{RUNPARAMS}->{Setup}->{ApplicationName};
+}
+
+=pod
+
+=head2 getRead1Length()
+
+ Title   : getRead1Length
+ Usage   : $sis->getRead1Length()
+ Function: returns used read 1 length
+ Example :
+ Returns : Integer or undef
+ Args    : none
+
+=cut
+
+sub getRead1Length {
+    my $self = shift;
+    if(!defined $self->{RUNPARAMS}){
+        confess "RunParameters haven't been loaded\n";
+    }
+    return $self->{RUNPARAMS}->{Setup}->{Read1} eq "" ? return : $self->{RUNPARAMS}->{Setup}->{Read1};
+}
+
+=pod
+
+=head2 getRead2Length()
+
+ Title   : getRead2Length
+ Usage   : $sis->getRead2Length()
+ Function: returns used read 2 length
+ Example :
+ Returns : Integer or undef
+ Args    : none
+
+=cut
+
+sub getRead2Length{
+    my $self = shift;
+    if(!defined $self->{RUNPARAMS}){
+        confess "RunParameters haven't been loaded\n";
+    }
+    return $self->{RUNPARAMS}->{Setup}->{Read2} eq "" ? return : $self->{RUNPARAMS}->{Setup}->{Read2};
+}
+
+=pod
+
+=head2 getBarcode()
+
+ Title   : getBarcode
+ Usage   : $sis->getBarcode()
+ Function: returns the used barcode sequence
+ Example :
+ Returns : String or undef
+ Args    : none
+
+=cut
+
+sub getBarcode{
+    my $self = shift;
+    if(!defined $self->{RUNPARAMS}){
+        confess "RunParameters haven't been loaded\n";
+    }
+    return $self->{RUNPARAMS}->{Setup}->{Barcode} eq "" ? return : $self->{RUNPARAMS}->{Setup}->{Barcode};
+}
+
+=pod
+
+=head2 getReagentKitVersion()
+
+ Title   : getReagentKitVersion
+ Usage   : $sis->getReagentKitVersion()
+ Function: returns the used reagemt kit version
+ Example :
+ Returns : String or undef
+ Args    : none
+
+=cut
+
+sub getReagentKitVersion{
+    my $self = shift;
+    if(!defined $self->{RUNPARAMS}){
+        confess "RunParameters haven't been loaded\n";
+    }
+    return $self->{RUNPARAMS}->{Setup}->{ReagentKitVersion} eq "" ? return : $self->{RUNPARAMS}->{Setup}->{ReagentKitVersion};
+}
+
 
 =pod
 

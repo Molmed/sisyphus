@@ -528,6 +528,8 @@ sub archiveRunfolder{
   open(my $tarPipe, qq(| tar cf "$tarFile" --no-recursion -C "$dirMask" --files-from -) )
     or die qq(Failed to open tarpipe 'tar cf "$tarFile" --no-recursion -C "$dirMask" --files-from -'\n\t$!\n);
 
+  compressMiSeqRunFolder($rfPath, $tarPipe, $checksums, $sisyphus, $dirMask);
+
   recurseRunfolder($rfPath, $tarPipe, $checksums, $sisyphus, $dirMask);
 }
 
@@ -792,4 +794,42 @@ sub recurseFastq{
 	}
     }
     closedir($dh);
+}
+
+=pod
+
+=head2 compressMiSeqRunFolder()
+
+ Title   : compressMiSeqRunFolder
+ Usage   : compressMiSeqRunFolder()($dir, $tarPipe, \%checksums, $sisyphus, $dirMask)
+ Function: Compress the MiSeq_Runfolder if it exists. 
+ Example :
+ Return  : nothing
+ Args    : The directory path of the file
+           An open filehandle for writing filenames to tar
+           A hashref for saving checksums of the archived files
+           An open filehandle for writing filenames to tar
+           A Sisyphus::Common object for the runfolder to archive
+           The part of the path to remove from the file's path
+
+=cut
+
+sub compressMiSeqRunFolder{
+    my $inDir = shift;
+    my $tarPipe = shift;
+    my $checksums = shift;
+    my $sisyphus = shift;
+    my $dirMask = shift;
+
+    my $file = 'MiSeq_Runfolder';
+    my $md5Sum = 'MD5/checksums.miseqrunfolder.md5';
+    if( -d "$inDir/$file"){
+        $file = $sisyphus->gzipFolder("$file","$inDir/$md5Sum"); # Gzip returns abs path
+        $file =~ s:^$inDir/::; # Make $file relative again
+        $checksums->{COMPRESSED}->{"$inDir/$file"} = $sisyphus->getMd5("$inDir/$file");
+ 
+  	my $path = "$inDir/$file";
+  	$path =~ s:^$dirMask/*::;
+  	print $tarPipe "$path\n" || die "Failed to write $path to tarPipe";
+    }
 }
