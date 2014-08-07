@@ -256,9 +256,9 @@ sub gzipFolder{
 	    system("tar -zcf '$dirPath/$file.tar.gz' -C '$dirPath' '$file'")==0 or confess "Failed to gzip $dirPath/$file\n";
 	}
     }
-
+    
     print "verifying $dirPath/$file.tar.gz\n" if($self->{DEBUG});
-
+    
     my $md5Hash = $self->getMd5ForArchiveContent($file);
     open(MD5SUM, $md5sumFile) or die "Couldn't open md5 file for $md5sumFile!\n";
 
@@ -272,10 +272,13 @@ sub gzipFolder{
 
 		if(!defined($md5Hash->{$path}))
 		{
+			print "Removing $file.tar.gz since the content doesn't match the stored md5 sums!\n";
+			unlink $file;
 			die "MD5 path not found in org file ($path)!\n";
 		}
 		elsif(!($md5Hash->{$path} eq $md5))
 		{
+			print "Removing $file.tar.gz since the content doesn't match the stored md5 sums!\n";
 			die "MD5 doesn't match org file ($path), $md5!=$md5Hash->{$path}!\n";
 		}
 		delete $md5Hash->{$path};
@@ -284,6 +287,8 @@ sub gzipFolder{
     close(MD5SUM);
     if((scalar keys %{$md5Hash}) > 0) {
         if($self->{DEBUG}) {
+		print "Removing $file.tar.gz since the content doesn't match the stored md5 sums!\n";
+		unlink $file;
 		print "Extra files in provided md5 list:\n";
 		foreach (keys  %{$md5Hash}) {
 			print "$_\t$md5Hash->{$_}\n";

@@ -177,6 +177,12 @@ unless($verifyOnly){
       }
     }
   }
+  
+  # Archive the MiSeq_Runfolder.tar.gz if it exist.
+  if(-e "MiSeq_Runfolder.tar.gz") {
+    $sisyphus->copy("MiSeq_Runfolder.tar.gz", $outDir, {VERIFY=>1,LINK=>1,RELATIVE=>0});
+    $sisyphus->copy("MD5/checksums.miseqrunfolder.md5",$outDir, {VERIFY=>1,LINK=>1,RELATIVE=>0});
+  }
 
   # Then copy/link the fastq-files. If the file exists in both the project directory
   # and the Unaligned/Excluded directory, archive only the copy in the project directory
@@ -528,7 +534,7 @@ sub archiveRunfolder{
   open(my $tarPipe, qq(| tar cf "$tarFile" --no-recursion -C "$dirMask" --files-from -) )
     or die qq(Failed to open tarpipe 'tar cf "$tarFile" --no-recursion -C "$dirMask" --files-from -'\n\t$!\n);
 
-  compressMiSeqRunFolder($rfPath, $tarPipe, $checksums, $sisyphus, $dirMask);
+  compressMiSeqRunFolder($rfPath, $checksums, $sisyphus, $dirMask);
 
   recurseRunfolder($rfPath, $tarPipe, $checksums, $sisyphus, $dirMask);
 }
@@ -568,6 +574,11 @@ sub recurseRunfolder {
     return;
   }
 
+  if(basename($dir) eq 'MiSeq_Runfolder'){
+    print STDERR "Skipping MiSeq_Runfolder dir '$dir'\n" if($debug);
+    return;
+  }
+
   opendir(my $dh, $dir) or die;
   foreach my $file ( grep {!/^\.{1,2}$/} readdir($dh) ){
 
@@ -580,7 +591,7 @@ sub recurseRunfolder {
     }else{
       # Skip archiving logs from sbatch, as this might be written to
       # by self
-      if( !($dir =~ m:slurmscripts/log: && $file =~ /^Arch-.*\.log/i) ){
+      if( !($dir =~ m:slurmscripts/log: && $file =~ /^Arch-.*\.log/i) && !($file =~/MiSeq_Runfolder\.tar\.gz/)){
 	addFile($dir, $file, $tarPipe, $checksums, $sisyphus, $dirMask);
       }
     }
@@ -816,20 +827,21 @@ sub recurseFastq{
 
 sub compressMiSeqRunFolder{
     my $inDir = shift;
-    my $tarPipe = shift;
     my $checksums = shift;
     my $sisyphus = shift;
     my $dirMask = shift;
 
     my $file = 'MiSeq_Runfolder';
     my $md5Sum = 'MD5/checksums.miseqrunfolder.md5';
+
+    if(-e  "$inDir/$file.tar.gz") {
+	print "Compressed MiSeq_Runfolder already exists!\n";
+	return;
+    }
+
     if( -d "$inDir/$file"){
         $file = $sisyphus->gzipFolder("$file","$inDir/$md5Sum"); # Gzip returns abs path
         $file =~ s:^$inDir/::; # Make $file relative again
         $checksums->{COMPRESSED}->{"$inDir/$file"} = $sisyphus->getMd5("$inDir/$file");
- 
-  	my $path = "$inDir/$file";
-  	$path =~ s:^$dirMask/*::;
-  	print $tarPipe "$path\n" || die "Failed to write $path to tarPipe";
     }
 }
