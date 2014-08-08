@@ -1,11 +1,9 @@
 language: perl
 perl:
-  - "5.10.1"
+  - "5.10"
 
 before_install: 
-  - "cpanm Digest::MD5"
-  - "cpanm PerlIO::gzip"
-  - "cpanm XML::Simple"
-
-script: "perl t/Qstat.t"
+  - "cpanm --quiet --notest Digest::MD5"
+  - "cpanm --quiet --notest PerlIO::gzip"
+  - "cpanm --quiet --notest XML::Simple"
 
