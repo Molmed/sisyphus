@@ -6,4 +6,5 @@ before_install:
   - "cpanm --quiet --notest Digest::MD5"
   - "cpanm --quiet --notest PerlIO::gzip"
   - "cpanm --quiet --notest XML::Simple"
-
+  - sudo apt-get update -qq
+  - sudo apt-get install -y dos2unix
