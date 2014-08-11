@@ -5,7 +5,7 @@ use ExtUtils::MakeMaker;
 
 WriteMakefile(
   NAME         => 'Sisyphus',
-  VERSION_FROM => 'version.pl',
+  VERSION_FROM => 'VERSION',
   test => {TESTS => 't/*.t'}
 );
 

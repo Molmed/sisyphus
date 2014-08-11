@@ -9,3 +9,9 @@ before_install:
   - "cpanm --quiet --notest PDL"
   - sudo apt-get update -qq
   - sudo apt-get install -y dos2unix
+
+before_script:
+  - echo 'our $VERSION="'`perl ./version.pl`'"' > VERSION
+  - make manifest
+
+
