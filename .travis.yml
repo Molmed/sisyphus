@@ -12,6 +12,7 @@ before_install:
 
 before_script:
   - echo 'our $VERSION="'`perl ./version.pl`'"' > VERSION
-  - make manifest
+  - perl -MExtUtils::Manifest=mkmanifest -e 'mkmanifest()'
+
 
 
