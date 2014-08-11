@@ -10,9 +10,9 @@ before_install:
   - sudo apt-get update -qq
   - sudo apt-get install -y dos2unix
 
-before_script:
+script:
   - echo 'our $VERSION="'`perl ./version.pl`'"' > VERSION
   - perl -MExtUtils::Manifest=mkmanifest -e 'mkmanifest()'
-
+  - perl Makefile.PL && make test
 
 
