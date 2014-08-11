@@ -24,7 +24,6 @@ lib/Molmed/Sisyphus/Plot.pm
 lib/Molmed/Sisyphus/QStat.pm
 lib/Molmed/Sisyphus/Uppmax.pm
 lib/Molmed/Sisyphus/Uppmax/SlurmJob.pm
-lib/Molmed/Sisyphus/Version.pm
 lib/XML/Simple.pm
 lib/YAML/Tiny.pm
 Makefile.PL
@@ -52,4 +51,5 @@ t/Common.t
 t/QStat.t
 unpack.pl
 uploadEntireMiSeqFolder.pl
+version.pl
 xml2html.pl

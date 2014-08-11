@@ -5,7 +5,7 @@ use ExtUtils::MakeMaker;
 
 WriteMakefile(
   NAME         => 'Sisyphus',
-  VERSION_FROM => 'lib/Molmed/Sisyphus/Version.pm',
+  VERSION_FROM => 'version.pl',
   test => {TESTS => 't/*.t'}
 );
 
