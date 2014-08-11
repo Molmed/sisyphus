@@ -181,7 +181,7 @@ unless($verifyOnly){
   # Archive the MiSeq_Runfolder.tar.gz if it exist.
   if(-e "MiSeq_Runfolder.tar.gz") {
     $sisyphus->copy("MiSeq_Runfolder.tar.gz", $outDir, {VERIFY=>1,LINK=>1,RELATIVE=>0});
-    $sisyphus->copy("MD5/checksums.miseqrunfolder.md5",$outDir, {VERIFY=>1,LINK=>1,RELATIVE=>0});
+    $sisyphus->copy("MD5/checksums.miseqrunfolder.md5","$outDir/checksums.miseqrunfolder.org.md5", {VERIFY=>1,LINK=>1,RELATIVE=>0});
   }
 
   # Then copy/link the fastq-files. If the file exists in both the project directory
