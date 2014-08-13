@@ -835,6 +835,7 @@ sub compressMiSeqRunFolder{
     my $md5Sum = 'MD5/checksums.miseqrunfolder.md5';
 
     if(-e  "$inDir/$file.tar.gz") {
+	$checksums->{COMPRESSED}->{"$inDir/$file"} = $sisyphus->getMd5("$inDir/$file");
 	print "Compressed MiSeq_Runfolder already exists!\n";
 	return;
     }
@@ -842,6 +843,6 @@ sub compressMiSeqRunFolder{
     if( -d "$inDir/$file"){
         $file = $sisyphus->gzipFolder("$file","$inDir/$md5Sum"); # Gzip returns abs path
         $file =~ s:^$inDir/::; # Make $file relative again
-        $checksums->{COMPRESSED}->{"$inDir/$file"} = $sisyphus->getMd5("$inDir/$file");
+        $checksums->{COMPRESSED}->{"$inDir/$file.tar.gz"} = $sisyphus->getMd5("$inDir/$file.tar.gz");
     }
 }
