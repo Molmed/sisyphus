@@ -428,7 +428,7 @@ EOF
 # If uploading a miseq runfolder, perform a dry-run
 
 # Set the miseq-specific paths
-my $miseq_exclude = "miseqentirerunfolder.rsync";
+my $miseq_include = "miseqentirerunfolder.rsync";
 my $miseq_dry_log = "rsync.miseqrunfolder.log";
 my $miseq_rsync_log = "rsync-real.miseqrunfolder.log";
 my $miseq_destination = "MiSeq_Runfolder";
@@ -438,7 +438,7 @@ if ($miseq) {
     print $scriptFh <<EOF;
 
 # Generate a list of files to transfer for MiSeq runfolder
-rsync -vrtp --dry-run --chmod=Dg+sx,ug+w,o-rwx --exclude-from '$FindBin::Bin/$miseq_exclude' '$rfName' '/$rnd' > '$rfName/$miseq_dry_log'
+rsync -vrtp --dry-run --chmod=Dg+sx,ug+w,o-rwx --include-from '$FindBin::Bin/$miseq_include' '$rfName' '/$rnd' > '$rfName/$miseq_dry_log'
 
 EOF
 }
@@ -474,7 +474,7 @@ SLEEP=300
 until [ \$RSYNC_OK = 0 ]; do
     echo -n "rsync $rfPath $targetPath/$rfName/$miseq_destination/"
     ssh $rHost mkdir -p $rPath/$rfName/$miseq_destination;
-    rsync -vrtp --chmod=Dg+sx,ug+w,o-rwx --exclude-from '$FindBin::Bin/$miseq_exclude' '$rfName' '$targetPath/$rfName/$miseq_destination/' >> '$rfName/$miseq_rsync_log'
+    rsync -vrtp --chmod=Dg+sx,ug+w,o-rwx --include-from '$FindBin::Bin/$miseq_include' '$rfName' '$targetPath/$rfName/$miseq_destination/' >> '$rfName/$miseq_rsync_log'
     RSYNC_OK=\$?
     if [ \$RSYNC_OK -gt 0 ]; then
        echo "FAILED will retry in \$SLEEP seconds"
