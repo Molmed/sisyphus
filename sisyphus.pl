@@ -50,6 +50,10 @@ Skip paranoid wait for runfolder completion. Just continue if RTAComplete.txt ex
 
 Continue even if data is missing. Adds --ignore-missing-stats, --ignore-missing-bcl, --ignore-missing-control to bcl2fastq conversion.
 
+=item -miseq
+
+Also upload the entire MiSeq runfolder to a subfolder in the runfolder on Uppmax
+
 =item -debug
 
 Print debugging information
@@ -84,6 +88,7 @@ The postprocessing includes the following steps:
 =cut
 
 my $rfPath = undef;
+my $miseq = 0;
 my $exec = 1;
 my $wait = 1;
 my $force = 0;
@@ -431,11 +436,11 @@ my $miseq_checksums = "checksums.miseqrunfolder.md5";
 
 if ($miseq) { 
     print $scriptFh <<EOF;
-    
-    # Generate a list of files to transfer for MiSeq runfolder
-    rsync -vrtp --dry-run --chmod=Dg+sx,ug+w,o-rwx --exclude-from '$FindBin::Bin/$miseq_exclude' '$rfName' '/$rnd' > '$rfName/$miseq_dry_log'
 
-    EOF
+# Generate a list of files to transfer for MiSeq runfolder
+rsync -vrtp --dry-run --chmod=Dg+sx,ug+w,o-rwx --exclude-from '$FindBin::Bin/$miseq_exclude' '$rfName' '/$rnd' > '$rfName/$miseq_dry_log'
+
+EOF
 }
 
 print $scriptFh <<EOF;
@@ -461,25 +466,26 @@ EOF
 # Do the transfer of the MiSeq runfolder
 if ($miseq) {
     print $scriptFh <<EOF;
-    
-    # Do the transfer of the MiSeq runfolder, loop until successful
-    rm -f $rfName/$miseq_rsync_log
-    RSYNC_OK=1
-    SLEEP=300
-    until [ \$RSYNC_OK = 0 ]; do
-        echo -n "rsync $rfPath $targetPath/$rfName/$miseq_destination/"
-        ssh $rHost mkdir -p $rPath/$rfName/$miseq_destination;
-        rsync -vrtp --chmod=Dg+sx,ug+w,o-rwx --exclude-from '$FindBin::Bin/$miseq_exclude' '$rfName' '$targetPath/$rfName/$miseq_destination/' >> '$rfName/$miseq_rsync_log'
-        RSYNC_OK=\$?
-        if [ \$RSYNC_OK -gt 0 ]; then
-           echo "FAILED will retry in \$SLEEP seconds"
-           sleep \$SLEEP
-        fi
-    done
-    check_errs \$RSYNC_OK "FAILED"
-    echo OK
-    
-    EOF
+
+# Do the transfer of the MiSeq runfolder, loop until successful
+rm -f $rfName/$miseq_rsync_log
+RSYNC_OK=1
+SLEEP=300
+until [ \$RSYNC_OK = 0 ]; do
+    echo -n "rsync $rfPath $targetPath/$rfName/$miseq_destination/"
+    ssh $rHost mkdir -p $rPath/$rfName/$miseq_destination;
+    rsync -vrtp --chmod=Dg+sx,ug+w,o-rwx --exclude-from '$FindBin::Bin/$miseq_exclude' '$rfName' '$targetPath/$rfName/$miseq_destination/' >> '$rfName/$miseq_rsync_log'
+    RSYNC_OK=\$?
+    if [ \$RSYNC_OK -gt 0 ]; then
+       echo "FAILED will retry in \$SLEEP seconds"
+       sleep \$SLEEP
+    fi
+done
+check_errs \$RSYNC_OK "FAILED"
+echo OK
+
+EOF
+
 }
 
 # Calculate md5 checksums of the transferred files
@@ -500,13 +506,13 @@ EOF
 if ($miseq) {
 
     print $scriptFh <<EOF;
-    
-    echo -n "Checksumming files from $rfPath for MiSeq runfolder"
-    cat $rfPath/$miseq_dry_log | $FindBin::Bin/md5sum.pl $rfName > '$rfPath/MD5/$miseq_checksums'
-    check_errs \$? "FAILED"
-    echo OK
 
-    EOF
+echo -n "Checksumming files from $rfPath for MiSeq runfolder"
+cat $rfPath/$miseq_dry_log | $FindBin::Bin/md5sum.pl $rfName > '$rfPath/MD5/$miseq_checksums'
+check_errs \$? "FAILED"
+echo OK
+
+EOF
     
 }
 
