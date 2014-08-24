@@ -4,11 +4,15 @@
 # rsync -av --dry-run --include-from miseqrunfolder.rsync $PWD > $PWD/rsync.miseqrunfolder.log
 #
 
-# include all directories
+# consider all files
 + */
 
-+ *.csv
-
+# exclude sisyphus-related directories
+- /*/Sisyphus/***
+- /*/Unaligned/***
+- /*/MD5/***
+- /*/Excluded/***
+   
 # exclude sisyphus-related files
 - .sentinel
 - *.sh
@@ -18,12 +22,5 @@
 - quickReport.txt
 - rsync*.log
 - checklist.chk
-
-# exclude sisyphus-related directories
-- Sisyphus
-- Unaligned
-- MD5
-- Excluded
-   
-- *
+- *.csv.*
 
