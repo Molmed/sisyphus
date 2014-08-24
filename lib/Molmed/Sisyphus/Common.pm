@@ -2355,10 +2355,10 @@ sub fixSampleSheet{
         }
         my $sampleSheetBak = "$sampleSheet.org.$i";
         # ..but if we have converted a miseq samplesheet, save the original under a stable name that can be used when uploading entire folder
-        if ($type -eq "miseq") {
-            $sampleSheetBak = $sampleSheet =~ s/\.csv/\.miseq\.csv/;
+        if ($type eq 'miseq') {
+            ($sampleSheetBak = $sampleSheet) =~ s/\.csv/.miseq.csv/;
         }
-	    rename($sampleSheet, $sampleSheetBak) or die "Failed to move $sampleSheet to $sampleSheetBak";
+	    rename($sampleSheet, $sampleSheetBak) or die "Failed to move $sampleSheet to $sampleSheetBak\n";
         open(my $fhOut, '>', $sampleSheet) or die "Failed to create new samplesheet in $sampleSheet\n";
         print $fhOut $output;
         close($fhOut);
