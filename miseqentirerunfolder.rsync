@@ -4,20 +4,23 @@
 # rsync -av --dry-run --include-from miseqrunfolder.rsync $PWD > $PWD/rsync.miseqrunfolder.log
 #
 
-.sentinel
-*.sh
-Excluded
-excludedTiles.*
-sisyphus.*
-setupBclToFastq.err
-quickReport.txt
-rsync*.log
-MD5
-rsync.summary.log
-checklist.chk
-Sisyphus
-Unaligned
-*.md5
-   
+# consider all files
++ */
 
+# exclude sisyphus-related directories
+- /*/Sisyphus/***
+- /*/Unaligned/***
+- /*/MD5/***
+- /*/Excluded/***
+   
+# exclude sisyphus-related files
+- .sentinel
+- *.sh
+- excludedTiles.*
+- sisyphus.*
+- setupBclToFastq.err
+- quickReport.txt
+- rsync*.log
+- checklist.chk
+- *.csv.*
 
