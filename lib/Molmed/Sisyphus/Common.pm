@@ -2353,8 +2353,8 @@ sub fixSampleSheet{
         while(-e "$sampleSheet.org.$i"){
 	        $i++;
         }
-        $sampleSheetBak = "$sampleSheet.org.$i"
-        # ..but if we have converted a miseq samplesheet, save the original under a clearer and stable name
+        my $sampleSheetBak = "$sampleSheet.org.$i";
+        # ..but if we have converted a miseq samplesheet, save the original under a stable name that can be used when uploading entire folder
         if ($type -eq "miseq") {
             $sampleSheetBak = $sampleSheet =~ s/\.csv/\.miseq\.csv/;
         }
