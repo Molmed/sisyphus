@@ -50,6 +50,10 @@ Skip paranoid wait for runfolder completion. Just continue if RTAComplete.txt ex
 
 Continue even if data is missing. Adds --ignore-missing-stats, --ignore-missing-bcl, --ignore-missing-control to bcl2fastq conversion.
 
+=item -miseq
+
+Also upload the entire MiSeq runfolder to a subfolder in the runfolder on Uppmax
+
 =item -debug
 
 Print debugging information
@@ -84,6 +88,7 @@ The postprocessing includes the following steps:
 =cut
 
 my $rfPath = undef;
+my $miseq = 0;
 my $exec = 1;
 my $wait = 1;
 my $force = 0;
@@ -96,6 +101,7 @@ my ($help,$man) = (0,0);
 GetOptions('help|?'=>\$help,
 	   'man'=>\$man,
 	   'runfolder=s' => \$rfPath,
+       'miseq!' => \$miseq,
 	   'exec!' => \$exec,
 	   'wait!' => \$wait,
 	   'force!' => \$force,
@@ -149,6 +155,13 @@ if(defined $config->{FASTQ_PATH}){
     $sisyphus->mkpath($fastqPath);
 }else{
     $fastqPath = "$rfPath";
+}
+
+# Only allow the -miseq flag if this is a miseq run
+unless (!$miseq || $sisyphus->machineType() eq 'miseq') {
+    print STDERR "The -miseq flag can only be used for MiSeq run folders ('$rfPath' does not appear to be one)\n";
+    pod2usage(-verbose => 1);
+    exit;
 }
 
 # Get extra library path from config and save to a separate file
@@ -410,6 +423,28 @@ check_errs \$? "Failed to cd to $rfRoot"
 # without actually doing it, for use by the checksumming
 rsync -vrktp --dry-run --chmod=Dg+sx,ug+w,o-rwx --prune-empty-dirs --include-from '$FindBin::Bin/hiseq.rsync' '$rfName' '/$rnd' > '$rfName/rsync.log'
 
+EOF
+
+# If uploading a miseq runfolder, perform a dry-run
+
+# Set the miseq-specific paths
+my $miseq_include = "miseqentirerunfolder.rsync";
+my $miseq_dry_log = "rsync.miseqrunfolder.log";
+my $miseq_rsync_log = "rsync-real.miseqrunfolder.log";
+my $miseq_destination = "MiSeq_Runfolder";
+my $miseq_checksums = "checksums.miseqrunfolder.md5";
+
+if ($miseq) { 
+    print $scriptFh <<EOF;
+
+# Generate a list of files to transfer for MiSeq runfolder
+rsync -vrtp --dry-run --chmod=Dg+sx,ug+w,o-rwx --include-from '$FindBin::Bin/$miseq_include' '$rfName' '/$rnd' > '$rfName/$miseq_dry_log'
+
+EOF
+}
+
+print $scriptFh <<EOF;
+
 # Now do the actual transfer, loop until successful
 rm -f $rfName/rsync-real.log
 RSYNC_OK=1
@@ -428,6 +463,31 @@ echo OK
 
 EOF
 
+# Do the transfer of the MiSeq runfolder
+if ($miseq) {
+    print $scriptFh <<EOF;
+
+# Do the transfer of the MiSeq runfolder, loop until successful
+rm -f $rfName/$miseq_rsync_log
+RSYNC_OK=1
+SLEEP=300
+until [ \$RSYNC_OK = 0 ]; do
+    echo -n "rsync $rfPath $targetPath/$rfName/$miseq_destination/"
+    ssh $rHost mkdir -p $rPath/$rfName/$miseq_destination;
+    rsync -vrtp --chmod=Dg+sx,ug+w,o-rwx --include-from '$FindBin::Bin/$miseq_include' '$rfName' '$targetPath/$rfName/$miseq_destination/' >> '$rfName/$miseq_rsync_log'
+    RSYNC_OK=\$?
+    if [ \$RSYNC_OK -gt 0 ]; then
+       echo "FAILED will retry in \$SLEEP seconds"
+       sleep \$SLEEP
+    fi
+done
+check_errs \$RSYNC_OK "FAILED"
+echo OK
+
+EOF
+
+}
+
 # Calculate md5 checksums of the transferred files
 print $scriptFh <<EOF;
 cd $rfRoot
@@ -442,6 +502,19 @@ check_errs \$? "FAILED"
 echo OK
 
 EOF
+
+if ($miseq) {
+
+    print $scriptFh <<EOF;
+
+echo -n "Checksumming files from $rfPath for MiSeq runfolder"
+cat $rfPath/$miseq_dry_log | $FindBin::Bin/md5sum.pl $rfName > '$rfPath/MD5/$miseq_checksums'
+check_errs \$? "FAILED"
+echo OK
+
+EOF
+    
+}
 
 print $scriptFh <<EOF;
 
