@@ -4,6 +4,9 @@
 # Address for quick report
 MAIL: medsci-molmed-bioinfo@lists.uu.se
 
+# Sender address for quick report
+SENDER: pontus.larsson@medsci.uu.se
+
 # CASAVA binaries
 CASAVA: /opt/CASAVA/1.8.4/bin/
 

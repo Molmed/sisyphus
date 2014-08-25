@@ -598,7 +598,7 @@ EOF
 # Make the quick report
 if(defined $config->{MAIL}){
     print $scriptFh "echo Generating quick report for $config->{MAIL}\n";
-    print $scriptFh "quickReport.pl -runfolder $rfPath -mail $config->{MAIL}\n\n";
+    print $scriptFh "quickReport.pl -runfolder $rfPath -mail $config->{MAIL} -sender $config->{SENDER}\n\n";
 }
 
 close $scriptFh;
