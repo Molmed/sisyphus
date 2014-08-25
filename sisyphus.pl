@@ -8,6 +8,7 @@ use POSIX ":sys_wait_h";
 use Getopt::Long;
 use Pod::Usage;
 use File::Basename;
+use Cwd qw(abs_path);
 
 use Molmed::Sisyphus::Common;
 
@@ -137,6 +138,7 @@ my $aHost = "milou-b.uppmax.uu.se";
 my $aPath = "/proj/$uProj/private/";
 my $sHost = "localhost";
 my $sPath = dirname($rfPath) . '/summaries';
+my $anPath = $rfRoot . '/MiSeqAnalysis';
 my $fastqPath = undef;
 my $mismatches = '1:1:1:1:1:1:1:1';
 
@@ -199,18 +201,23 @@ if(defined $config->{SUMMARY_PATH}){
 if(defined $config->{UPPNEX_PROJECT}){
     $uProj = $config->{UPPNEX_PROJECT};
 }
+if(defined $config->{ANALYSIS_PATH}){
+    $anPath = abs_path($rfPath . '/' . $config->{ANALYSIS_PATH});
+}
 
 # Strip trailing slashes from paths
 $rPath =~ s:/*$::;
 $oPath =~ s:/*$::;
 $aPath =~ s:/*$::;
 $sPath =~ s:/*$::;
+$anPath =~ s:/*$::;
 
 # Set combined paths
 my $targetPath = "$rHost:$rPath";
 my $summaryPath = "$sHost:$sPath";
 my $archivePath = "$aHost:$aPath";
 my $rBin = "$rPath/$rfName/Sisyphus";
+my $analysisPath = "$anPath/$rfName";
 
 if($debug){
     print "\$rHost => $rHost\n";
@@ -221,6 +228,7 @@ if($debug){
     print "\$aPath => $aPath\n";
     print "\$oPath => $oPath\n";
     print "\$rfName => $rfName\n";
+    print "\$anPath => $anPath\n";
 
 };
 
@@ -254,6 +262,23 @@ until($complete){
 	$complete=0;
     }
     sleep 600 unless($complete);
+}
+
+if ($miseq) {
+    print STDERR "Checking MiSeq Analysis folder for completion!\n\n";
+    $complete = 0;
+    until($complete) {
+        if (! -e $analysisPath || ! -d $analysisPath) {
+            print "Analysis folder does not exist, expects $analysisPath, going to sleep\n";
+        }
+        elsif (! -e "$analysisPath/TransferComplete.txt") {
+            print "Indication that transfer of analysis results is complete is missing, going to sleep\n";
+        }
+        else {
+            $complete = 1;
+        }
+        sleep 600 unless($complete);
+    }
 }
 
 die unless($complete);
