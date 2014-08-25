@@ -2348,14 +2348,20 @@ sub fixSampleSheet{
     }
     # Replace the old sample sheet with a fixed up version if all tests passed
     if($ok){
-	my $i = 1;
-	while(-e "$sampleSheet.org.$i"){
-	    $i++;
-	}
-	rename($sampleSheet, "$sampleSheet.org.$i") or die "Failed to move $sampleSheet to $sampleSheet.org.$i";
-	open(my $fhOut, '>', $sampleSheet) or die "Failed to create new samplesheet in $sampleSheet\n";
-	print $fhOut $output;
-	close($fhOut);
+        # Pick the next available name for keeping a copy of the old samplesheet
+        my $i = 1;
+        while(-e "$sampleSheet.org.$i"){
+	        $i++;
+        }
+        my $sampleSheetBak = "$sampleSheet.org.$i";
+        # ..but if we have converted a miseq samplesheet, save the original under a stable name that can be used when uploading entire folder
+        if ($type eq 'miseq') {
+            ($sampleSheetBak = $sampleSheet) =~ s/\.csv/.miseq.csv/;
+        }
+	    rename($sampleSheet, $sampleSheetBak) or die "Failed to move $sampleSheet to $sampleSheetBak\n";
+        open(my $fhOut, '>', $sampleSheet) or die "Failed to create new samplesheet in $sampleSheet\n";
+        print $fhOut $output;
+        close($fhOut);
     }
     return($ok);
 }
