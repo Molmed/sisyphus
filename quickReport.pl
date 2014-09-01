@@ -57,12 +57,14 @@ Compiles some quick statistics about the run and sends a mail to the specified a
 # Parse options
 my($help,$man) = (0,0);
 my($rfPath,$mail) = (undef,undef);
+my $sender = 'seq@medsci.uu.se';
 our($debug) = 0;
 
 GetOptions('help|?'=>\$help,
 	   'man'=>\$man,
 	   'runfolder=s' => \$rfPath,
 	   'mail=s' => \$mail,
+       'sender=s' => \$sender,
 	   'debug' => \$debug,
 	  ) or pod2usage(-verbose => 0);
 pod2usage(-verbose => 1)  if ($help);
@@ -141,13 +143,13 @@ if(defined $mail && $mail =~ m/\w\@\w/){
     #Create a new object with 'new'.
     my $smtp = Net::SMTP->new("smtp.uu.se");
     #Send the MAIL command to the server.
-    $smtp->mail('seq@medsci.uu.se');
+    $smtp->mail($sender);
     #Send the server the 'Mail To' address.
     $smtp->to($mail);
     #Start the message.
     $smtp->data();
     #Send the message.
-    $smtp->datasend('From: seq@medsci.uu.se' . "\n");
+    $smtp->datasend("From: $sender\n");
     $smtp->datasend("To: $mail\n");
     $smtp->datasend("Subject: " . basename($rfPath) . "\n");
     $smtp->datasend("MIME-Version: 1.0\n");
