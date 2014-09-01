@@ -264,6 +264,10 @@ until($complete){
     sleep 600 unless($complete);
 }
 
+# Sleep 30 minutes as an additional precaution
+sleep 1800 if($wait);
+
+# Check that the MiSeq analysis folder has finished copying, wait until it finishes otherwise
 if ($miseq) {
     print STDERR "Checking MiSeq Analysis folder for completion!\n\n";
     $complete = 0;
@@ -279,14 +283,25 @@ if ($miseq) {
         }
         sleep 600 unless($complete);
     }
+    # Temporarily change the sisyphus MD5 file
+    my $orgmd5 = $sisyphus->{MD5FILE};
+    $sisyphus->{MD5FILE} = dirname($orgmd5) . "/miseq_analysis.md5";
+    # Calculate the MD5 sums of the miseq analysis folder
+    my $md5hash = $sisyphus->md5Dir($analysisPath, -noCache => 1, -save => 1);
+    # Tarball up the MiSeq analysis folder. This will verify the tarball and remove the original folder
+    my $tarball = $sisyphus->gzipFolder($analysisPath,$sisyphus->{MD5FILE});
+    # Rename the MD5 sum file back to the original
+    $sisyphus->{MD5FILE} = $orgmd5;
+    # Move the tarball to the regular miseq folder
+    my $final_tarball = $sisyphus->{PATH} . "/" . basename($tarball);
+    rename($tarball, $final_tarball) or die "Failed to move $tarball to $final_tarball\n";
+    # Calculate and store the MD5 of the tarball
+    $sisyphus->getMd5($final_tarball);
 }
 
 die unless($complete);
 
 print STDERR "Runfolder $rfPath ready to go!\n";
-
-# Sleep 30 minutes as an additional precaution
-sleep 1800 if($wait);
 
 my $runInfo = $sisyphus->getRunInfo() || die "Failed to read RunInfo.xml from $rfPath\n";
 
