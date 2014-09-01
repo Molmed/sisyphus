@@ -264,9 +264,6 @@ until($complete){
     sleep 600 unless($complete);
 }
 
-# Sleep 30 minutes as an additional precaution
-sleep 1800 if($wait);
-
 # Check that the MiSeq analysis folder has finished copying, wait until it finishes otherwise
 if ($miseq) {
     print STDERR "Checking MiSeq Analysis folder for completion!\n\n";
@@ -283,25 +280,14 @@ if ($miseq) {
         }
         sleep 600 unless($complete);
     }
-    # Temporarily change the sisyphus MD5 file
-    my $orgmd5 = $sisyphus->{MD5FILE};
-    $sisyphus->{MD5FILE} = dirname($orgmd5) . "/miseq_analysis.md5";
-    # Calculate the MD5 sums of the miseq analysis folder
-    my $md5hash = $sisyphus->md5Dir($analysisPath, -noCache => 1, -save => 1);
-    # Tarball up the MiSeq analysis folder. This will verify the tarball and remove the original folder
-    my $tarball = $sisyphus->gzipFolder($analysisPath,$sisyphus->{MD5FILE});
-    # Rename the MD5 sum file back to the original
-    $sisyphus->{MD5FILE} = $orgmd5;
-    # Move the tarball to the regular miseq folder
-    my $final_tarball = $sisyphus->{PATH} . "/" . basename($tarball);
-    rename($tarball, $final_tarball) or die "Failed to move $tarball to $final_tarball\n";
-    # Calculate and store the MD5 of the tarball
-    $sisyphus->getMd5($final_tarball);
 }
 
 die unless($complete);
 
 print STDERR "Runfolder $rfPath ready to go!\n";
+
+# Sleep 30 minutes as an additional precaution
+sleep 1800 if($wait);
 
 my $runInfo = $sisyphus->getRunInfo() || die "Failed to read RunInfo.xml from $rfPath\n";
 
@@ -459,31 +445,42 @@ fi
 cd $rfRoot
 check_errs \$? "Failed to cd to $rfRoot"
 
-# First make a list of all the files that will be transferred,
-# without actually doing it, for use by the checksumming
-rsync -vrktp --dry-run --chmod=Dg+sx,ug+w,o-rwx --prune-empty-dirs --include-from '$FindBin::Bin/hiseq.rsync' '$rfName' '/$rnd' > '$rfName/rsync.log'
+EOF
+
+# If uploading a MiSeq Analysis folder, tarball it and move it into the normal runfolder
+if ($miseq) {
+	print $scriptFh <<EOF;
+
+if [ ! -e "$rfPath/MD5" ]; then
+    mkdir -m 2770 $rfPath/MD5
+    check_errs \$? "Failed to mkdir $rfPath/MD5"
+fi
+
+cd $anPath
+check_errs \$? "Failed to cd to $anPath"
+
+echo -n "Checksumming files from $analysisPath"
+
+# List the contents of the MiSeq analysis folder, and calculate MD5 checksums
+find '$rfName' -type f | $FindBin::Bin/md5sum.pl $rfName > $rfPath/MD5/checksums.miseqrunfolder.md5
+check_errs \$? "FAILED"
+echo OK
+
+# Tarball the entire MiSeq analysis folder and move it under the runfolder
+echo -n "Tarballing MiSeq analysis folder '$analysisPath'"
+$FindBin::Bin/gzipFolder.pl '$rfName' '$rfPath/MD5/checksums.miseqrunfolder.md5' '$rfPath/MiSeq_Runfolder.tar.gz'
+check_errs \$? "FAILED"
+echo OK
 
 EOF
 
-# If uploading a miseq runfolder, perform a dry-run
-
-# Set the miseq-specific paths
-my $miseq_include = "miseqentirerunfolder.rsync";
-my $miseq_dry_log = "rsync.miseqrunfolder.log";
-my $miseq_rsync_log = "rsync-real.miseqrunfolder.log";
-my $miseq_destination = "MiSeq_Runfolder";
-my $miseq_checksums = "checksums.miseqrunfolder.md5";
-
-if ($miseq) { 
-    print $scriptFh <<EOF;
-
-# Generate a list of files to transfer for MiSeq runfolder
-rsync -vrtp --dry-run --chmod=Dg+sx,ug+w,o-rwx --include-from '$FindBin::Bin/$miseq_include' '$rfName' '/$rnd' > '$rfName/$miseq_dry_log'
-
-EOF
 }
 
 print $scriptFh <<EOF;
+
+# Make a list of all the files that will be transferred,
+# without actually doing it, for use by the checksumming
+rsync -vrktp --dry-run --chmod=Dg+sx,ug+w,o-rwx --prune-empty-dirs --include-from '$FindBin::Bin/hiseq.rsync' '$rfName' '/$rnd' > '$rfName/rsync.log'
 
 # Now do the actual transfer, loop until successful
 rm -f $rfName/rsync-real.log
@@ -501,35 +498,7 @@ done
 check_errs \$RSYNC_OK "FAILED"
 echo OK
 
-EOF
-
-# Do the transfer of the MiSeq runfolder
-if ($miseq) {
-    print $scriptFh <<EOF;
-
-# Do the transfer of the MiSeq runfolder, loop until successful
-rm -f $rfName/$miseq_rsync_log
-RSYNC_OK=1
-SLEEP=300
-until [ \$RSYNC_OK = 0 ]; do
-    echo -n "rsync $rfPath $targetPath/$rfName/$miseq_destination/"
-    ssh $rHost mkdir -p $rPath/$rfName/$miseq_destination;
-    rsync -vrtp --chmod=Dg+sx,ug+w,o-rwx --include-from '$FindBin::Bin/$miseq_include' '$rfName' '$targetPath/$rfName/$miseq_destination/' >> '$rfName/$miseq_rsync_log'
-    RSYNC_OK=\$?
-    if [ \$RSYNC_OK -gt 0 ]; then
-       echo "FAILED will retry in \$SLEEP seconds"
-       sleep \$SLEEP
-    fi
-done
-check_errs \$RSYNC_OK "FAILED"
-echo OK
-
-EOF
-
-}
-
 # Calculate md5 checksums of the transferred files
-print $scriptFh <<EOF;
 cd $rfRoot
 check_errs \$? "Failed to cd to $rfRoot"
 if [ ! -e "$rfPath/MD5" ]; then
@@ -540,23 +509,6 @@ echo -n "Checksumming files from $rfPath"
 cat $rfPath/rsync.log | $FindBin::Bin/md5sum.pl $rfName > $rfPath/MD5/checksums.md5
 check_errs \$? "FAILED"
 echo OK
-
-EOF
-
-if ($miseq) {
-
-    print $scriptFh <<EOF;
-
-echo -n "Checksumming files from $rfPath for MiSeq runfolder"
-cat $rfPath/$miseq_dry_log | $FindBin::Bin/md5sum.pl $rfName > '$rfPath/MD5/$miseq_checksums'
-check_errs \$? "FAILED"
-echo OK
-
-EOF
-    
-}
-
-print $scriptFh <<EOF;
 
 # And copy them to the target
 RSYNC_OK=1

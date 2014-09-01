@@ -88,9 +88,6 @@ sub new{
 	$self->{THREADS} = 8;
     }
 
-    # Set the default MD5 file path
-    $self->{MD5FILE} = $self->{PATH} . "/MD5/sisyphus.md5";
-    
     bless ($self, $class);
     return $self;
 }
@@ -548,11 +545,10 @@ sub saveMd5{
     $file =~ s:^$rfPath/::;
     my $runfolder = basename($rfPath);
 
-    my $md5file = $self->{MD5FILE};
-    $self->mkpath(dirname($md5file),2770);
+    $self->mkpath("$rfPath/MD5",2770);
     print STDERR "Writing MD5 for '$file'\n" if($self->{DEBUG});
-    open(my $md5fh, ">>", $self->{MD5FILE}) or die "Failed to open $md5file:$!\n";
-    flock($md5fh, LOCK_EX) || confess "Failed to lock $md5file:$!\n";
+    open(my $md5fh, ">>", "$rfPath/MD5/sisyphus.md5") or die "Failed to open $rfPath/MD5/sisyphus.md5:$!\n";
+    flock($md5fh, LOCK_EX) || confess "Failed to lock $rfPath/MD5/sisyphus.md5:$!\n";
     print $md5fh "$sum  $runfolder/$file\n";
     flock($md5fh, LOCK_UN);
     close($md5fh);
@@ -581,17 +577,15 @@ sub readMd5sums{
     my $rfPath = $self->{PATH};
     my $rfParent = dirname($rfPath);
     my %md5data;
-    
-    my $md5path = dirname($self->{MD5FILE});
-    if(-e "$md5path"){
-        opendir(MD5DIR, "$md5path/") or die "Failed to open MD5-directory '$md5path': $!\n";
+    if(-e "$rfPath/MD5"){
+        opendir(MD5DIR, "$rfPath/MD5/") or die "Failed to open MD5-directory '$rfPath/MD5': $!\n";
         foreach my $file (readdir(MD5DIR)){
             if($file=~m/\.md5(\.gz)?$/){
 		my $inFh;
 		if($file =~ m/\.gz/){
-		    open($inFh, '-|', "zcat $md5path/$file") or die "Failed to open MD5-file '$md5path/$file': $!\n";
+		    open($inFh, '-|', "zcat $rfPath/MD5/$file") or die "Failed to open MD5-file '$rfPath/MD5/$file': $!\n";
 		}else{
-		    open($inFh, '<', "$md5path/$file") or die "Failed to open MD5-file '$md5path/$file': $!\n";
+		    open($inFh, '<', "$rfPath/MD5/$file") or die "Failed to open MD5-file '$rfPath/MD5/$file': $!\n";
 		}
 
                 while(<$inFh>){
