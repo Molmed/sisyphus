@@ -256,12 +256,15 @@ until($complete){
     if(-e "$rfPath/SampleSheet.csv"){
 	# Check sanity of sample sheet
 	$complete = $sisyphus->fixSampleSheet("$rfPath/SampleSheet.csv");
-	print "SampleSheet has errors. Please fix it. You do not have to abort!\nJust fix the file and the script will continue after sleeping 10 minutes from now.\n" unless($complete);
+	print STDERR "SampleSheet has errors. Please fix it. You do not have to abort!\nJust fix the file and the script will continue after sleeping 10 minutes from now.\n" unless($complete);
     }else{
-	print "SampleSheet.csv is missing\n";
+	print STDERR "SampleSheet.csv is missing\n";
 	$complete=0;
     }
-    sleep 600 unless($complete);
+    unless($complete) {
+      print STDERR "Sleeping for 10 minutes\n";
+      sleep 600;
+    }
 }
 
 # Check that the MiSeq analysis folder has finished copying, wait until it finishes otherwise
@@ -270,15 +273,18 @@ if ($miseq) {
     $complete = 0;
     until($complete) {
         if (! -e $analysisPath || ! -d $analysisPath) {
-            print "Analysis folder does not exist, expects $analysisPath, going to sleep\n";
+            print STDERR "Analysis folder does not exist, expects $analysisPath\n";
         }
         elsif (! -e "$analysisPath/TransferComplete.txt") {
-            print "Indication that transfer of analysis results is complete is missing, going to sleep\n";
+            print STDERR "Indication that transfer of analysis results is complete is missing\n";
         }
         else {
             $complete = 1;
         }
-        sleep 600 unless($complete);
+        unless($complete) {
+          print STDERR "Sleeping for 10 minutes\n";
+          sleep 600;
+        }
     }
 }
 
@@ -462,24 +468,31 @@ if [ -e "$rfName" ]; then
   # List the contents of the MiSeq analysis folder, and calculate MD5 checksums
   find '$rfName' -type f | $FindBin::Bin/md5sum.pl $rfName > $rfPath/MD5/checksums.miseqrunfolder.md5
   check_errs \$? "FAILED"
+  
   echo OK
 
   # Tarball the entire MiSeq analysis folder and move it under the runfolder
   echo -n "Tarballing MiSeq analysis folder '$analysisPath'"
   $FindBin::Bin/gzipFolder.pl '$rfName' '$rfPath/MD5/checksums.miseqrunfolder.md5'
+  
   check_errs \$? "FAILED"
+  
   echo OK
+  
   echo -n "Move MiSeq analysis tarball to '$rfPath'"
   mv "$rfName.tar.gz" "$rfPath/MiSeq_Runfolder.tar.gz"
   check_errs \$? "FAILED"
+  
   echo OK
 
 # If the analysis runfolder does not exist but the tarball does, it's ok, we are just re-running the script
 elif [ -e "$rfPath/MiSeq_Runfolder.tar.gz" ]; then
   echo -n "MiSeq analysis folder is missing, but the tarball exists. Everything is OK!"
+  
 # Else, the folders and arguments need to be verified
 else
   check_errs 1 "Was expecting a MiSeq analysis runfolder: '$analysisPath', but did not find one"
+  
 fi
   
 EOF
