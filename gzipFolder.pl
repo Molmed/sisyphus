@@ -5,31 +5,19 @@ use FindBin;                # Find the script location
 use File::Basename;
 use File::Copy;
 use Cwd qw(abs_path);
+use List::Util qw( max );
 use lib "$FindBin::Bin/lib";# Add the script libdir to libs
 use Molmed::Sisyphus::Common;
 
 my $dir = shift || die "Directory path to gzip required\n";
 my $md5file = shift || die "MD5 file to verify archive against required\n";
-my $destination = shift || dirname(abs_path($dir)) . "/" . basename($dir) . ".tar.gz";
-my $force = shift || 0;
 
 # Set the number of threads to half the number of available procs (used by pigz)
 my $threads = `cat /proc/cpuinfo |grep "^processor"|wc -l`;
-$threads = $threads/2;
-
-# Verify that the destination does not already exist
-if (-e $destination) {
-	if ($force) {
-		warn "$destination already exists, removing..\n";
-		unlink($destination) or die "Failed to remove $destination\n";
-	}
-	else {
-		die "$destination already exists\n";
-	}
-}
+$threads = max(1,$threads/2);
 
 # Create a Common object to handle the operations
-my $obj = Molmed::Sisyphus::Common->new(PATH=>dirname($dir), DEBUG => 1);
+my $obj = Molmed::Sisyphus::Common->new(PATH=>dirname($dir));
 $obj->{THREADS} = $threads;
 
 # If the sisyphus.md5 exists, make a backup before zipping, since that will modify it. If it doesn't exist, make sure to remove the created file once we're done
@@ -42,13 +30,9 @@ if (-e $sismd5) {
 
 # Do the tarballing, including verifying archive and removing original folder
 my $tarball = $obj->gzipFolder(basename($dir),$md5file);
-unless(move($tarball,$destination)) {
-	unlink($destination);
-	die "Failed to rename $tarball to $destination\n";
-}
 
 # Calculate the md5sum of the gzip file
-my $md5 = $obj->getMd5($destination, -noCache => 1);
+my $md5 = $obj->getMd5($tarball);
 
 # Clean up the generated md5 files
 if ($md5bak) {
@@ -60,4 +44,4 @@ else {
 }
 
 # Print out the md5 of the generated tarball
-print("$md5  $destination\n");
+print("$md5  $tarball\n");

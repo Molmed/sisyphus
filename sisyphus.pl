@@ -441,10 +441,6 @@ if [ -e "$rfPath/Sisyphus/.git" ]; then
    check_errs \$? "Failed to get sisyphus version from $rfPath/Sisyphus/.git"
 fi
 
-# Transfer files to UPPMAX
-cd $rfRoot
-check_errs \$? "Failed to cd to $rfRoot"
-
 EOF
 
 # If uploading a MiSeq Analysis folder, tarball it and move it into the normal runfolder
@@ -459,24 +455,43 @@ fi
 cd $anPath
 check_errs \$? "Failed to cd to $anPath"
 
-echo -n "Checksumming files from $analysisPath"
+if [ -e "$rfName" ]; then
 
-# List the contents of the MiSeq analysis folder, and calculate MD5 checksums
-find '$rfName' -type f | $FindBin::Bin/md5sum.pl $rfName > $rfPath/MD5/checksums.miseqrunfolder.md5
-check_errs \$? "FAILED"
-echo OK
+  echo -n "Checksumming files from $analysisPath"
 
-# Tarball the entire MiSeq analysis folder and move it under the runfolder
-echo -n "Tarballing MiSeq analysis folder '$analysisPath'"
-$FindBin::Bin/gzipFolder.pl '$rfName' '$rfPath/MD5/checksums.miseqrunfolder.md5' '$rfPath/MiSeq_Runfolder.tar.gz'
-check_errs \$? "FAILED"
-echo OK
+  # List the contents of the MiSeq analysis folder, and calculate MD5 checksums
+  find '$rfName' -type f | $FindBin::Bin/md5sum.pl $rfName > $rfPath/MD5/checksums.miseqrunfolder.md5
+  check_errs \$? "FAILED"
+  echo OK
 
+  # Tarball the entire MiSeq analysis folder and move it under the runfolder
+  echo -n "Tarballing MiSeq analysis folder '$analysisPath'"
+  $FindBin::Bin/gzipFolder.pl '$rfName' '$rfPath/MD5/checksums.miseqrunfolder.md5'
+  check_errs \$? "FAILED"
+  echo OK
+  echo -n "Move MiSeq analysis tarball to '$rfPath'"
+  mv "$rfName.tar.gz" "$rfPath/MiSeq_Runfolder.tar.gz"
+  check_errs \$? "FAILED"
+  echo OK
+
+# If the analysis runfolder does not exist but the tarball does, it's ok, we are just re-running the script
+elif [ -e "$rfPath/MiSeq_Runfolder.tar.gz" ]; then
+  echo -n "MiSeq analysis folder is missing, but the tarball exists. Everything is OK!"
+# Else, the folders and arguments need to be verified
+else
+  check_errs 1 "Was expecting a MiSeq analysis runfolder: '$analysisPath', but did not find one"
+fi
+  
 EOF
 
 }
 
 print $scriptFh <<EOF;
+
+
+# Transfer files to UPPMAX
+cd $rfRoot
+check_errs \$? "Failed to cd to $rfRoot"
 
 # Make a list of all the files that will be transferred,
 # without actually doing it, for use by the checksumming

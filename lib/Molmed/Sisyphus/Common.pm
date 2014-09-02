@@ -250,16 +250,16 @@ sub gzipFolder{
     }else{
 	die "$dirPath/$file is not a folder!\n" if(! -d "$dirPath/$file");
 	my @stat = stat("$dirPath/$file");
-	my $pig = system("tar -cC $dirPath/$file . | pigz -n -T -p $self->{THREADS} -c > '$dirPath/$file.tar.gz'");
+	my $pig = system("tar -cC $dirPath $file | pigz -n -T -p $self->{THREADS} -c > '$dirPath/$file.tar.gz'");
 	if($pig){ # pigz failed
-	    unlink("$dirPath/$file.tar.gz") if(! $self->{DEBUG} && -e "$$dirPath/$file.tar.gz" && -e "$dirPath/$file");
+	    unlink("$dirPath/$file.tar.gz") if(! $self->{DEBUG} && -e "$dirPath/$file.tar.gz" && -e "$dirPath/$file");
 	    system("tar -zcf '$dirPath/$file.tar.gz' -C '$dirPath' '$file'")==0 or confess "Failed to gzip $dirPath/$file\n";
 	}
     }
     
     print "verifying $dirPath/$file.tar.gz\n" if($self->{DEBUG});
     
-    my $md5Hash = $self->getMd5ForArchiveContent($file);
+    my $md5Hash = $self->getMd5ForArchiveContent("$dirPath/$file");
     open(MD5SUM, $md5sumFile) or die "Couldn't open md5 file for $md5sumFile!\n";
 
     print "Validating MD5 for each file in the compressed archive '$dirPath/$file'\n" if($self->{DEBUG});
