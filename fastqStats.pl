@@ -139,7 +139,7 @@ my $rseed = 0;
 foreach my $c (split //, $fcid) {
     $rseed += ord($c);
 }
-srand($rseed)
+srand($rseed);
 print STDERR "Using random seed $rseed based on fcId $fcid\n";
 
 my %files;
