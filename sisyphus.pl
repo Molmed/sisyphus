@@ -95,7 +95,7 @@ my $wait = 1;
 my $force = 0;
 our $debug = 0;
 my $threads = `cat /proc/cpuinfo |grep "^processor"|wc -l`;
-$threads = $threads/2;
+$threads = ($threads == 1) ?  1 :  int($threads/2);
 
 my ($help,$man) = (0,0);
 
