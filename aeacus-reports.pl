@@ -168,7 +168,7 @@ foreach my $proj (keys %{$sampleSheet}){
 					       EXECDIR=>$rfPath,      # Directory from which to run the script
 					       NAME=>"$proj-$rfShort",# Name of job, also used in script name
 					       PROJECT=>$uProj,       # project for resource allocation
-					       TIME=>"0-00:30:00",    # Maximum runtime, formatted as d-hh:mm:ss
+					       TIME=>"0-03:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
 					       QOS=>$uQos,            # High priority
 					       PARTITION=>'core'      # core or node (or devel));
 					      );
@@ -206,7 +206,7 @@ my $repJob =
                                            EXECDIR=>$rfPath,      # Directory from which to run the script
                                            NAME=>"Rep-$rfShort", # Name of job, also used in script name
                                            PROJECT=>$uProj,       # project for resource allocation
-                                           TIME=>"0-00:30:00",    # Maximum runtime, formatted as d-hh:mm:ss
+                                           TIME=>"0-03:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
                                            QOS=>$uQos,            # High priority
                                            PARTITION=>'core'      # core or node (or devel));
                                           );
@@ -242,7 +242,7 @@ my $archJob =
 					   PROJECT=>$uProj,       # project for resource allocation
 					   TIME=>"2-00:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
 					   PARTITION=>'core',      # core or node (or devel))
-					   CORES=>'2'
+					   CORES=>'4'
 					  );
 $archJob->addDep($repJob);
 $archJob->addCommand("module load uppmax");
