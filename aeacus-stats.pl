@@ -150,7 +150,7 @@ for(my $i=1; $i<=$numLanes; $i++){
 					      EXECDIR=>$rfPath,      # Directory from which to run the script
 					      NAME=>"FF_$i-$rfShort",# Name of job, also used in script name
 					      PROJECT=>$uProj,       # project for resource allocation
-					      TIME=>"0-08:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
+					      TIME=>"1-00:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
 					      QOS=>$uQos,            # High priority
 					      PARTITION=>'core'      # core or node (or devel));
 					     );
