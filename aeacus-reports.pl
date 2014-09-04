@@ -242,7 +242,7 @@ my $archJob =
 					   PROJECT=>$uProj,       # project for resource allocation
 					   TIME=>"2-00:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
 					   PARTITION=>'core',      # core or node (or devel))
-					   CORES=>'4'
+					   CORES=>'2'
 					  );
 $archJob->addDep($repJob);
 $archJob->addCommand("module load uppmax");
