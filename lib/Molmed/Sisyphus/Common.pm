@@ -871,10 +871,15 @@ sub getRunInfo{
     my $indexed = 0;
     my @reads;
 
-    if(! -e "$rfPath/RunInfo.xml" && -e "$rfPath/RunInfo.xml.gz"){
+    if(! -e "$rfPath/RunInfo.xml") {
+      if ( -e "$rfPath/RunInfo.xml.gz"){
         `gunzip -N "$rfPath/RunInfo.xml.gz"`;
+      }
+      else {
+        die "Could not find $rfPath/RunInfo.xml[.gz] (required)\n";
+      }
     }
-
+    
     my $runInfo = XMLin("$rfPath/RunInfo.xml", ForceArray=>['Read']) || confess "Failed to read RunInfo\n";
     return undef unless($runInfo);
 
