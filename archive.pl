@@ -10,6 +10,7 @@ use Pod::Usage;
 use Cwd qw(abs_path cwd);
 use File::Basename;
 use File::Find;
+use File::Copy;
 use Digest::MD5;
 
 use Molmed::Sisyphus::Common qw(mkpath);
@@ -181,7 +182,9 @@ unless($verifyOnly){
   # Archive the MiSeq_Runfolder.tar.gz if it exist.
   if(-e "MiSeq_Runfolder.tar.gz") {
     $sisyphus->copy("MiSeq_Runfolder.tar.gz", $outDir, {VERIFY=>1,LINK=>1,RELATIVE=>0});
-    $sisyphus->copy("MD5/checksums.miseqrunfolder.md5","$outDir/checksums.miseqrunfolder.org.md5", {VERIFY=>1,LINK=>1,RELATIVE=>0});
+    $sisyphus->copy("MD5/checksums.miseqrunfolder.md5",$outDir, {VERIFY=>1,LINK=>1,RELATIVE=>0});
+	# Rename the checksum file that goes into swestore
+	move("$outDir/checksums.miseqrunfolder.md5","$outDir/MiSeq_Runfolder.original.md5") or warn "Failed to rename the MiSeq_Runfolder checksum file";
   }
 
   # Then copy/link the fastq-files. If the file exists in both the project directory
@@ -835,14 +838,12 @@ sub compressMiSeqRunFolder{
     my $md5Sum = 'MD5/checksums.miseqrunfolder.md5';
 
     if(-e  "$inDir/$file.tar.gz") {
-	$checksums->{COMPRESSED}->{"$inDir/$file"} = $sisyphus->getMd5("$inDir/$file");
+	$checksums->{COMPRESSED}->{"$inDir/$file.tar.gz"} = $sisyphus->getMd5("$inDir/$file.tar.gz");
 	print "Compressed MiSeq_Runfolder already exists!\n";
 	return;
     }
 
-    if( -d "$inDir/$file"){
-        $file = $sisyphus->gzipFolder("$file","$inDir/$md5Sum"); # Gzip returns abs path
-        $file =~ s:^$inDir/::; # Make $file relative again
-        $checksums->{COMPRESSED}->{"$inDir/$file"} = $sisyphus->getMd5("$inDir/$file");
+    elsif( -d "$inDir/$file"){
+      die "MiSeq_Runfolder exists but is not compressed!\n";
     }
 }

@@ -8,6 +8,7 @@ use POSIX ":sys_wait_h";
 use Getopt::Long;
 use Pod::Usage;
 use File::Basename;
+use Cwd qw(abs_path);
 
 use Molmed::Sisyphus::Common;
 
@@ -137,6 +138,7 @@ my $aHost = "milou-b.uppmax.uu.se";
 my $aPath = "/proj/$uProj/private/";
 my $sHost = "localhost";
 my $sPath = dirname($rfPath) . '/summaries';
+my $anPath = $rfRoot . '/MiSeqAnalysis';
 my $fastqPath = undef;
 my $mismatches = '1:1:1:1:1:1:1:1';
 
@@ -199,18 +201,23 @@ if(defined $config->{SUMMARY_PATH}){
 if(defined $config->{UPPNEX_PROJECT}){
     $uProj = $config->{UPPNEX_PROJECT};
 }
+if(defined $config->{ANALYSIS_PATH}){
+    $anPath = abs_path($rfPath . '/' . $config->{ANALYSIS_PATH});
+}
 
 # Strip trailing slashes from paths
 $rPath =~ s:/*$::;
 $oPath =~ s:/*$::;
 $aPath =~ s:/*$::;
 $sPath =~ s:/*$::;
+$anPath =~ s:/*$::;
 
 # Set combined paths
 my $targetPath = "$rHost:$rPath";
 my $summaryPath = "$sHost:$sPath";
 my $archivePath = "$aHost:$aPath";
 my $rBin = "$rPath/$rfName/Sisyphus";
+my $analysisPath = "$anPath/$rfName";
 
 if($debug){
     print "\$rHost => $rHost\n";
@@ -221,6 +228,7 @@ if($debug){
     print "\$aPath => $aPath\n";
     print "\$oPath => $oPath\n";
     print "\$rfName => $rfName\n";
+    print "\$anPath => $anPath\n";
 
 };
 
@@ -248,12 +256,36 @@ until($complete){
     if(-e "$rfPath/SampleSheet.csv"){
 	# Check sanity of sample sheet
 	$complete = $sisyphus->fixSampleSheet("$rfPath/SampleSheet.csv");
-	print "SampleSheet has errors. Please fix it. You do not have to abort!\nJust fix the file and the script will continue after sleeping 10 minutes from now.\n" unless($complete);
+	print STDERR "SampleSheet has errors. Please fix it. You do not have to abort!\nJust fix the file and the script will continue after sleeping 10 minutes from now.\n" unless($complete);
     }else{
-	print "SampleSheet.csv is missing\n";
+	print STDERR "SampleSheet.csv is missing\n";
 	$complete=0;
     }
-    sleep 600 unless($complete);
+    unless($complete) {
+      print STDERR "Sleeping for 10 minutes\n";
+      sleep 600;
+    }
+}
+
+# Check that the MiSeq analysis folder has finished copying, wait until it finishes otherwise
+if ($miseq) {
+    print STDERR "Checking MiSeq Analysis folder for completion!\n\n";
+    $complete = 0;
+    until($complete) {
+        if (! -e $analysisPath || ! -d $analysisPath) {
+            print STDERR "Analysis folder does not exist, expects $analysisPath\n";
+        }
+        elsif (! -e "$analysisPath/TransferComplete.txt") {
+            print STDERR "Indication that transfer of analysis results is complete is missing\n";
+        }
+        else {
+            $complete = 1;
+        }
+        unless($complete) {
+          print STDERR "Sleeping for 10 minutes\n";
+          sleep 600;
+        }
+    }
 }
 
 die unless($complete);
@@ -415,35 +447,68 @@ if [ -e "$rfPath/Sisyphus/.git" ]; then
    check_errs \$? "Failed to get sisyphus version from $rfPath/Sisyphus/.git"
 fi
 
+EOF
+
+# If uploading a MiSeq Analysis folder, tarball it and move it into the normal runfolder
+if ($miseq) {
+	print $scriptFh <<EOF;
+
+if [ ! -e "$rfPath/MD5" ]; then
+    mkdir -m 2770 $rfPath/MD5
+    check_errs \$? "Failed to mkdir $rfPath/MD5"
+fi
+
+cd $anPath
+check_errs \$? "Failed to cd to $anPath"
+
+if [ -e "$rfName" ]; then
+
+  echo -n "Checksumming files from $analysisPath"
+
+  # List the contents of the MiSeq analysis folder, and calculate MD5 checksums
+  find '$rfName' -type f | $FindBin::Bin/md5sum.pl $rfName > $rfPath/MD5/checksums.miseqrunfolder.md5
+  check_errs \$? "FAILED"
+  
+  echo OK
+
+  # Tarball the entire MiSeq analysis folder and move it under the runfolder
+  echo -n "Tarballing MiSeq analysis folder '$analysisPath'"
+  $FindBin::Bin/gzipFolder.pl '$rfName' '$rfPath/MD5/checksums.miseqrunfolder.md5'
+  
+  check_errs \$? "FAILED"
+  
+  echo OK
+  
+  echo -n "Move MiSeq analysis tarball to '$rfPath'"
+  mv "$rfName.tar.gz" "$rfPath/MiSeq_Runfolder.tar.gz"
+  check_errs \$? "FAILED"
+  
+  echo OK
+
+# If the analysis runfolder does not exist but the tarball does, it's ok, we are just re-running the script
+elif [ -e "$rfPath/MiSeq_Runfolder.tar.gz" ]; then
+  echo -n "MiSeq analysis folder is missing, but the tarball exists. Everything is OK!"
+  
+# Else, the folders and arguments need to be verified
+else
+  check_errs 1 "Was expecting a MiSeq analysis runfolder: '$analysisPath', but did not find one"
+  
+fi
+  
+EOF
+
+}
+
+print $scriptFh <<EOF;
+
+
 # Transfer files to UPPMAX
 cd $rfRoot
 check_errs \$? "Failed to cd to $rfRoot"
 
-# First make a list of all the files that will be transferred,
+# Make a list of all the files that will be transferred,
 # without actually doing it, for use by the checksumming
 rsync -vrktp --dry-run --chmod=Dg+sx,ug+w,o-rwx --prune-empty-dirs --include-from '$FindBin::Bin/hiseq.rsync' '$rfName' '/$rnd' > '$rfName/rsync.log'
-
-EOF
-
-# If uploading a miseq runfolder, perform a dry-run
-
-# Set the miseq-specific paths
-my $miseq_include = "miseqentirerunfolder.rsync";
-my $miseq_dry_log = "rsync.miseqrunfolder.log";
-my $miseq_rsync_log = "rsync-real.miseqrunfolder.log";
-my $miseq_destination = "MiSeq_Runfolder";
-my $miseq_checksums = "checksums.miseqrunfolder.md5";
-
-if ($miseq) { 
-    print $scriptFh <<EOF;
-
-# Generate a list of files to transfer for MiSeq runfolder
-rsync -vrtp --dry-run --chmod=Dg+sx,ug+w,o-rwx --include-from '$FindBin::Bin/$miseq_include' '$rfName' '/$rnd' > '$rfName/$miseq_dry_log'
-
-EOF
-}
-
-print $scriptFh <<EOF;
 
 # Now do the actual transfer, loop until successful
 rm -f $rfName/rsync-real.log
@@ -461,35 +526,7 @@ done
 check_errs \$RSYNC_OK "FAILED"
 echo OK
 
-EOF
-
-# Do the transfer of the MiSeq runfolder
-if ($miseq) {
-    print $scriptFh <<EOF;
-
-# Do the transfer of the MiSeq runfolder, loop until successful
-rm -f $rfName/$miseq_rsync_log
-RSYNC_OK=1
-SLEEP=300
-until [ \$RSYNC_OK = 0 ]; do
-    echo -n "rsync $rfPath $targetPath/$rfName/$miseq_destination/"
-    ssh $rHost mkdir -p $rPath/$rfName/$miseq_destination;
-    rsync -vrtp --chmod=Dg+sx,ug+w,o-rwx --include-from '$FindBin::Bin/$miseq_include' '$rfName' '$targetPath/$rfName/$miseq_destination/' >> '$rfName/$miseq_rsync_log'
-    RSYNC_OK=\$?
-    if [ \$RSYNC_OK -gt 0 ]; then
-       echo "FAILED will retry in \$SLEEP seconds"
-       sleep \$SLEEP
-    fi
-done
-check_errs \$RSYNC_OK "FAILED"
-echo OK
-
-EOF
-
-}
-
 # Calculate md5 checksums of the transferred files
-print $scriptFh <<EOF;
 cd $rfRoot
 check_errs \$? "Failed to cd to $rfRoot"
 if [ ! -e "$rfPath/MD5" ]; then
@@ -500,23 +537,6 @@ echo -n "Checksumming files from $rfPath"
 cat $rfPath/rsync.log | $FindBin::Bin/md5sum.pl $rfName > $rfPath/MD5/checksums.md5
 check_errs \$? "FAILED"
 echo OK
-
-EOF
-
-if ($miseq) {
-
-    print $scriptFh <<EOF;
-
-echo -n "Checksumming files from $rfPath for MiSeq runfolder"
-cat $rfPath/$miseq_dry_log | $FindBin::Bin/md5sum.pl $rfName > '$rfPath/MD5/$miseq_checksums'
-check_errs \$? "FAILED"
-echo OK
-
-EOF
-    
-}
-
-print $scriptFh <<EOF;
 
 # And copy them to the target
 RSYNC_OK=1
