@@ -114,6 +114,7 @@ my $oPath = "$rfPath/Projects";
 my $tmpdir = "/proj/a2009002/private/nobackup/tmp/$$";
 my $scriptDir = "$rfPath/slurmscripts";
 my $skipLanes = [];
+my $email = undef;
 
 # Read the sisyphus configuration and override the defaults
 my $config = $sisyphus->readConfig();
@@ -137,6 +138,9 @@ if(defined $config->{TMPDIR}){
 }
 if(defined $config->{SKIP_LANES}){
     $skipLanes = $config->{SKIP_LANES};
+}
+if(defined $config->{MAIL}){
+    $email = $config->{MAIL};
 }
 
 # Strip trailing slashes from paths
@@ -170,7 +174,9 @@ foreach my $proj (keys %{$sampleSheet}){
 					       PROJECT=>$uProj,       # project for resource allocation
 					       TIME=>"0-03:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
 					       QOS=>$uQos,            # High priority
-					       PARTITION=>'core'      # core or node (or devel));
+					       PARTITION=>'core',      # core or node (or devel));
+                 MAIL_USER=>$email,
+                 MAIL_TYPE=>'FAIL'
 					      );
     foreach my $lane (keys (%{$sampleSheet->{$proj}})){
 	$projJob->addDep($ffJobs{$lane}) if exists($ffJobs{$lane});
@@ -208,7 +214,9 @@ my $repJob =
                                            PROJECT=>$uProj,       # project for resource allocation
                                            TIME=>"0-03:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
                                            QOS=>$uQos,            # High priority
-                                           PARTITION=>'core'      # core or node (or devel));
+                                           PARTITION=>'core',     # core or node (or devel));
+                                           MAIL_USER=>$email,
+                                           MAIL_TYPE=>'END'
                                           );
 foreach my $job (values %projJobs){
     $repJob->addDep($job);
@@ -242,7 +250,9 @@ my $archJob =
 					   PROJECT=>$uProj,       # project for resource allocation
 					   TIME=>"2-00:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
 					   PARTITION=>'core',      # core or node (or devel))
-					   CORES=>'2'
+					   CORES=>'2',
+             MAIL_USER=>$email,
+             MAIL_TYPE=>'FAIL'
 					  );
 $archJob->addDep($repJob);
 $archJob->addCommand("module load uppmax");

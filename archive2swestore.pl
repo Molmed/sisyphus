@@ -59,6 +59,10 @@ Slurm account to use if submitting batch jobs
 
 Skip uploading and just verify the archive, assuming it is already at SweStore.
 
+=item -noemail
+
+Skip slurm email notifications
+
 =item -debug
 
 Print debugging information
@@ -90,7 +94,7 @@ my $scriptCommand = join(" ", "$FindBin::Bin/$FindBin::RealScript", @ARGV);
 
 # Parse options
 my($help,$man) = (0,0);
-my($srcDir,$tmpPath,$iPath,$verifyOnly,$proj,$config) = (undef,undef,undef,0,undef,undef);
+my($srcDir,$tmpPath,$iPath,$verifyOnly,$proj,$config,$noemail) = (undef,undef,undef,0,undef,undef,undef);
 our($debug) = 0;
 
 GetOptions('help|?'=>\$help,
@@ -101,6 +105,7 @@ GetOptions('help|?'=>\$help,
 	   'verifyOnly' =>\$verifyOnly,
 	   'ipath=s'=>\$iPath,
 	   'proj' =>\$proj,
+	   'noemail' =>\$noemail,
 	   'debug' => \$debug,
 	  ) or pod2usage(-verbose => 0);
 pod2usage(-verbose => 1)  if ($help);
@@ -147,6 +152,11 @@ unless(defined $tmpPath){
 	pod2usage(-verbose => 1);
 	exit;
     }
+}
+
+my $email = undef;
+unless (defined $noemail) {
+  $email = $yml->{MAIL}
 }
 
 $tmpPath = "$tmpPath/$$";
@@ -207,7 +217,9 @@ unless($verifyOnly){
 	    PROJECT=>$proj,        # project for resource allocation
 	    TIME=>"1-00:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
 	    STARTTIME=>"$sTime",   # Defer job until
-	    PARTITION=>'core'      # core or node (or devel));
+	    PARTITION=>'core',     # core or node (or devel));
+      MAIL_USER=>$email, 
+      MAIL_TYPE=>'END', 
 	);
     $job->addCommand("$scriptCommand --verifyOnly -ipath '$iPath/$month'", "archive2swestore on $rfName FAILED");
     print STDERR "Submitting SwSt-$rfName starting at $sTime\t";
