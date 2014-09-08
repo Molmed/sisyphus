@@ -26,6 +26,7 @@ my $job =  Molmed::Sisyphus::Uppmax::SlurmJob->new(
   TIME=>$runTime,   # Maximum runtime, formatted as d-hh:mm:ss
   QOS=>$qos,        # Qos flag for higher priority (short,interact,seqver)
   PARTITION=>$partition, # core or node (or devel)
+  MAIL_USER=>$email, # An email address to send notification about job state changes to
  );
 
 =head1 CONSTRUCTORS
@@ -69,6 +70,18 @@ Maximum runtime, formatted as d-hh:mm:ss
 =item PARTITION
 
 core, node or devel
+
+=over 4
+
+=item MAIL_USER
+
+An email address to send notification about job state changes to
+
+=over 4
+
+=item MAIL_TYPE
+
+Which job state changes will result in an email notification. Defaults to FAIL
 
 =over 4
 
@@ -423,6 +436,14 @@ EOF
     }
     if(exists $self->{STARTTIME}){
 	print $scriptFh qq(#SBATCH --begin="$self->{STARTTIME}"\n);
+    }
+    if(exists $self->{MAIL_USER} && defined $self->{MAIL_USER}){
+      my $mtype = "FAIL";
+	    if (exists $self->{MAIL_TYPE} && defined $self->{MAIL_TYPE}){
+        $mtype = $self->{MAIL_TYPE};
+      }
+	    print $scriptFh "#SBATCH --mail-user=$self->{MAIL_USER}\n";
+      print $scriptFh "#SBATCH --mail-type=$mtype\n";
     }
     my @deps = $self->dependencies();
     my $depflag = '';
