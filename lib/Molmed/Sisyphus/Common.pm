@@ -1335,7 +1335,7 @@ sub runParameters{
 
 =cut
 
-sub getRunType{
+sub getRunMode{
     my $self = shift;
     if(!defined $self->{RUNPARAMS}){
 	confess "RunParameters haven't been loaded\n";
@@ -1382,6 +1382,11 @@ sub getRead1Length {
     if(!defined $self->{RUNPARAMS}){
         confess "RunParameters haven't been loaded\n";
     }
+    if($self->machineType() eq "miseq") {
+       foreach($self->{RUNPARAMS}->{Reads}->{RunInfoRead}->[0]) {
+               return $_->{NumCycles} if($_->{IsIndexedRead} eq 'N');
+       }
+    }
     return $self->{RUNPARAMS}->{Setup}->{Read1} eq "" ? return : $self->{RUNPARAMS}->{Setup}->{Read1};
 }
 
@@ -1402,6 +1407,18 @@ sub getRead2Length{
     my $self = shift;
     if(!defined $self->{RUNPARAMS}){
         confess "RunParameters haven't been loaded\n";
+    }
+    if($self->machineType() eq "miseq") {
+        my $second = 0;
+        foreach(@{$self->{RUNPARAMS}->{Reads}->{RunInfoRead}}) {
+            if($_->{IsIndexedRead} eq 'N') {
+                if($second) {
+                    return $_->{NumCycles};
+                } else {
+                    $second = 1;
+                }
+           }
+        }
     }
     return $self->{RUNPARAMS}->{Setup}->{Read2} eq "" ? return : $self->{RUNPARAMS}->{Setup}->{Read2};
 }
@@ -1445,7 +1462,11 @@ sub getReagentKitVersion{
     if(!defined $self->{RUNPARAMS}){
         confess "RunParameters haven't been loaded\n";
     }
-    return $self->{RUNPARAMS}->{Setup}->{ReagentKitVersion} eq "" ? return : $self->{RUNPARAMS}->{Setup}->{ReagentKitVersion};
+    if($self->machineType() eq "miseq") {
+       return $self->{RUNPARAMS}->{ReagentKitVersion} eq ""  ? return : $self->{RUNPARAMS}->{ReagentKitVersion};
+    } else {
+       return $self->{RUNPARAMS}->{Setup}->{Flowcell} eq ""  ? return : $self->{RUNPARAMS}->{Setup}->{Flowcell};
+    }
 }
 
 
