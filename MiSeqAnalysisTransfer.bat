@@ -27,6 +27,14 @@ REM /e - Copy (possibly empty) subdirectories
 REM /z - Use restart mode
 echo About to start copying the folder "%miseqfolder%" to "%biotankdrive%%biotankdir%"
 pause
+
+REM Assert that the file indicating finished analysis is present, wait for user to confirm that analysis has finished and loop until this can be verified
+:complete
+if not exist %miseqfolder%\CompletedJobInfo.xml (
+echo A file, "Completedjobinfo.xml", indicating that secondary analysis has finished is not present in %miseqfolder%. Please wait until analysis has finished and once it is done, press any key to continue.
+pause 
+goto complete
+)
 robocopy "%miseqfolder%" "%biotankdrive%%biotankdir%%runname%" * /e /z
 if errorlevel 4 (goto error) else (goto ok)
 
