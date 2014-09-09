@@ -95,7 +95,6 @@ sub new{
 
     $self->{ADAPTERS}->{TRUSEQ} = ["AGATCGGAAGAGCACACGTC",
                                    "AGATCGGAAGAGCGTCGTGT"];
-
     # Set default max number of samplings
     unless(exists $self->{MAXSAMPLES}){
 	$self->{MAXSAMPLES} = 1e5;
@@ -207,6 +206,136 @@ sub addDataPoint{
 	$self->checkAdaptor($seq);
     }
     return 1;
+}
+
+=pod
+
+=head2 addQValuePerBaseAndPosition()
+
+ Title   : addQValuePerBaseAndPosition
+ Usage   : $qstat->addQValuePerBaseAndPosition($seq,$qstring)
+ Function: Parses a FASTQ quality string per base and adds it to the statistics
+ Example : $qstat->qValuePerBaseAndePosition($seq,$qstring)
+ Returns : nothing
+ Args    : a sequence string and a FASTQ quality string
+
+=cut
+
+sub addQValuePerBaseAndPosition{
+    my $self = shift;
+    my $seqString = shift;
+    my $qualString = shift;
+
+    if(rand() < $self->{SAMPLING_DENSITY}){
+        die "Missing OFFSET for parsing of Q-value strings\n" unless(exists $self->{OFFSET});
+        my $base = "";
+	my $qual;
+        if(exists $self->{QPERBASEANDPOSITION}){
+            for (my $i = 0; $i < length($seqString); $i++) {
+                $base = lc(substr($seqString,$i,1));
+                $qual = ord(substr($qualString,$i,1)) - $self->{OFFSET};
+                $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'Q'} .= pack("c",$qual);
+                $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'sum'} += $qual;
+                $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'num'}++;
+            }
+        }else{
+            for(my $i = 0; $i < length($seqString); $i++){
+		$self->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'Q'} = "";
+		$self->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'sum'} = 0;
+		$self->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'num'} = 0;
+
+		$self->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'Q'} = "";
+		$self->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'sum'} = 0;
+		$self->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'num'} = 0;
+
+		$self->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'Q'} = "";
+		$self->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'sum'} = 0;
+		$self->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'num'} = 0;
+
+		$self->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'Q'} = "";
+		$self->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'sum'} = 0;
+		$self->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'num'} = 0;
+
+		$self->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'Q'} = "";
+		$self->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'sum'} = 0;
+		$self->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'num'} = 0;
+
+		$base = lc(substr($seqString,$i,1));
+                $qual = ord(substr($qualString,$i,1)) - $self->{OFFSET};
+
+                $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'Q'} = pack("c",$qual);
+                $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'sum'} = $qual;
+                $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'num'} = 1;
+	    }
+        }
+    }
+}
+
+=pod
+
+=head2 calculateQValuePerBase()
+
+ Title   : calculateQValuePerBase
+ Usage   : $qstat->calculateQValuePerBase()
+ Function: calculate statistic using information that have been added using addQValuePerBaseAndPosition
+ Example : $qstat->calculateQValuePerBase()
+ Returns : nothing
+ Args    : nothing
+
+=cut
+
+sub calculateQValuePerBase {
+    my $self = shift;
+
+    if(exists $self->{QPERBASEANDPOSITION}){
+	my $result;
+
+	for(my $position = 0; $position < scalar @{$self->{QPERBASEANDPOSITION}}; $position++){
+            foreach my $base ('a', 'c', 'g', 't', 'n') {
+                if(defined($result->{$base}->{SUM})){
+                    $result->{$base}->{SUM} += $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'sum'};
+                    $result->{$base}->{NUM} += $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'num'};
+                } else {
+                    $result->{$base}->{SUM} = $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'sum'};
+                    $result->{$base}->{NUM} = $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'num'};
+                }
+            }
+	}
+
+	foreach my $base ('a', 'c', 'g', 't', 'n') {
+            if($result->{$base}->{NUM} == 0) {
+                $result->{$base}->{MEAN} = 0;
+            } else {
+                $result->{$base}->{MEAN} = $result->{$base}->{SUM} / $result->{$base}->{NUM};
+            }
+	}
+	my $values;
+
+        for(my $position = 0; $position < scalar @{$self->{QPERBASEANDPOSITION}}; $position++){
+           foreach my $base ('a', 'c', 'g', 't', 'n') {
+                for (my $i = 0; $i < $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'num'}; $i++) {
+                    if(defined($result->{$base}->{VAR})){
+                        $result->{$base}->{VAR} += ((unpack('c',substr($self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'Q'},$i,1)))[0] - $result->{$base}->{MEAN})**2;
+                    } else {
+                        $result->{$base}->{VAR} = ((unpack('c',substr($self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'Q'},$i,1)))[0] - $result->{$base}->{MEAN})**2;
+			$values->{$base} = "";
+                    }
+                    $values->{$base} .= (unpack('c',substr($self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'Q'},$i,1)))[0] . ",";
+                }
+            }
+        }
+	foreach my $base ('a', 'c', 'g', 't', 'n') {
+		if(defined($result->{$base}->{NUM}) && defined($result->{$base}->{VAR})) {
+			$result->{$base}->{VAR} = $result->{$base}->{VAR} * (1 / ($result->{$base}->{NUM} - 1));
+			$result->{$base}->{STDV} = sqrt($result->{$base}->{VAR});
+		} else {
+			$result->{$base}->{VAR} = 0;
+			$result->{$base}->{STDV} = 0;
+		}
+	}
+        return $result;
+    }
+    return undef;
 }
 
 =pod
