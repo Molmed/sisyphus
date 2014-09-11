@@ -11,6 +11,11 @@ use Molmed::Sisyphus::Libpath;
 use XML::Simple;
 use Data::Dumper;
 
+use constant MACHINE_CHEMISTRY_NOT_FOUND => 102;
+use constant SEQUENCED_LENGTH_NOT_FOUND => 103;
+
+use Scalar::Util;
+
 sub new{
     my $proto = shift;
     my $class = ref($proto) || $proto;
@@ -78,6 +83,7 @@ sub validateSequenceRun {
 	while(<QC_RESULT_FILE>) {
 		chomp;
 		my @row = split(/\t/, $_);
+
 		if(/^Lane/)
 		{
 			my $counter = 0;
@@ -94,24 +100,31 @@ sub validateSequenceRun {
 					if($_->{'controlSoftware'} =~ /^MiSeq/ && $_->{'version'} eq $sisphus->getReagentKitVersion()) {#For MiSeq reagent kit version must checked
 						$qcRequirementsFound = 1;
 						print "Info: " . $_->{'controlSoftware'} . "\t" . $_->{'version'} . "\n" if($self->{VERBOSE});
+
 						my $result = $self->validateResult($sisphus,\@row,$qcResultHeaderMap,$_); 
-						if($result)
+
+						if(defined($result) && ref($result) eq 'HASH')
 						{
 							$failedRuns->{$row[$qcResultHeaderMap->{'Lane'}]}->{$row[$qcResultHeaderMap->{'Read'}]} = $result;
+						} elsif(defined($result)) {
+							return $result;
 						}
 					}elsif($_->{'controlSoftware'} =~ /^HiSeq/ && $_->{'mode'} eq  $sisphus->getRunMode() && $_->{'version'} eq $sisphus->getReagentKitVersion()){#For HighSeq the used run mode must be checked
 						$qcRequirementsFound = 1;
 						print "Info: " . $_->{'controlSoftware'} . "\t" . $_->{'mode'} ."\n" if($self->{VERBOSE});
 						my $result = $self->validateResult($sisphus,\@row,$qcResultHeaderMap,$_);
-						if($result)
+						if(defined($result) && ref($result) eq 'HASH')
                                                 {
 							$failedRuns->{$row[$qcResultHeaderMap->{'Lane'}]}->{$row[$qcResultHeaderMap->{'Read'}]} = $result;
-                                                }
+                                                } elsif(defined($result)) {
+							return $result;
+						}
 					}
 				}
 			}
 			if(!$qcRequirementsFound) {
-				die "Couldn't find any specified QC requirements for the used run parameters!\n";
+				print STDERR "Couldn't find any specified QC requirements for the used run parameters!\n";
+				return MACHINE_CHEMISTRY_NOT_FOUND;
 			}
 		}
 	}
@@ -181,6 +194,12 @@ sub validateResult {
 		print "Passed generated cluster requirement: $result->[$resultMapping->{'ReadsPF (M)'}] ($qcRequirements->{'numberOfCluster'})!\n" if($self->{VERBOSE});
 	}
 	my $readLength = $result->[$resultMapping->{Read}] == 1 ? $sisphus->getRead1Length() : $sisphus->getRead2Length();
+
+	if(!defined($qcRequirements->{lengths}->{"l$readLength"})) {
+		print STDERR "Couldn't find the used read length $readLength in the sisyphus_qc.xml file!\n";
+		return SEQUENCED_LENGTH_NOT_FOUND;
+	}
+
 	if($qcRequirements->{lengths}->{"l$readLength"}->{q30} > $result->[$resultMapping->{'Yield Q30 (G)'}])
 	{
 		print "Failed Q30 yield requirement: $result->[$resultMapping->{'Yield Q30 (G)'}] (" . $qcRequirements->{lengths}->{"l$readLength"}->{q30} . ")!\n" if($self->{VERBOSE});
@@ -192,8 +211,8 @@ sub validateResult {
 	{
 		print "Passed Q30 yield requirement: $result->[$resultMapping->{'Yield Q30 (G)'}] (" . $qcRequirements->{lengths}->{"l$readLength"}->{q30} . ")!\n" if($self->{VERBOSE});
 	}
-	
-	if($qcRequirements->{lengths}->{"l$readLength"}->{errorRate} < $result->[$resultMapping->{'ErrRate'}])
+
+	if($result->[$resultMapping->{'ErrRate'}] eq '-' || $qcRequirements->{lengths}->{"l$readLength"}->{errorRate} < $result->[$resultMapping->{'ErrRate'}])
         {
                 print "Failed ErrorRate requirement: $result->[$resultMapping->{'ErrRate'}] (" . $qcRequirements->{lengths}->{"l$readLength"}->{errorRate} . ")!\n" if($self->{VERBOSE});
 		$failures->{errorRate}->{'req'} = $qcRequirements->{lengths}->{"l$readLength"}->{errorRate};

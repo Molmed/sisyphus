@@ -499,6 +499,17 @@ EOF
 
 }
 
+# Make the quick report
+if (defined $config->{MAIL}) {
+    print $scriptFh "echo Generating quick report for $config->{MAIL}\n";
+    print $scriptFh "quickReport.pl -runfolder $rfPath -mail $config->{MAIL} -sender $config->{SENDER}\n\n";
+    print $scriptFh "qcValidateRun.pl -runfolder $rfPath -mail $config->{MAIL} -sender $config->{SENDER}\n\n";
+
+    print $scriptFh <<EOF;
+check_errs \$? "FAILED QC"
+EOF
+}
+
 print $scriptFh <<EOF;
 
 
@@ -615,11 +626,30 @@ check_errs $? "FAILED to start aeacus-stats.pl in $rPath/$rfName at $rHost";
 
 EOF
 
-# Make the quick report
-if(defined $config->{MAIL}){
-    print $scriptFh "echo Generating quick report for $config->{MAIL}\n";
-    print $scriptFh "quickReport.pl -runfolder $rfPath -mail $config->{MAIL} -sender $config->{SENDER}\n\n";
-}
+print $scriptFh <<EOF;
+cd $rfRoot
+check_errs \$? "Failed to cd to $rfRoot"
+
+# Start extracting projects and archive data
+# to manual start after inspection
+START_OK=1
+SLEEP=300
+sleep 10
+until [ \$START_OK = 0 ]; do
+    echo -n "Starting extracting and archiving at UPPMAX "
+    ssh $rHost "cd $rPath/$rfName; ./Sisyphus/aeacus-reports.pl -runfolder $rPath/$rfName $debugFlag";
+    START_OK=\$?
+    if [ \$START_OK -gt 0 ]; then
+       echo "FAILED will retry in \$SLEEP seconds"
+       sleep \$SLEEP
+    fi
+done
+check_errs \$START_OK "FAILED"
+echo OK
+
+check_errs $? "FAILED to start aeacus-reports.pl in $rPath/$rfName at $rHost";
+
+EOF
 
 close $scriptFh;
 
