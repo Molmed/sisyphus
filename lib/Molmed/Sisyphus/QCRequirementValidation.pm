@@ -11,8 +11,10 @@ use Molmed::Sisyphus::Libpath;
 use XML::Simple;
 use Data::Dumper;
 
-use constant MACHINE_CHEMISTRY_NOT_FOUND => 102;
+use constant RUN_TYPE_NOT_FOUND => 102;
 use constant SEQUENCED_LENGTH_NOT_FOUND => 103;
+use constant ERROR_READING_QUICKREPORT => 104;
+use constant ERROR_READING_QC_CRITERIAS => 105;
 
 use Scalar::Util;
 
@@ -47,11 +49,12 @@ sub loadQCRequirement {
 	my $self = shift;
 	my $file = shift;
 
-	my $qcFonfig = XMLin($file) or die "Failed to read provided file: $file!\n";
+	eval {
+		$self->{QC_REQUIREMENT} = XMLin($file);		
+	};
+	return ERROR_READING_QC_CRITERIAS if $@;
 
-	$self->{QC_REQUIREMENT} = $qcFonfig;
-
-	return $qcFonfig;
+	return 0;
 }
 
 =pod
@@ -77,10 +80,14 @@ sub validateSequenceRun {
 	my $qcResult;
 	my $qcResultHeaderMap;
 	die "QC requirements haven't been loaded!\n" if(!defined($self->{QC_REQUIREMENT}));
-	#print Dumper($self->{QC_REQUIREMENT});
-	open QC_RESULT_FILE, $qcResultFile or die "Couldn't open qc result file: $qcResultFile!\n";
+	my $qcResultFILE;
+	#print Dumper$self->{QC_REQUIREMENT});
+	unless (open($qcResultFILE, $qcResultFile)) {
+		return ERROR_READING_QUICKREPORT;
+	}
+
 	my $failedRuns;
-	while(<QC_RESULT_FILE>) {
+	while(<$qcResultFILE>) {
 		chomp;
 		my @row = split(/\t/, $_);
 
@@ -96,11 +103,16 @@ sub validateSequenceRun {
 		{
 			my $qcRequirementsFound = 0;
 			foreach (@{$self->{QC_REQUIREMENT}->{'platforms'}->{'platform'}}) {
-				if($_->{'controlSoftware'} eq $sisphus->getApplicationName()) {
-					if($_->{'controlSoftware'} =~ /^MiSeq/ && $_->{'version'} eq $sisphus->getReagentKitVersion()) {#For MiSeq reagent kit version must checked
+				if($_->{'controlSoftware'} eq $sisphus->getApplicationName() && 
+				   $_->{'version'} eq $sisphus->getReagentKitVersion()) {
+					if(($_->{'controlSoftware'} =~ /^MiSeq/ ) || ($_->{'controlSoftware'} =~ /^HiSeq/ && 
+					    $_->{'mode'} eq  $sisphus->getRunMode())) {
 						$qcRequirementsFound = 1;
-						print "Info: " . $_->{'controlSoftware'} . "\t" . $_->{'version'} . "\n" if($self->{VERBOSE});
-
+						if($self->{VERBOSE}) {
+							print STDOUT "Info: " . $_->{'controlSoftware'} . "\t" . 
+							       $_->{'version'} . 
+							       ($_->{'controlSoftware'} =~ /^HiSeq/ ? "\t".$sisphus->getRunMode() : "") . "\n" ;
+						}
 						my $result = $self->validateResult($sisphus,\@row,$qcResultHeaderMap,$_); 
 
 						if(defined($result) && ref($result) eq 'HASH')
@@ -109,27 +121,17 @@ sub validateSequenceRun {
 						} elsif(defined($result)) {
 							return $result;
 						}
-					}elsif($_->{'controlSoftware'} =~ /^HiSeq/ && $_->{'mode'} eq  $sisphus->getRunMode() && $_->{'version'} eq $sisphus->getReagentKitVersion()){#For HighSeq the used run mode must be checked
-						$qcRequirementsFound = 1;
-						print "Info: " . $_->{'controlSoftware'} . "\t" . $_->{'mode'} ."\n" if($self->{VERBOSE});
-						my $result = $self->validateResult($sisphus,\@row,$qcResultHeaderMap,$_);
-						if(defined($result) && ref($result) eq 'HASH')
-                                                {
-							$failedRuns->{$row[$qcResultHeaderMap->{'Lane'}]}->{$row[$qcResultHeaderMap->{'Read'}]} = $result;
-                                                } elsif(defined($result)) {
-							return $result;
-						}
 					}
 				}
 			}
 			if(!$qcRequirementsFound) {
 				print STDERR "Couldn't find any specified QC requirements for the used run parameters!\n";
-				return MACHINE_CHEMISTRY_NOT_FOUND;
+				return RUN_TYPE_NOT_FOUND;
 			}
 		}
 	}
 	
-	close(QC_RESULT_FILE);
+	close($qcResultFILE);
 
 	if(scalar keys %{$failedRuns} == 0)
 	{

@@ -35,87 +35,98 @@ $sisyphus->getRunInfo();
 $sisyphus->runParameters();
 
 my $qc = QCRequirementValidation->new(DEBUG=>$debug);
-my $file = "$rfPath/sisyphus_qc.xml";
-$qc->loadQCRequirement($file);
-my $result = $qc->validateSequenceRun($sisyphus,"$rfPath/quickReport.txt");
+my $qcFile = "$rfPath/sisyphus_qc.xml";
+my $loadQCconfig = $qc->loadQCRequirement($qcFile);
+my $result = 0;
+if($loadQCconfig != $qc->ERROR_READING_QC_CRITERIAS) {
+	$result = $qc->validateSequenceRun($sisyphus,"$rfPath/quickReport.txt");
 
-if(!defined($result))
-{
-	exit 0;
+	if(!defined($result))
+	{
+		exit 0;
+	}
 }
-else
-{	
-	open FAILED_QC, "> $rfPath/failedQc.html" or die "Couldn't create file $rfPath/failedQC.html\n";
-	print FAILED_QC '<html><body>' . "\n";
-	if(ref($result) eq 'HASH') {
-		foreach my $lane (keys %{$result}) {
-			print FAILED_QC "<h2>Lane $lane failed the following QC-criteria:</h2>\n";
-			print STDERR "Lane $lane failed the following QC-criteria:\n";
-			foreach my $read (keys %{$result->{$lane}}) {
-				print FAILED_QC "<ul>\n\t<li>Read $read:\n\t\t<ul>\n";
-				print STDERR "\tRead $read:\n";
-				foreach my $criteria (keys %{$result->{$lane}->{$read}}) {
-					if($criteria eq 'sampleFraction') {
-						print FAILED_QC "\t\t\t\t<li>$criteria:\n\t\t\t\t<ul>\n";
-						print STDERR"\t\t$criteria:\n";
-						foreach my $sample (
-								sort {$result->{$lane}->{$read}->{$criteria}->{$a}->{res} <=> $result->{$lane}->{$read}->{$criteria}->{$b}->{res}} 
-								keys  %{$result->{$lane}->{$read}->{$criteria}}) {
-							printf FAILED_QC "\t\t\t\t\t\t<li>%s: %.3f (%.3f)</li>\n", $sample, $result->{$lane}->{$read}->{$criteria}->{$sample}->{res}, $result->{$lane}->{$read}->{$criteria}->{$sample}->{req};
-							printf STDERR "\t\t\t\t%s: %.3f (%.3f)\n", $sample, $result->{$lane}->{$read}->{$criteria}->{$sample}->{res}, $result->{$lane}->{$read}->{$criteria}->{$sample}->{req};
-						}
-						print FAILED_QC "\t\t\t\t\t</ul>\n\t\t\t</li>\n";
+print $result . "\n";
+open FAILED_QC, "> $rfPath/failedQc.html" or die "Couldn't create file $rfPath/failedQC.html\n";
+print FAILED_QC '<html><body>' . "\n";
+if($loadQCconfig == $qc->ERROR_READING_QC_CRITERIAS) {
+	print FAILED_QC "<h2>Couldn't read sisyphus_qc.xml</2>\n";
+	print FAILED_QC "File: $qcFile";
+} elsif(ref($result) eq 'HASH') {
+	foreach my $lane (keys %{$result}) {
+		print FAILED_QC "<h2>Lane $lane failed the following QC-criteria:</h2>\n";
+		print STDERR "Lane $lane failed the following QC-criteria:\n";
+		foreach my $read (keys %{$result->{$lane}}) {
+			print FAILED_QC "<ul>\n\t<li>Read $read:\n\t\t<ul>\n";
+			print STDERR "\tRead $read:\n";
+			foreach my $criteria (keys %{$result->{$lane}->{$read}}) {
+				if($criteria eq 'sampleFraction') {
+					print FAILED_QC "\t\t\t\t<li>$criteria:\n\t\t\t\t<ul>\n";
+					print STDERR"\t\t$criteria:\n";
+					foreach my $sample (
+							sort {$result->{$lane}->{$read}->{$criteria}->{$a}->{res} <=> $result->{$lane}->{$read}->{$criteria}->{$b}->{res}} 
+							keys  %{$result->{$lane}->{$read}->{$criteria}}) {
+						printf FAILED_QC "\t\t\t\t\t\t<li>%s: %.3f (%.3f)</li>\n", $sample, $result->{$lane}->{$read}->{$criteria}->{$sample}->{res}, $result->{$lane}->{$read}->{$criteria}->{$sample}->{req};
+						printf STDERR "\t\t\t\t%s: %.3f (%.3f)\n", $sample, $result->{$lane}->{$read}->{$criteria}->{$sample}->{res}, $result->{$lane}->{$read}->{$criteria}->{$sample}->{req};
 					}
-					else {
-						print FAILED_QC "\t\t\t<li>$criteria\t$result->{$lane}->{$read}->{$criteria}->{res} ($result->{$lane}->{$read}->{$criteria}->{req})</li>\n";
-						print STDERR "\t\t$criteria\t$result->{$lane}->{$read}->{$criteria}->{res} ($result->{$lane}->{$read}->{$criteria}->{req})\n";
-					}
+					print FAILED_QC "\t\t\t\t\t</ul>\n\t\t\t</li>\n";
 				}
-				print FAILED_QC "\t\t</ul>\n\t</li>\n</ul>\n";
+				else {
+					print FAILED_QC "\t\t\t<li>$criteria\t$result->{$lane}->{$read}->{$criteria}->{res} ($result->{$lane}->{$read}->{$criteria}->{req})</li>\n";
+					print STDERR "\t\t$criteria\t$result->{$lane}->{$read}->{$criteria}->{res} ($result->{$lane}->{$read}->{$criteria}->{req})\n";
+				}
 			}
+			print FAILED_QC "\t\t</ul>\n\t</li>\n</ul>\n";
 		}
-		print FAILED_QC "</body></html>\n";
-
-	} elsif($result == $qc->MACHINE_CHEMISTRY_NOT_FOUND) {
-		print FAILED_QC "<h2>Missing QC criterias</2>\n";
-		print FAILED_QC "Couldn't match the used run parameters (machine/reagent/runMode) with a specified QC criteria!";
-	} elsif($result == $qc->SEQUENCED_LENGTH_NOT_FOUND) {
-		print FAILED_QC "<h2>Missing QC criterias</2>\n";
-		print FAILED_QC "The used read length and machine/reagent/runMode combination couldn't be found in the specified QC criteria!";
-	} else {
-		die "Unhandled case!\n";
 	}
-	close(FAILED_QC);
-
-	if(defined $mail && $mail =~ m/\w\@\w/){
-	    open(my $repFh, '<', "$rfPath/failedQc.html");
-	    my $msg = "";
-	    while(<$repFh>){
-		$msg .= $_;
-	    }
-	    close($repFh);
-	    require Net::SMTP;
-	    #Create a new object with 'new'.
-	    my $smtp = Net::SMTP->new("smtp.uu.se");
-	    #Send the MAIL command to the server.
-	    $smtp->mail($sender);
-	    #Send the server the 'Mail To' address.
-	    $smtp->to($mail);
-	    #Start the message.
-	    $smtp->data();
-	    #Send the message.
-	    $smtp->datasend("From: $sender\n");
-	    $smtp->datasend("To: $mail\n");
-	    $smtp->datasend("Subject: FAILED QC: " . basename($rfPath) . "\n");
-	    $smtp->datasend("MIME-Version: 1.0\n");
-	    $smtp->datasend("Content-Type: text/html; charset=us-ascii\n");
-	    $smtp->datasend("\n");
-	    $smtp->datasend("$msg\n\n");
-	    #End the message.
-		print $msg;
-	    $smtp->dataend();
-	    #Close the connection to your server.
-	    $smtp->quit();
-	}
-	exit 1;
+} elsif($result == $qc->RUN_TYPE_NOT_FOUND) {
+	print STDERR "Couldn't match the used run parameters (machine/reagent/runMode) with a specified QC criteria!\n";
+	print FAILED_QC "<h2>Missing QC criterias</2>\n";
+	print FAILED_QC "Couldn't match the used run parameters (machine/reagent/runMode) with a specified QC criteria!\n";
+} elsif($result == $qc->SEQUENCED_LENGTH_NOT_FOUND) {
+	print STDERR "The used read length and machine/reagent/runMode combination couldn't be found in the specified QC criteria!\n";
+	print FAILED_QC "<h2>Missing QC criterias</2>\n";
+	print FAILED_QC "The used read length and machine/reagent/runMode combination couldn't be found in the specified QC criteria!\n";
+} elsif($result == $qc->ERROR_READING_QUICKREPORT){
+	print STDERR "Couldn't read quickReport.txt: $rfPath/quickReport.txt!\n";
+	print FAILED_QC "<h2>Couldn't read quickReport.txt</2>\n";
+	print FAILED_QC "File: $rfPath/quickReport.txt\n";
+} else {
+	die "Unhandled case!\n";
 }
+print FAILED_QC "</body></html>\n";
+close(FAILED_QC);
+
+if(defined $mail && $mail =~ m/\w\@\w/){
+    open(my $repFh, '<', "$rfPath/failedQc.html");
+    my $msg = "";
+    while(<$repFh>){
+	$msg .= $_;
+    }
+    close($repFh);
+    require Net::SMTP;
+    #Create a new object with 'new'.
+    my $smtp = Net::SMTP->new("smtp.uu.se");
+    #Send the MAIL command to the server.
+    $smtp->mail($sender);
+    #Send the server the 'Mail To' address.
+    $smtp->to($mail);
+    #Start the message.
+    $smtp->data();
+    #Send the message.
+    $smtp->datasend("From: $sender\n");
+    $smtp->datasend("To: $mail\n");
+    $smtp->datasend("Subject: FAILED QC: " . basename($rfPath) . "\n");
+    $smtp->datasend("MIME-Version: 1.0\n");
+    $smtp->datasend("Content-Type: text/html; charset=us-ascii\n");
+    $smtp->datasend("\n");
+    $smtp->datasend("$msg\n\n");
+    #End the message.
+    print $msg;
+    $smtp->dataend();
+    #Close the connection to your server.
+    $smtp->quit();
+}
+
+exit 1;
+
