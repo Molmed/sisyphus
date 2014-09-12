@@ -151,7 +151,7 @@ if(defined $mail && $mail =~ m/\w\@\w/){
     #Send the message.
     $smtp->datasend("From: $sender\n");
     $smtp->datasend("To: $mail\n");
-    $smtp->datasend("Subject: Sisyphus quickReport" . basename($rfPath) . "\n");
+    $smtp->datasend("Subject: [Sisyphus] [Quick Report]" . basename($rfPath) . "\n");
     $smtp->datasend("MIME-Version: 1.0\n");
     $smtp->datasend("Content-Type: text/html; charset=us-ascii\n");
     $smtp->datasend("\n");
