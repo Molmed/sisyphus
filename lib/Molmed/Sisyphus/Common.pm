@@ -580,7 +580,7 @@ sub readMd5sums{
     if(-e "$rfPath/MD5"){
         opendir(MD5DIR, "$rfPath/MD5/") or die "Failed to open MD5-directory '$rfPath/MD5': $!\n";
         foreach my $file (readdir(MD5DIR)){
-            if($file=~m/\.md5(\.gz)?$/){
+            if($file=~m/\.md5(\.gz)?$/ && $file !~ /^checksums\.miseqrunfolder\.md5(\.gz)?$/){
 		my $inFh;
 		if($file =~ m/\.gz/){
 		    open($inFh, '-|', "zcat $rfPath/MD5/$file") or die "Failed to open MD5-file '$rfPath/MD5/$file': $!\n";
