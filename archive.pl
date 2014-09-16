@@ -634,7 +634,7 @@ sub addFile{
   if($file =~ m/\.(png|jpg|jpeg|zip)$/i ||
      $file =~ m/(summary)?report.(htm|xm|xs)l/i ||
      "$inDir/$file"=~m:Projects/.*/(checksums|README|.*\.md5): ||
-     $inDir =~ m/\/Sisyphus\//){
+     $inDir =~ m/\/Sisyphus/){
     $checksums->{ORIGINAL}->{"$inDir/$file"} = $sisyphus->getMd5("$inDir/$file");
     $checksums->{COMPRESSED}->{"$inDir/$file"} = $sisyphus->getMd5("$inDir/$file");
   }elsif($file =~ m/\.(gz|bz2)$/i){
