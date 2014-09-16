@@ -1,4 +1,4 @@
-package QCRequirementValidation;
+package Molmed::Sisyphus::QCRequirementValidation;
 
 use base 'Exporter';
 our @EXPORT_OK = ('mkpath');

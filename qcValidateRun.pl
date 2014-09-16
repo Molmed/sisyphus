@@ -15,6 +15,7 @@ use constant FAILED_QC_REQUIREMENTS => 101;
 my $sender = undef;
 my $mail = undef;
 my $rfPath = undef;
+my $qcFile = undef;
 our $debug = 0;
 my ($help,$man) = (0,0);
 
@@ -23,6 +24,7 @@ my ($help,$man) = (0,0);
 GetOptions('runfolder=s' => \$rfPath, 
 	    'mail=s' => \$mail,
 	    'sender=s' => \$sender,
+	    'qcFile=s' => \$sender,
 	    'debug' => \$debug,
 ) or pod2usage(-verbose => 0);
 
@@ -34,8 +36,8 @@ my $sisyphus = Molmed::Sisyphus::Common->new(PATH=>$rfPath, DEBUG=>$debug);
 $sisyphus->getRunInfo();
 $sisyphus->runParameters();
 
-my $qc = QCRequirementValidation->new(DEBUG=>$debug);
-my $qcFile = "$rfPath/sisyphus_qc.xml";
+my $qc = Molmed::Sisyphus::QCRequirementValidation->new(DEBUG=>$debug);
+$qcFile = defined($qcFile) ? $qcFile : "$rfPath/sisyphus_qc.xml";
 my $loadQCconfig = $qc->loadQCRequirement($qcFile);
 my $result = 0;
 if($loadQCconfig != $qc->ERROR_READING_QC_CRITERIAS) {
