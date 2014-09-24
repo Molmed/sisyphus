@@ -237,6 +237,7 @@
 	      <th>Contiguous Length<br/>with Q&#8805;30 (bp)</th>
 	      <th>Duplicates</th>
 	      <th>Adapter<br/>sequences</th>
+	      <th>Q mean value<br/>per base and position</th>
 	    </tr>
 	  </thead>
 	  <tbody>
@@ -248,7 +249,7 @@
 		</xsl:choose>
 	      </xsl:variable>
 	      <tr class="{$row-class}">
-		<td colspan="18" class="SampleName"><xsl:value-of select="@Id"/></td>
+		<td colspan="19" class="SampleName"><xsl:value-of select="@Id"/></td>
 	      </tr>
 	      <xsl:for-each select="./Tag">
 		<xsl:for-each select="./Lane">
@@ -347,6 +348,15 @@
 			</xsl:when>
 			<xsl:otherwise>
 			  <td><a href="{concat('./',@AdapterPlot)}"><img alt="Adapter Plot" src="{concat('./',@AdapterPlotThumb)}"/></a></td>
+			</xsl:otherwise>
+		      </xsl:choose>
+		
+		      <xsl:choose>
+			<xsl:when test="@QValuePerBase = &apos;NA&apos;">
+			  <td>NA</td>
+			</xsl:when>
+			<xsl:otherwise>
+			  <td><a href="{concat('./',@QValuePerBase)}"><img alt="Adapter Plot" src="{concat('./',@QValuePerBaseThumb)}"/></a></td>
 			</xsl:otherwise>
 		      </xsl:choose>
 

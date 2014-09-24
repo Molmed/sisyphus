@@ -350,6 +350,10 @@ foreach my $sampleFile (sort sortSamples @samples){
     ($metrics{DupPlot} = $dplot[0]) =~ s:^$plotDir/:Plots/:;
     ($metrics{DupPlotThumb} = $dplot[1]) =~ s:^$plotDir/:Plots/:;
 
+    my @qpbplot = $plotter->plotQPerBase($sample,"$plotDir/$smpl/$tag-L00$lane-R$read-QvaluePerBase", "Q value per base $plotTitle");
+    ($metrics{QValuePerBase} = $qpbplot[0]) =~ s:^$plotDir/:Plots/:;
+    ($metrics{QValuePerBaseThumb} = $qpbplot[1]) =~ s:^$plotDir/:Plots/:;
+
     push @{$sampleXmlDataAll->{Sample}->{$smpl}->{Tag}->{$tag}->{Lane}->{$lane}->{Read}}, \%metrics;
 
     unless($skipLanes{$lane}){

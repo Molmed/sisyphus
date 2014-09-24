@@ -135,7 +135,9 @@ foreach my $proj (keys %{$sampleSheet}){
 				<$filehandle>;
 				$qual = <$filehandle>;
 				chomp($qual);
-				$stat->addQValuePerBaseAndPosition($seq,$qual);
+				if(rand() < $stat->{SAMPLING_DENSITY}) {
+					$stat->addQValuePerBaseAndPosition($seq,$qual);
+				}
 			}
 			close($filehandle);
 			$baseQC->{$info->{SampleID}}->{$lid}->{$read}->{$info->{Index}} = $stat->calculateQValuePerBase();
