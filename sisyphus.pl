@@ -8,6 +8,7 @@ use POSIX ":sys_wait_h";
 use Getopt::Long;
 use Pod::Usage;
 use File::Basename;
+use Cwd qw(abs_path);
 
 use Molmed::Sisyphus::Common;
 
@@ -50,6 +51,10 @@ Skip paranoid wait for runfolder completion. Just continue if RTAComplete.txt ex
 
 Continue even if data is missing. Adds --ignore-missing-stats, --ignore-missing-bcl, --ignore-missing-control to bcl2fastq conversion.
 
+=item -miseq
+
+Also upload the entire MiSeq runfolder to a subfolder in the runfolder on Uppmax
+
 =item -debug
 
 Print debugging information
@@ -84,18 +89,20 @@ The postprocessing includes the following steps:
 =cut
 
 my $rfPath = undef;
+my $miseq = 0;
 my $exec = 1;
 my $wait = 1;
 my $force = 0;
 our $debug = 0;
 my $threads = `cat /proc/cpuinfo |grep "^processor"|wc -l`;
-$threads = $threads/2;
+$threads = ($threads == 1) ?  1 :  int($threads/2);
 
 my ($help,$man) = (0,0);
 
 GetOptions('help|?'=>\$help,
 	   'man'=>\$man,
 	   'runfolder=s' => \$rfPath,
+       'miseq!' => \$miseq,
 	   'exec!' => \$exec,
 	   'wait!' => \$wait,
 	   'force!' => \$force,
@@ -131,6 +138,7 @@ my $aHost = "milou-b.uppmax.uu.se";
 my $aPath = "/proj/$uProj/private/";
 my $sHost = "localhost";
 my $sPath = dirname($rfPath) . '/summaries';
+my $anPath = $rfRoot . '/MiSeqAnalysis';
 my $fastqPath = undef;
 my $mismatches = '1:1:1:1:1:1:1:1';
 
@@ -149,6 +157,13 @@ if(defined $config->{FASTQ_PATH}){
     $sisyphus->mkpath($fastqPath);
 }else{
     $fastqPath = "$rfPath";
+}
+
+# Only allow the -miseq flag if this is a miseq run
+unless (!$miseq || $sisyphus->machineType() eq 'miseq') {
+    print STDERR "The -miseq flag can only be used for MiSeq run folders ('$rfPath' does not appear to be one)\n";
+    pod2usage(-verbose => 1);
+    exit;
 }
 
 # Get extra library path from config and save to a separate file
@@ -186,18 +201,23 @@ if(defined $config->{SUMMARY_PATH}){
 if(defined $config->{UPPNEX_PROJECT}){
     $uProj = $config->{UPPNEX_PROJECT};
 }
+if(defined $config->{ANALYSIS_PATH}){
+    $anPath = abs_path($rfPath . '/' . $config->{ANALYSIS_PATH});
+}
 
 # Strip trailing slashes from paths
 $rPath =~ s:/*$::;
 $oPath =~ s:/*$::;
 $aPath =~ s:/*$::;
 $sPath =~ s:/*$::;
+$anPath =~ s:/*$::;
 
 # Set combined paths
 my $targetPath = "$rHost:$rPath";
 my $summaryPath = "$sHost:$sPath";
 my $archivePath = "$aHost:$aPath";
 my $rBin = "$rPath/$rfName/Sisyphus";
+my $analysisPath = "$anPath/$rfName";
 
 if($debug){
     print "\$rHost => $rHost\n";
@@ -208,6 +228,7 @@ if($debug){
     print "\$aPath => $aPath\n";
     print "\$oPath => $oPath\n";
     print "\$rfName => $rfName\n";
+    print "\$anPath => $anPath\n";
 
 };
 
@@ -235,12 +256,36 @@ until($complete){
     if(-e "$rfPath/SampleSheet.csv"){
 	# Check sanity of sample sheet
 	$complete = $sisyphus->fixSampleSheet("$rfPath/SampleSheet.csv");
-	print "SampleSheet has errors. Please fix it. You do not have to abort!\nJust fix the file and the script will continue after sleeping 10 minutes from now.\n" unless($complete);
+	print STDERR "SampleSheet has errors. Please fix it. You do not have to abort!\nJust fix the file and the script will continue after sleeping 10 minutes from now.\n" unless($complete);
     }else{
-	print "SampleSheet.csv is missing\n";
+	print STDERR "SampleSheet.csv is missing\n";
 	$complete=0;
     }
-    sleep 600 unless($complete);
+    unless($complete) {
+      print STDERR "Sleeping for 10 minutes\n";
+      sleep 600;
+    }
+}
+
+# Check that the MiSeq analysis folder has finished copying, wait until it finishes otherwise
+if ($miseq) {
+    print STDERR "Checking MiSeq Analysis folder for completion!\n\n";
+    $complete = 0;
+    until($complete) {
+        if (! -e $analysisPath || ! -d $analysisPath) {
+            print STDERR "Analysis folder does not exist, expects $analysisPath\n";
+        }
+        elsif (! -e "$analysisPath/TransferComplete.txt") {
+            print STDERR "Indication that transfer of analysis results is complete is missing\n";
+        }
+        else {
+            $complete = 1;
+        }
+        unless($complete) {
+          print STDERR "Sleeping for 10 minutes\n";
+          sleep 600;
+        }
+    }
 }
 
 die unless($complete);
@@ -402,11 +447,77 @@ if [ -e "$rfPath/Sisyphus/.git" ]; then
    check_errs \$? "Failed to get sisyphus version from $rfPath/Sisyphus/.git"
 fi
 
+EOF
+
+# If uploading a MiSeq Analysis folder, tarball it and move it into the normal runfolder
+if ($miseq) {
+	print $scriptFh <<EOF;
+
+if [ ! -e "$rfPath/MD5" ]; then
+    mkdir -m 2770 $rfPath/MD5
+    check_errs \$? "Failed to mkdir $rfPath/MD5"
+fi
+
+cd $anPath
+check_errs \$? "Failed to cd to $anPath"
+
+if [ -e "$rfName" ]; then
+
+  echo -n "Checksumming files from $analysisPath"
+
+  # List the contents of the MiSeq analysis folder, and calculate MD5 checksums
+  find '$rfName' -type f | $FindBin::Bin/md5sum.pl $rfName > $rfPath/MD5/checksums.miseqrunfolder.md5
+  check_errs \$? "FAILED"
+  
+  echo OK
+
+  # Tarball the entire MiSeq analysis folder and move it under the runfolder
+  echo -n "Tarballing MiSeq analysis folder '$analysisPath'"
+  $FindBin::Bin/gzipFolder.pl '$rfName' '$rfPath/MD5/checksums.miseqrunfolder.md5'
+  
+  check_errs \$? "FAILED"
+  
+  echo OK
+  
+  echo -n "Move MiSeq analysis tarball to '$rfPath'"
+  mv "$rfName.tar.gz" "$rfPath/MiSeq_Runfolder.tar.gz"
+  check_errs \$? "FAILED"
+  
+  echo OK
+
+# If the analysis runfolder does not exist but the tarball does, it's ok, we are just re-running the script
+elif [ -e "$rfPath/MiSeq_Runfolder.tar.gz" ]; then
+  echo -n "MiSeq analysis folder is missing, but the tarball exists. Everything is OK!"
+  
+# Else, the folders and arguments need to be verified
+else
+  check_errs 1 "Was expecting a MiSeq analysis runfolder: '$analysisPath', but did not find one"
+  
+fi
+  
+EOF
+
+}
+
+# Make the quick report
+if (defined $config->{MAIL}) {
+    print $scriptFh "echo Generating quick report for $config->{MAIL}\n";
+    print $scriptFh "quickReport.pl -runfolder $rfPath -mail $config->{MAIL} -sender $config->{SENDER}\n\n";
+    print $scriptFh "qcValidateRun.pl -runfolder $rfPath -mail $config->{MAIL} -sender $config->{SENDER}\n\n";
+
+    print $scriptFh <<EOF;
+check_errs \$? "FAILED QC"
+EOF
+}
+
+print $scriptFh <<EOF;
+
+
 # Transfer files to UPPMAX
 cd $rfRoot
 check_errs \$? "Failed to cd to $rfRoot"
 
-# First make a list of all the files that will be transferred,
+# Make a list of all the files that will be transferred,
 # without actually doing it, for use by the checksumming
 rsync -vrktp --dry-run --chmod=Dg+sx,ug+w,o-rwx --prune-empty-dirs --include-from '$FindBin::Bin/hiseq.rsync' '$rfName' '/$rnd' > '$rfName/rsync.log'
 
@@ -426,10 +537,7 @@ done
 check_errs \$RSYNC_OK "FAILED"
 echo OK
 
-EOF
-
 # Calculate md5 checksums of the transferred files
-print $scriptFh <<EOF;
 cd $rfRoot
 check_errs \$? "Failed to cd to $rfRoot"
 if [ ! -e "$rfPath/MD5" ]; then
@@ -440,10 +548,6 @@ echo -n "Checksumming files from $rfPath"
 cat $rfPath/rsync.log | $FindBin::Bin/md5sum.pl $rfName > $rfPath/MD5/checksums.md5
 check_errs \$? "FAILED"
 echo OK
-
-EOF
-
-print $scriptFh <<EOF;
 
 # And copy them to the target
 RSYNC_OK=1
@@ -522,11 +626,30 @@ check_errs $? "FAILED to start aeacus-stats.pl in $rPath/$rfName at $rHost";
 
 EOF
 
-# Make the quick report
-if(defined $config->{MAIL}){
-    print $scriptFh "echo Generating quick report for $config->{MAIL}\n";
-    print $scriptFh "quickReport.pl -runfolder $rfPath -mail $config->{MAIL}\n\n";
-}
+print $scriptFh <<EOF;
+cd $rfRoot
+check_errs \$? "Failed to cd to $rfRoot"
+
+# Start extracting projects and archive data
+# to manual start after inspection
+START_OK=1
+SLEEP=300
+sleep 10
+until [ \$START_OK = 0 ]; do
+    echo -n "Starting extracting and archiving at UPPMAX "
+    ssh $rHost "cd $rPath/$rfName; ./Sisyphus/aeacus-reports.pl -runfolder $rPath/$rfName $debugFlag";
+    START_OK=\$?
+    if [ \$START_OK -gt 0 ]; then
+       echo "FAILED will retry in \$SLEEP seconds"
+       sleep \$SLEEP
+    fi
+done
+check_errs \$START_OK "FAILED"
+echo OK
+
+check_errs $? "FAILED to start aeacus-reports.pl in $rPath/$rfName at $rHost";
+
+EOF
 
 close $scriptFh;
 

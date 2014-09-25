@@ -2,7 +2,10 @@
 
 
 # Address for quick report
-MAIL: johan.dahlberg@medsci.uu.se
+MAIL: medsci-molmed-bioinfo@lists.uu.se
+
+# Sender address for quick report
+SENDER: pontus.larsson@medsci.uu.se
 
 # CASAVA binaries
 CASAVA: /opt/CASAVA/1.8.4/bin/
@@ -58,6 +61,9 @@ SUMMARY_HOST: mm-xlas002
 
 # The directory on ARCHIVE_HOST to put the runfolder in
 SUMMARY_PATH: /mnt/Seq-Summaries/2014/
+
+# The path, relative to the runfolder, where MiSeq analysis output is deposited
+ANALYSIS_PATH: ../MiSeqAnalysis/
 
 # The UPPNEX project to use for processing
 UPPNEX_PROJECT: a2009002

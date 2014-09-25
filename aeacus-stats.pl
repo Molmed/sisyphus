@@ -108,6 +108,7 @@ my $aPath = "/proj/$uProj";
 my $oPath = "/proj/$uProj/private/nobackup/OUTBOX";
 my $scriptDir = "$rfPath/slurmscripts";
 my $skipLanes = [];
+my $email = undef; 
 
 # Read the sisyphus configuration and override the defaults
 my $config = $sisyphus->readConfig();
@@ -125,6 +126,9 @@ if(defined $config->{ARCHIVE_PATH}){
 }
 if(defined $config->{SKIP_LANES}){
     $skipLanes = $config->{SKIP_LANES};
+}
+if(defined $config->{MAIL}){
+    $email = $config->{MAIL};
 }
 
 # Strip trailing slashes from paths
@@ -150,9 +154,11 @@ for(my $i=1; $i<=$numLanes; $i++){
 					      EXECDIR=>$rfPath,      # Directory from which to run the script
 					      NAME=>"FF_$i-$rfShort",# Name of job, also used in script name
 					      PROJECT=>$uProj,       # project for resource allocation
-					      TIME=>"0-08:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
+					      TIME=>"1-00:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
 					      QOS=>$uQos,            # High priority
-					      PARTITION=>'core'      # core or node (or devel));
+					      PARTITION=>'core',     # core or node (or devel));
+                MAIL_USER=>$email,
+                MAIL_TYPE=>'FAIL'
 					     );
     $ffJob->addCommand("$FindBin::Bin/fastqStats.pl -runfolder $rfPath -lane $i $debugFlag", "fastqStats.pl on lane $i FAILED");
     $ffJobs{$i} = $ffJob;

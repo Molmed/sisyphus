@@ -3,6 +3,7 @@
 - *.fastq*
 - .sentinel
 - /*/*_Netcopy_complete*
+- MiSeq_Runfolder.tar.gz
 
 + */
 + /*/*

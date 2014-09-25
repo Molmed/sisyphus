@@ -133,6 +133,15 @@ foreach my $l (@{$lane}){
 
 $lane = [@remaining];
 
+# Initialize the random generator and use a random seed based upon the flowcell id
+my $fcid = $sisyphus->fcId() || "ABC123CXX";
+my $rseed = 0;
+foreach my $c (split //, $fcid) {
+    $rseed += ord($c);
+}
+srand($rseed);
+print STDERR "Using random seed $rseed based on fcId $fcid\n";
+
 my %files;
 find({wanted => sub{findFastq(\%files, $lane)}, no_chdir => 1}, $inDir);
 

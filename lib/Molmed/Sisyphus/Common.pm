@@ -250,16 +250,16 @@ sub gzipFolder{
     }else{
 	die "$dirPath/$file is not a folder!\n" if(! -d "$dirPath/$file");
 	my @stat = stat("$dirPath/$file");
-	my $pig = system("tar -cC $dirPath/$file . | pigz -n -T -p $self->{THREADS} -c > '$dirPath/$file.tar.gz'");
+	my $pig = system("tar -cC $dirPath $file | pigz -n -T -p $self->{THREADS} -c > '$dirPath/$file.tar.gz'");
 	if($pig){ # pigz failed
-	    unlink("$dirPath/$file.tar.gz") if(! $self->{DEBUG} && -e "$$dirPath/$file.tar.gz" && -e "$dirPath/$file");
+	    unlink("$dirPath/$file.tar.gz") if(! $self->{DEBUG} && -e "$dirPath/$file.tar.gz" && -e "$dirPath/$file");
 	    system("tar -zcf '$dirPath/$file.tar.gz' -C '$dirPath' '$file'")==0 or confess "Failed to gzip $dirPath/$file\n";
 	}
     }
     
     print "verifying $dirPath/$file.tar.gz\n" if($self->{DEBUG});
     
-    my $md5Hash = $self->getMd5ForArchiveContent($file);
+    my $md5Hash = $self->getMd5ForArchiveContent("$dirPath/$file");
     open(MD5SUM, $md5sumFile) or die "Couldn't open md5 file for $md5sumFile!\n";
 
     print "Validating MD5 for each file in the compressed archive '$dirPath/$file'\n" if($self->{DEBUG});
@@ -580,7 +580,7 @@ sub readMd5sums{
     if(-e "$rfPath/MD5"){
         opendir(MD5DIR, "$rfPath/MD5/") or die "Failed to open MD5-directory '$rfPath/MD5': $!\n";
         foreach my $file (readdir(MD5DIR)){
-            if($file=~m/\.md5(\.gz)?$/){
+            if($file=~m/\.md5(\.gz)?$/ && $file !~ /^checksums\.miseqrunfolder\.md5(\.gz)?$/){
 		my $inFh;
 		if($file =~ m/\.gz/){
 		    open($inFh, '-|', "zcat $rfPath/MD5/$file") or die "Failed to open MD5-file '$rfPath/MD5/$file': $!\n";
@@ -871,10 +871,15 @@ sub getRunInfo{
     my $indexed = 0;
     my @reads;
 
-    if(! -e "$rfPath/RunInfo.xml" && -e "$rfPath/RunInfo.xml.gz"){
+    if(! -e "$rfPath/RunInfo.xml") {
+      if ( -e "$rfPath/RunInfo.xml.gz"){
         `gunzip -N "$rfPath/RunInfo.xml.gz"`;
+      }
+      else {
+        die "Could not find $rfPath/RunInfo.xml[.gz] (required)\n";
+      }
     }
-
+    
     my $runInfo = XMLin("$rfPath/RunInfo.xml", ForceArray=>['Read']) || confess "Failed to read RunInfo\n";
     return undef unless($runInfo);
 
@@ -1330,7 +1335,7 @@ sub runParameters{
 
 =cut
 
-sub getRunType{
+sub getRunMode{
     my $self = shift;
     if(!defined $self->{RUNPARAMS}){
 	confess "RunParameters haven't been loaded\n";
@@ -1377,6 +1382,11 @@ sub getRead1Length {
     if(!defined $self->{RUNPARAMS}){
         confess "RunParameters haven't been loaded\n";
     }
+    if($self->machineType() eq "miseq") {
+       foreach($self->{RUNPARAMS}->{Reads}->{RunInfoRead}->[0]) {
+               return $_->{NumCycles} if($_->{IsIndexedRead} eq 'N');
+       }
+    }
     return $self->{RUNPARAMS}->{Setup}->{Read1} eq "" ? return : $self->{RUNPARAMS}->{Setup}->{Read1};
 }
 
@@ -1397,6 +1407,18 @@ sub getRead2Length{
     my $self = shift;
     if(!defined $self->{RUNPARAMS}){
         confess "RunParameters haven't been loaded\n";
+    }
+    if($self->machineType() eq "miseq") {
+        my $second = 0;
+        foreach(@{$self->{RUNPARAMS}->{Reads}->{RunInfoRead}}) {
+            if($_->{IsIndexedRead} eq 'N') {
+                if($second) {
+                    return $_->{NumCycles};
+                } else {
+                    $second = 1;
+                }
+           }
+        }
     }
     return $self->{RUNPARAMS}->{Setup}->{Read2} eq "" ? return : $self->{RUNPARAMS}->{Setup}->{Read2};
 }
@@ -1440,7 +1462,11 @@ sub getReagentKitVersion{
     if(!defined $self->{RUNPARAMS}){
         confess "RunParameters haven't been loaded\n";
     }
-    return $self->{RUNPARAMS}->{Setup}->{ReagentKitVersion} eq "" ? return : $self->{RUNPARAMS}->{Setup}->{ReagentKitVersion};
+    if($self->machineType() eq "miseq") {
+       return $self->{RUNPARAMS}->{ReagentKitVersion} eq ""  ? return : $self->{RUNPARAMS}->{ReagentKitVersion};
+    } else {
+       return $self->{RUNPARAMS}->{Setup}->{Flowcell} eq ""  ? return : $self->{RUNPARAMS}->{Setup}->{Flowcell};
+    }
 }
 
 
@@ -2348,14 +2374,20 @@ sub fixSampleSheet{
     }
     # Replace the old sample sheet with a fixed up version if all tests passed
     if($ok){
-	my $i = 1;
-	while(-e "$sampleSheet.org.$i"){
-	    $i++;
-	}
-	rename($sampleSheet, "$sampleSheet.org.$i") or die "Failed to move $sampleSheet to $sampleSheet.org.$i";
-	open(my $fhOut, '>', $sampleSheet) or die "Failed to create new samplesheet in $sampleSheet\n";
-	print $fhOut $output;
-	close($fhOut);
+        # Pick the next available name for keeping a copy of the old samplesheet
+        my $i = 1;
+        while(-e "$sampleSheet.org.$i"){
+	        $i++;
+        }
+        my $sampleSheetBak = "$sampleSheet.org.$i";
+        # ..but if we have converted a miseq samplesheet, save the original under a stable name that can be used when uploading entire folder
+        if ($type eq 'miseq') {
+            ($sampleSheetBak = $sampleSheet) =~ s/\.csv/.miseq.csv/;
+        }
+	    rename($sampleSheet, $sampleSheetBak) or die "Failed to move $sampleSheet to $sampleSheetBak\n";
+        open(my $fhOut, '>', $sampleSheet) or die "Failed to create new samplesheet in $sampleSheet\n";
+        print $fhOut $output;
+        close($fhOut);
     }
     return($ok);
 }
