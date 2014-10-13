@@ -41,19 +41,19 @@
 			<version>Version2</version>
 			<unidentified>5.0</unidentified>
 			<numberOfCluster>10</numberOfCluster>
-			<overridePoolingRequirement>0</overridePoolingRequirement>
+			<overridePoolingRequirement>1</overridePoolingRequirement>
 			<lengths>
 				<l251>
 					<q30>1.8</q30>
-					<errorRate>2.0</errorRate>
+					<errorRate>-</errorRate>
 				</l251>
 				<l151>
 					<q30>1.1</q30>
-					<errorRate>1.5</errorRate>
+					<errorRate>-</errorRate>
 				</l151>
 				<l26>
 					<q30>0.2</q30>
-					<errorRate>1.0</errorRate>
+					<errorRate>-</errorRate>
 				</l26>
 			</lengths>
 		</platform>
@@ -62,15 +62,15 @@
 			<version>Version3</version>
 			<unidentified>5.0</unidentified>
 			<numberOfCluster>18</numberOfCluster>
-			<overridePoolingRequirement>0</overridePoolingRequirement>
+			<overridePoolingRequirement>1</overridePoolingRequirement>
 			<lengths>
 				<l301>
 					<q30>3.7</q30>
-					<errorRate>2.5</errorRate>
+					<errorRate>-</errorRate>
 				</l301>
 				<l75>
 					<q30>1.1</q30>
-					<errorRate>1.5</errorRate>
+					<errorRate>-</errorRate>
 				</l75>
 			</lengths>
 		</platform>

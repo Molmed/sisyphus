@@ -1,0 +1,3 @@
+Lane	Read	ReadsPF (M)	Yield Q30 (G)	ErrRate	Excluded	Sample Fractions	Unidentified
+1	1	25	1.8	0.27	0	 19.9:a1r2-4w	2.0
+1	2	25	1.8	0.49	0	 98.0:a1r2-4w	2.0
