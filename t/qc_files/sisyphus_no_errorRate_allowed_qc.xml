@@ -45,15 +45,15 @@
 			<lengths>
 				<l251>
 					<q30>1.8</q30>
-					<errorRate>2.0</errorRate>
+					<errorRate>-</errorRate>
 				</l251>
 				<l151>
 					<q30>1.1</q30>
-					<errorRate>1.5</errorRate>
+					<errorRate>-</errorRate>
 				</l151>
 				<l26>
 					<q30>0.2</q30>
-					<errorRate>1.0</errorRate>
+					<errorRate>-</errorRate>
 				</l26>
 			</lengths>
 		</platform>
@@ -66,11 +66,11 @@
 			<lengths>
 				<l301>
 					<q30>3.7</q30>
-					<errorRate>2.5</errorRate>
+					<errorRate>-</errorRate>
 				</l301>
 				<l75>
 					<q30>1.1</q30>
-					<errorRate>1.5</errorRate>
+					<errorRate>-</errorRate>
 				</l75>
 			</lengths>
 		</platform>

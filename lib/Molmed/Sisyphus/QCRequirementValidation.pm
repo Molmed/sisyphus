@@ -214,32 +214,37 @@ sub validateResult {
 		print "Passed Q30 yield requirement: $result->[$resultMapping->{'Yield Q30 (G)'}] (" . $qcRequirements->{lengths}->{"l$readLength"}->{q30} . ")!\n" if($self->{VERBOSE});
 	}
 
-	if($result->[$resultMapping->{'ErrRate'}] eq '-' || $qcRequirements->{lengths}->{"l$readLength"}->{errorRate} < $result->[$resultMapping->{'ErrRate'}])
+	if($qcRequirements->{lengths}->{"l$readLength"}->{errorRate} eq "-"  ||  (!($result->[$resultMapping->{'ErrRate'}] eq '-') && $qcRequirements->{lengths}->{"l$readLength"}->{errorRate} >= $result->[$resultMapping->{'ErrRate'}]))
         {
+		print "Passed ErrorRate requirement: $result->[$resultMapping->{'ErrRate'}] (".$qcRequirements->{lengths}->{"l$readLength"}->{errorRate}.")!\n" if($self->{VERBOSE});
+        }
+	else
+	{
                 print "Failed ErrorRate requirement: $result->[$resultMapping->{'ErrRate'}] (" . $qcRequirements->{lengths}->{"l$readLength"}->{errorRate} . ")!\n" if($self->{VERBOSE});
 		$failures->{errorRate}->{'req'} = $qcRequirements->{lengths}->{"l$readLength"}->{errorRate};
                 $failures->{errorRate}->{'res'} = $result->[$resultMapping->{'ErrRate'}];
         }
-        else
-        {
-                print "Passed ErrorRate requirement: $result->[$resultMapping->{'ErrRate'}] (".$qcRequirements->{lengths}->{"l$readLength"}->{errorRate}.")!\n" if($self->{VERBOSE});
-        }
-	my @samples = split(/,[ ]/,$result->[$resultMapping->{'Sample Fractions'}]);
-	my $numberOfSamples = @samples;
-	my $minData = $qcRequirements->{'numberOfCluster'} / 2 / $numberOfSamples;
-	foreach(@samples) {
-		$_ =~ s/^[ ]+//;
-		my @info = split(/:/,$_);
-		if(($info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}]) < $minData)
-		{
-			print "Sample $info[1] haven't received sufficient amount data: " . ($info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}]) . " ($minData)\n" if($self->{VERBOSE});
-			$failures->{sampleFraction}->{$info[1]}->{'req'} = $minData;
-                	$failures->{sampleFraction}->{$info[1]}->{'res'} = $info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}];
-		}
-		else
-		{
-			print "Sample $info[1] have received sufficient amount of data: " . ($info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}]) . " ($minData)\n" if($self->{VERBOSE}); 
+        
+	unless($qcRequirements->{overridePoolingRequirement} eq 1) {
+		my @samples = split(/,[ ]/,$result->[$resultMapping->{'Sample Fractions'}]);
+		my $numberOfSamples = @samples;
+		my $minData = $qcRequirements->{'numberOfCluster'} / 2 / $numberOfSamples;
+		foreach(@samples) {
+			$_ =~ s/^[ ]+//;
+			my @info = split(/:/,$_);
+			if(($info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}]) < $minData)
+			{
+				print "Sample $info[1] haven't received sufficient amount data: " . ($info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}]) . " ($minData)\n" if($self->{VERBOSE});
+				$failures->{sampleFraction}->{$info[1]}->{'req'} = $minData;
+                		$failures->{sampleFraction}->{$info[1]}->{'res'} = $info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}];
+			}
+			else
+			{
+				print "Sample $info[1] have received sufficient amount of data: " . ($info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}]) . " ($minData)\n" if($self->{VERBOSE}); 
+			}
 		}
 	}
+
 	return (scalar keys %{$failures}) > 0 ? $failures : undef;
+
 }
