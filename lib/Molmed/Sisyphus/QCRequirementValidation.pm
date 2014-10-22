@@ -78,6 +78,7 @@ sub validateSequenceRun {
 	my $qcResultFile = shift;
 	
 	my $qcResult;
+
 	my $qcResultHeaderMap;
 	die "QC requirements haven't been loaded!\n" if(!defined($self->{QC_REQUIREMENT}));
 	my $qcResultFILE;
@@ -87,10 +88,10 @@ sub validateSequenceRun {
 	}
 
 	my $failedRuns;
+	my $warningRuns;
 	while(<$qcResultFILE>) {
 		chomp;
 		my @row = split(/\t/, $_);
-
 		if(/^Lane/)
 		{
 			my $counter = 0;
@@ -113,14 +114,18 @@ sub validateSequenceRun {
 							       $_->{'version'} . 
 							       ($_->{'controlSoftware'} =~ /^HiSeq/ ? "\t".$sisphus->getRunMode() : "") . "\n" ;
 						}
-						my $result = $self->validateResult($sisphus,\@row,$qcResultHeaderMap,$self->{QC_REQUIREMENT},$_); 
-
+						my ($result,$warnings) = $self->validateResult($sisphus,\@row,$qcResultHeaderMap,$self->{QC_REQUIREMENT},$_); 
+						
+						if(defined($warnings)) {
+							$warningRuns->{$row[$qcResultHeaderMap->{'Lane'}]}->{$row[$qcResultHeaderMap->{'Read'}]} = $warnings;
+						}
+						
 						if(defined($result) && ref($result) eq 'HASH')
 						{
 							$failedRuns->{$row[$qcResultHeaderMap->{'Lane'}]}->{$row[$qcResultHeaderMap->{'Read'}]} = $result;
-						} elsif(defined($result)) {
-							return $result;
-						}
+						}#elsif(defined($result)) {
+						#	return $result;
+						#}
 					}
 				}
 			}
@@ -133,10 +138,10 @@ sub validateSequenceRun {
 	
 	close($qcResultFILE);
 
-	if(scalar keys %{$failedRuns} == 0)
+	if(scalar keys %{$failedRuns} == 0 && scalar keys %{$warningRuns} == 0)
 	{
 		print "Passed QC\n" if($self->{VERBOSE});
-		return undef;
+		return (undef, undef);
 	}
 	else
 	{
@@ -160,8 +165,30 @@ sub validateSequenceRun {
 					}
 				}
 			}
+			print "The following lanes gave warnings:\n";
+			foreach my $lane (sort keys %{$warningRuns}) {
+				foreach my $read (sort keys %{$warningRuns->{$lane}}) {
+					print "Lane: $lane\tRead: $read\n";
+					foreach my $warning (sort keys %{$warningRuns->{$lane}->{$read}}) {
+						if($warning eq 'sampleFraction')
+						{
+							print " -Insufficient data for the following samples:\n";
+							foreach my $sample (keys %{$warningRuns->{$lane}->{$read}->{$warning}}) {
+								print " --Sample: $sample\tResult:$warningRuns->{$lane}->{$read}->{$warning}->{$sample}->{res}\tRequired:$warningRuns->{$lane}->{$read}->{$warning}->{$sample}->{req}\n";
+							}
+						}
+						else
+						{
+							print " -$warning\tResult:$warningRuns->{$lane}->{$read}->{$warning}->{res}\tRequired:$warningRuns->{$lane}->{$read}->{$warning}->{req}\n";
+						}
+					}
+				}
+			}
 		}
-		return $failedRuns;
+
+		$failedRuns = undef if(scalar keys %{$failedRuns} == 0);
+		$warningRuns = undef if(scalar keys %{$warningRuns} == 0);
+		return ($failedRuns,$warningRuns);
 	}
 }
 
@@ -175,136 +202,122 @@ sub validateResult {
         my $qcRequirements = shift;
 
 	my $failures;
-	
-	if((defined($qcXML->{overrides}->{pass}->{$result->[$resultMapping->{'Lane'}]}) && 
-	    defined($qcXML->{overrides}->{pass}->{$result->[$resultMapping->{'Lane'}]}->{'unidentified'}) &&
-            $qcXML->{overrides}->{pass}->{$result->[$resultMapping->{'Lane'}]}->{'unidentified'} < $result->[$resultMapping->{'Unidentified'}) ||
-	    $qcRequirements->{'unidentified'} < $result->[$resultMapping->{'Unidentified'}] )
+	my $warnings;
+
+	if((exists($qcXML->{overrides}->{pass}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{'unidentified'}) &&
+            	$qcXML->{overrides}->{pass}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{'unidentified'} < $result->[$resultMapping->{'Unidentified'}]) ||
+           (!exists($qcXML->{overrides}->{pass}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{'unidentified'}) && 
+	    	$qcRequirements->{'unidentified'} < $result->[$resultMapping->{'Unidentified'}]))
 	{
 		
 		print "Failed unidentified requirement: $result->[$resultMapping->{'Unidentified'}] ($qcRequirements->{'unidentified'})!\n" if($self->{VERBOSE});
-		if((defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}) &&
-		    defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{'unidentified'}) &&
-		    $qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{'unidentified'}) > $result->[$resultMapping->{'Unidentified'}]) {
-			$failures->{warning}->{unidentified}->{'req'} = $qcRequirements->{'unidentified'};
-			$failures->{warning}->{unidentified}->{'res'} = $result->[$resultMapping->{'Unidentified'}];
-		}
-		else
-		{
-			$failures->{unidentified}->{'req'} = $qcRequirements->{'unidentified'};
-			$failures->{unidentified}->{'res'} = $result->[$resultMapping->{'Unidentified'}];
-		}
+		$failures->{unidentified}->{'req'} = $qcRequirements->{'unidentified'};
+		$failures->{unidentified}->{'res'} = $result->[$resultMapping->{'Unidentified'}];
 	}
 	else
 	{
+		if(exists($qcXML->{overrides}->{warning}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{'unidentified'}) &&
+		    $qcXML->{overrides}->{warning}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{'unidentified'} < $result->[$resultMapping->{'Unidentified'}]) {
+			$warnings->{unidentified}->{'req'} = $qcRequirements->{'unidentified'};
+			$warnings->{unidentified}->{'res'} = $result->[$resultMapping->{'Unidentified'}];
+		}
 		print "Passed unidentified requirement: $result->[$resultMapping->{'Unidentified'}] ($qcRequirements->{'unidentified'})!\n" if($self->{VERBOSE});
 	}
-	if((defined($qcXML->{overrides}->{pass}->{$result->[$resultMapping->{'Lane'}]}) && 
-	    defined($qcXML->{overrides}->{pass}->{$result->[$resultMapping->{'Lane'}]}->{'numberOfCluster'}) &&
-            $qcXML->{overrides}->{pass}->{$result->[$resultMapping->{'Lane'}]}->{'numberOfCluster'} > $result->[$resultMapping->{'ReadsPF (M)'}]) ||
-	    $qcRequirements->{'numberOfCluster'} > $result->[$resultMapping->{'ReadsPF (M)'}])
+	if((exists($qcXML->{overrides}->{pass}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{'numberOfCluster'}) &&
+            	$qcXML->{overrides}->{pass}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{'numberOfCluster'} > $result->[$resultMapping->{'ReadsPF (M)'}]) ||
+	   (!exists($qcXML->{overrides}->{pass}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{'numberOfCluster'}) &&
+	    	$qcRequirements->{'numberOfCluster'} > $result->[$resultMapping->{'ReadsPF (M)'}]))
         {
-                print "Failed generated cluster requirement: $result->[$resultMapping->{'ReadsPF (M)'}] ($qcRequirements->{'numberOfCluster'})!\n" if($self->{VERBOSE});
-		if((defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}) &&
-		    defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{'numberOfCluster'}) &&
-		    $qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{'numberOfCluster'}) < $result->[$resultMapping->{'ReadsPF (M)']) {
-			$failures->{warning}->{numberOfCluster}->{'req'} = $qcRequirements->{'numberOfCluster'};
-	                $failures->{warning}->{numberOfCluster}->{'res'} = $result->[$resultMapping->{'ReadsPF (M)'}];
-		}
-		else
-		{
-			$failures->{numberOfCluster}->{'req'} = $qcRequirements->{'numberOfCluster'};
-	                $failures->{numberOfCluster}->{'res'} = $result->[$resultMapping->{'ReadsPF (M)'}];
-		}
+		print "Failed generated cluster requirement: $result->[$resultMapping->{'ReadsPF (M)'}] ($qcRequirements->{'numberOfCluster'})!\n" if($self->{VERBOSE});
+		$failures->{numberOfCluster}->{'req'} = $qcRequirements->{'numberOfCluster'};
+	        $failures->{numberOfCluster}->{'res'} = $result->[$resultMapping->{'ReadsPF (M)'}];
         }
 	else
 	{
+		if(exists($qcXML->{overrides}->{warning}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{'numberOfCluster'}) &&
+		    $qcXML->{overrides}->{warning}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{'numberOfCluster'} > $result->[$resultMapping->{'ReadsPF (M)'}]) {
+			$warnings->{numberOfCluster}->{'req'} = $qcRequirements->{'numberOfCluster'};
+	                $warnings->{numberOfCluster}->{'res'} = $result->[$resultMapping->{'ReadsPF (M)'}];
+		}
 		print "Passed generated cluster requirement: $result->[$resultMapping->{'ReadsPF (M)'}] ($qcRequirements->{'numberOfCluster'})!\n" if($self->{VERBOSE});
 	}
 	my $readLength = $result->[$resultMapping->{Read}] == 1 ? $sisphus->getRead1Length() : $sisphus->getRead2Length();
 
-	if(!(defined($qcXML->{overrides}->{pass}->{$result->[$resultMapping->{'Lane'}]}) && 
-	    defined($qcXML->{overrides}->{pass}->{$result->[$resultMapping->{'Lane'}]}->{'l$readLength'})) &&
-	    !defined($qcRequirements->{lengths}->{"l$readLength"})) {
+	if(!(exists($qcXML->{overrides}->{pass}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{'l$readLength'})) &&
+	    !exists($qcRequirements->{lengths}->{"l$readLength"})) {
 		print STDERR "Couldn't find the used read length $readLength in the sisyphus_qc.xml file!\n";
 		return SEQUENCED_LENGTH_NOT_FOUND;
 	}
 
-	if((defined($qcXML->{overrides}->{pass}->{$result->[$resultMapping->{'Lane'}]}) && 
-	    defined($qcXML->{overrides}->{pass}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}) &&
-	    defined($qcXML->{overrides}->{pass}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{q30}) &&
-            $qcXML->{overrides}->{pass}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{q30} > $result->[$resultMapping->{'Yield Q30 (G)'}]) ||
-	    $qcRequirements->{lengths}->{"l$readLength"}->{q30} > $result->[$resultMapping->{'Yield Q30 (G)'}])
+	if((exists($qcXML->{overrides}->{pass}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{q30}) &&
+            	$qcXML->{overrides}->{pass}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{q30} > $result->[$resultMapping->{'Yield Q30 (G)'}]) ||
+	   (!exists($qcXML->{overrides}->{pass}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{q30}) &&
+		$qcRequirements->{lengths}->{"l$readLength"}->{q30} > $result->[$resultMapping->{'Yield Q30 (G)'}]))
 	{
 		print "Failed Q30 yield requirement: $result->[$resultMapping->{'Yield Q30 (G)'}] (" . $qcRequirements->{lengths}->{"l$readLength"}->{q30} . ")!\n" if($self->{VERBOSE});
-		if((defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}) &&
-		    defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}) &&
-	    	    defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{q30}) &&
-		    $qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{q30} > $result->[$resultMapping->{'Yield Q30 (G)']) {
-			$failures->{warning}->{q30}->{'req'} = defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}) &&
-							       defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}) &&
-					    	    	       defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{q30}) ? 
-				$qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{q30} : $qcRequirements->{lengths}->{"l$readLength"}->{q30};
-                	$failures->{warning}->{q30}->{'res'} = $result->[$resultMapping->{'Yield Q30 (G)'}];
-		}
-		else
-		{
-			
-			$failures->{q30}->{'req'} = defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}) &&
-						    defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}) &&
-					    	    defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{q30}) ? 
-				$qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{q30} : $qcRequirements->{lengths}->{"l$readLength"}->{q30};
-                	$failures->{q30}->{'res'} = $result->[$resultMapping->{'Yield Q30 (G)'}];
-		}
+		$failures->{q30}->{'req'} = $qcRequirements->{lengths}->{"l$readLength"}->{q30};
+                $failures->{q30}->{'res'} = $result->[$resultMapping->{'Yield Q30 (G)'}];
 	}
 	else
 	{
+		if(exists($qcXML->{overrides}->{warning}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{q30}) &&
+		   $qcXML->{overrides}->{warning}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{q30} > $result->[$resultMapping->{'Yield Q30 (G)'}]) {
+			$warnings->{q30}->{'req'} = exists($qcXML->{overrides}->{warning}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{q30}) ? 
+				$qcXML->{overrides}->{warning}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{q30} : 
+				$qcRequirements->{lengths}->{"l$readLength"}->{q30};
+
+                	$warnings->{q30}->{'res'} = $result->[$resultMapping->{'Yield Q30 (G)'}];
+		}
 		print "Passed Q30 yield requirement: $result->[$resultMapping->{'Yield Q30 (G)'}] (" . $qcRequirements->{lengths}->{"l$readLength"}->{q30} . ")!\n" if($self->{VERBOSE});
 	}
 
-	if((defined($qcXML->{overrides}->{pass}->{$result->[$resultMapping->{'Lane'}]}) && 
-	    defined($qcXML->{overrides}->{pass}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}) &&
-	    defined($qcXML->{overrides}->{pass}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{errorRate}) &&
-            $qcXML->{overrides}->{pass}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{errorRate} < $result->[$resultMapping->{'ErrRate'}]) ||
-	    $result->[$resultMapping->{'ErrRate'}] eq '-' || $qcRequirements->{lengths}->{"l$readLength"}->{errorRate} < $result->[$resultMapping->{'ErrRate'}])
+	if((exists($qcXML->{overrides}->{pass}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{errorRate}) && 
+	    (($qcXML->{overrides}->{pass}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{errorRate} eq '-' && $result->[$resultMapping->{'ErrRate'}] eq '-') ||
+            (!($result->[$resultMapping->{'ErrRate'}] eq "-") && $qcXML->{overrides}->{pass}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{errorRate} >= $result->[$resultMapping->{'ErrRate'}]))) ||
+	   (!exists($qcXML->{overrides}->{pass}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{errorRate}) &&
+		(($result->[$resultMapping->{'ErrRate'}] eq '-' && $qcRequirements->{lengths}->{"l$readLength"}->{errorRate} eq '-') || 
+		((!($result->[$resultMapping->{'ErrRate'}] eq '-') && $qcRequirements->{lengths}->{"l$readLength"}->{errorRate} > $result->[$resultMapping->{'ErrRate'}])))))
         {
+		if(exists($qcXML->{overrides}->{warning}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{errorRate}) &&
+		    $qcXML->{overrides}->{warning}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{errorRate} < $result->[$resultMapping->{'ErrRate'}])
+		{
+			$warnings->{errorRate}->{'req'} = exists($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{errorRate}) ? 
+				$qcXML->{overrides}->{warning}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{errorRate} : 
+				$qcRequirements->{lengths}->{"l$readLength"}->{errorRate};
+
+			$warnings->{errorRate}->{'res'} = $result->[$resultMapping->{'ErrRate'}];
+		}
 		print "Passed ErrorRate requirement: $result->[$resultMapping->{'ErrRate'}] (".$qcRequirements->{lengths}->{"l$readLength"}->{errorRate}.")!\n" if($self->{VERBOSE});
         }
 	else
 	{
                 print "Failed ErrorRate requirement: $result->[$resultMapping->{'ErrRate'}] (" . $qcRequirements->{lengths}->{"l$readLength"}->{errorRate} . ")!\n" if($self->{VERBOSE});
-		if((defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}) &&
-		    defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}) &&
-	    	    defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{errorRate}) &&
-		    $qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{errorRate} > $result->[$resultMapping->{'ErrRate']) {
-			$failures->{warning}->{q30}->{'req'} = defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}) &&
-						    defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}) &&
-					    	    defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{errorRate}) ? 
-				$qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{q30} : $qcRequirements->{lengths}->{"l$readLength"}->{errorRate};
-                	$failures->{warning}->{errorRate}->{'res'} = $result->[$resultMapping->{'ErrRate'}];
-		}
-		else
-		{
-			$failures->{q30}->{'req'} = defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}) &&
-						    defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}) &&
-					    	    defined($qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{errorRate}) ? 
-				$qcXML->{overrides}->{warning}->{$result->[$resultMapping->{'Lane'}]}->{"l$readLength"}->{q30} : $qcRequirements->{lengths}->{"l$readLength"}->{errorRate};
-                	$failures->{errorRate}->{'res'} = $result->[$resultMapping->{'ErrRate'}];
-		}
+		$failures->{errorRate}->{'req'} = $qcRequirements->{lengths}->{"l$readLength"}->{errorRate};
+                $failures->{errorRate}->{'res'} = $result->[$resultMapping->{'ErrRate'}];
         }
       
-	unless($qcRequirements->{overridePoolingRequirement} eq 1) {
+	unless(defined($qcRequirements->{overridePoolingRequirement}) && $qcRequirements->{overridePoolingRequirement} eq 1) {
 		my @samples = split(/,[ ]/,$result->[$resultMapping->{'Sample Fractions'}]);
 		my $numberOfSamples = @samples;
 		my $minData = $qcRequirements->{'numberOfCluster'} / 2 / $numberOfSamples;
 		foreach(@samples) {
 			$_ =~ s/^[ ]+//;
 			my @info = split(/:/,$_);
-			if(($info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}]) < $minData)
+			if((!(exists($qcXML->{overrides}->{pass}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{overridePoolingRequirement}) ||
+			     $qcXML->{overrides}->{pass}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{overridePoolingRequirement}) == 1) &&
+ ($info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}]) < $minData)
 			{
 				print "Sample $info[1] haven't received sufficient amount data: " . ($info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}]) . " ($minData)\n" if($self->{VERBOSE});
-				$failures->{sampleFraction}->{$info[1]}->{'req'} = $minData;
-                		$failures->{sampleFraction}->{$info[1]}->{'res'} = $info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}];
+				if(exists($qcXML->{overrides}->{warning}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{overridePoolingRequirement}) &&
+				   $qcXML->{overrides}->{warning}->{"lane" . $result->[$resultMapping->{'Lane'}]}->{overridePoolingRequirement} == 1) {
+					$warnings->{sampleFraction}->{$info[1]}->{'req'} = $minData;
+        	        		$warnings->{sampleFraction}->{$info[1]}->{'res'} = $info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}];
+				}
+				else
+				{
+					$failures->{sampleFraction}->{$info[1]}->{'req'} = $minData;
+                                        $failures->{sampleFraction}->{$info[1]}->{'res'} = $info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}];
+				}
 			}
 			else
 			{
@@ -313,6 +326,6 @@ sub validateResult {
 		}
 	}
 
-	return (scalar keys %{$failures}) > 0 ? $failures : undef;
+	return ((scalar keys %{$failures}) > 0 ? $failures : undef,(scalar keys %{$warnings}) > 0 ? $warnings : undef);
 
 }

@@ -47,10 +47,13 @@ my $qc = Molmed::Sisyphus::QCRequirementValidation->new();
 isa_ok($qc, 'Molmed::Sisyphus::QCRequirementValidation', "New qcValidation object created");
 ##Loading QC requirement
 $qc->loadQCRequirement("$testFolder/sisyphus_qc.xml");
-my $qcResult = $qc->validateSequenceRun($sis,"$testFolder/quickReport_override_not_enough_data_for_sample.txt");
+my ($qcResult,$warnings) = $qc->validateSequenceRun($sis,"$testFolder/quickReport_override_not_enough_data_for_sample.txt");
 ok($qcResult->{'1'}->{'1'}->{'sampleFraction'}->{'a1r2-4w'}->{'res'} eq "4.975", "Not enough data for sample");
+ok(!defined($warnings), "no warnings");
 $qc->loadQCRequirement("$testFolder/sisyphus_override_pooling_requirement_qc.xml");
-ok(!defined($qc->validateSequenceRun($sis,"$testFolder/quickReport_override_not_enough_data_for_sample.txt")), "Override pooling requirement");
+($qcResult,$warnings) = $qc->validateSequenceRun($sis,"$testFolder/quickReport_override_not_enough_data_for_sample.txt");
+ok(!defined($qcResult), "Override pooling requirement");
+ok(!defined($warnings), "Override pooling requirement");
 
 
 done_testing();

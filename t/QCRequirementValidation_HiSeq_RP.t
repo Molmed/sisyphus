@@ -43,15 +43,15 @@ isa_ok($qc, 'Molmed::Sisyphus::QCRequirementValidation', "New qcValidation objec
 ##Loading QC requirement
 $qc->loadQCRequirement("$testFolder/sisyphus_qc.xml");
 ok(!defined($qc->validateSequenceRun($sis,"$testFolder/quickReport.txt")), "QC returned ok");
-my $result  = $qc->validateSequenceRun($sis,"$testFolder/quickReport_not_enough_clusters.txt");
+my ($result, $warning) = $qc->validateSequenceRun($sis,"$testFolder/quickReport_not_enough_clusters.txt");
 ok($result->{'1'}->{'1'}->{'numberOfCluster'}->{'res'} eq 109 , "Not enough clusters");
-$result  = $qc->validateSequenceRun($sis,"$testFolder/quickReport_to_many_undefined.txt");
+($result, $warning)  = $qc->validateSequenceRun($sis,"$testFolder/quickReport_to_many_undefined.txt");
 ok($result->{'2'}->{'2'}->{'unidentified'}->{'res'} eq "8.5", "To many undefined");
-$result  = $qc->validateSequenceRun($sis,"$testFolder/quickReport_to_high_errorRate.txt");
+($result, $warning) = $qc->validateSequenceRun($sis,"$testFolder/quickReport_to_high_errorRate.txt");
 ok($result->{'2'}->{'1'}->{'errorRate'}->{'res'} eq "2.04", "To high error rate");
-$result  = $qc->validateSequenceRun($sis,"$testFolder/quickReport_not_enough_data_for_sample.txt");
+($result, $warning) = $qc->validateSequenceRun($sis,"$testFolder/quickReport_not_enough_data_for_sample.txt");
 ok($result->{'1'}->{'2'}->{'sampleFraction'}->{'FH4'}->{'res'} eq "3.9039", "Not enough data for sample");
-$result  = $qc->validateSequenceRun($sis,"$testFolder/quickReport_to_low_q30_yield.txt");
+($result, $warning) = $qc->validateSequenceRun($sis,"$testFolder/quickReport_to_low_q30_yield.txt");
 ok($result->{'2'}->{'1'}->{'q30'}->{'res'} eq "12.2", "To low Q30 yield");
 
 

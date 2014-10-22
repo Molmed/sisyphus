@@ -42,7 +42,8 @@ my $qc = Molmed::Sisyphus::QCRequirementValidation->new();
 isa_ok($qc, 'Molmed::Sisyphus::QCRequirementValidation', "New qcValidation object created");
 ##Loading QC requirement
 $qc->loadQCRequirement("$testFolder/sisyphus_no_errorRate_allowed_qc.xml");
-ok(!defined($qc->validateSequenceRun($sis,"$testFolder/quickReport_no_errorRate.txt")), "Passing missing errorRate test");
+my ($result, $warning) = $qc->validateSequenceRun($sis,"$testFolder/quickReport_no_errorRate.txt");
+ok(!defined($result), "Passing missing errorRate test");
 
 
 done_testing();
