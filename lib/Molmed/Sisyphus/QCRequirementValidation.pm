@@ -123,9 +123,7 @@ sub validateSequenceRun {
 						if(defined($result) && ref($result) eq 'HASH')
 						{
 							$failedRuns->{$row[$qcResultHeaderMap->{'Lane'}]}->{$row[$qcResultHeaderMap->{'Read'}]} = $result;
-						}#elsif(defined($result)) {
-						#	return $result;
-						#}
+						}
 					}
 				}
 			}
