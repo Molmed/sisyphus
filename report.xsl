@@ -94,12 +94,14 @@
 		<th>Yield<br/>Q&#8805;30 (bp)</th>
 		<th>MeanQ</th>
 		<th>PhiX<br/>Error</th>
+		<th>Q-score per base A/C/G/T</th>
 		<th>Q-score<br/>distribution</th>
 		<th>Base<br/>composition</th>
 		<th>GC<br/>distribution</th>
 		<th>Contiguous Length<br/>with Q&#8805;30 (bp)</th>
 		<th>Duplicates</th>
 		<th>Adapter<br/>sequences</th>
+		<th>Q-score per base<br/>and position</th>
 	      </tr>
 	    </thead>
 	    <tbody>
@@ -150,6 +152,12 @@
 
 		  <td><xsl:value-of select="@QMean"/><span class="stddev">&#177;<xsl:value-of select="@QStdDev"/></span></td>
 		  <td><xsl:value-of select="@ErrRate"/><span class="stddev">&#177;<xsl:value-of select="@ErrRateSD"/></span></td>
+		  <td>
+                     <xsl:value-of select="@QValuePerBaseAMean"/><span class="stddev">&#177;<xsl:value-of select="@QValuePerBaseAStdv"/></span><br/>
+		     <xsl:value-of select="@QValuePerBaseCMean"/><span class="stddev">&#177;<xsl:value-of select="@QValuePerBaseCStdv"/></span><br/>
+		     <xsl:value-of select="@QValuePerBaseGMean"/><span class="stddev">&#177;<xsl:value-of select="@QValuePerBaseGStdv"/></span><br/>
+		     <xsl:value-of select="@QValuePerBaseTMean"/><span class="stddev">&#177;<xsl:value-of select="@QValuePerBaseTStdv"/></span>	   
+                  </td>
 
 		  <xsl:choose>
 		    <xsl:when test="@QscorePlot = &apos;NA&apos;">
@@ -205,6 +213,15 @@
 		    </xsl:otherwise>
 		  </xsl:choose>
 
+		  <xsl:choose>
+		    <xsl:when test="@QValuePerBase = &apos;NA&apos;">
+		      <td>NA</td>
+		    </xsl:when>
+		    <xsl:otherwise>
+		      <td><a href="{concat('./',@QValuePerBase)}"><img alt="Adapter Plot" src="{concat('./',@QValuePerBaseThumb)}"/></a></td>
+		    </xsl:otherwise>
+		  </xsl:choose>
+
 		  </tr>
 	      </xsl:for-each>
 	    </xsl:for-each>
@@ -231,13 +248,14 @@
 	      <th>Q&#8805;30(%)</th>
 	      <th>Yield<br/>Q&#8805;30 (bp)</th>
 	      <th>MeanQ</th>
+	      <th>Q-score per base A/C/G/T</th>
 	      <th>Q-score<br/>distribution</th>
 	      <th>Base<br/>composition</th>
 	      <th>GC<br/>distribution</th>
 	      <th>Contiguous Length<br/>with Q&#8805;30 (bp)</th>
 	      <th>Duplicates</th>
 	      <th>Adapter<br/>sequences</th>
-	      <th>Q mean value<br/>per base and position</th>
+	      <th>Q-score per base<br/> and position</th>
 	    </tr>
 	  </thead>
 	  <tbody>
@@ -296,7 +314,12 @@
 			</xsl:call-template>
 		      </td>
 		      <td><xsl:value-of select="@QMean"/><span class="stddev">&#177;<xsl:value-of select="@QStdDev"/></span></td>
-
+		      <td>
+                         <xsl:value-of select="@QValuePerBaseAMean"/><span class="stddev">&#177;<xsl:value-of select="@QValuePerBaseAStdv"/></span><br/>
+                         <xsl:value-of select="@QValuePerBaseCMean"/><span class="stddev">&#177;<xsl:value-of select="@QValuePerBaseCStdv"/></span><br/>
+                         <xsl:value-of select="@QValuePerBaseGMean"/><span class="stddev">&#177;<xsl:value-of select="@QValuePerBaseGStdv"/></span><br/>
+                         <xsl:value-of select="@QValuePerBaseTMean"/><span class="stddev">&#177;<xsl:value-of select="@QValuePerBaseTStdv"/></span>	   
+                  </td>
 		      <xsl:choose>
 			<xsl:when test="@QscorePlot = &apos;NA&apos;">
 			  <td>NA</td>
@@ -476,6 +499,12 @@
 	      <td>PhiX Error</td>
 	      <td>Fraction of mismatch bases in the spike in phage PhiX control sequences (&#177;Standard deviation)</td>
 	    </tr>
+
+	    <tr>
+	      <td>Q-score per base A/C/G/T</td>
+	      <td>Mean Q-score for each base (&#177;Standard deviation)</td>
+	    </tr>
+
 
 	    <tr>
 	      <td>Tag</td>

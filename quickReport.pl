@@ -108,7 +108,7 @@ sub findFastq{
 use File::Find;
 find({wanted => sub{findFastq(\%files)}, no_chdir => 1}, $rfPath);
 
-
+my $laneQC;
 
 foreach my $proj (keys %{$sampleSheet}){
     foreach my $lid (keys %{$sampleSheet->{$proj}}){
@@ -141,6 +141,10 @@ foreach my $proj (keys %{$sampleSheet}){
 			}
 			close($filehandle);
 			$baseQC->{$info->{SampleID}}->{$lid}->{$read}->{$info->{Index}} = $stat->calculateQValuePerBase();
+			if(!defined($laneQC->{$lid}->{$read})) {
+				$laneQC->{$lid}->{$read} = Molmed::Sisyphus::QStat->new(OFFSET=>$OFFSET, DEBUG=>$debug);	
+			}
+			$laneQC->{$lid}->{$read} = $laneQC->{$lid}->{$read}->add($stat);
 		}
 	    }
         }
@@ -150,6 +154,7 @@ foreach my $proj (keys %{$sampleSheet}){
 my %laneFrac;
 my %laneUnknown;
 my $reads;
+
 foreach my $sample (keys %{$RtaSampleStats}){
     foreach my $lane (keys %{$RtaSampleStats->{$sample}}){
 	foreach my $barcode (keys %{$RtaSampleStats->{$sample}->{$lane}->{1}}){
@@ -157,20 +162,6 @@ foreach my $sample (keys %{$RtaSampleStats}){
 		$laneUnknown{$lane} = sprintf('%.1f', $RtaSampleStats->{$sample}->{$lane}->{1}->{$barcode}->{PctLane});
 	    }else{
 		push @{$laneFrac{$lane}}, sprintf(' %.1f:%s', $RtaSampleStats->{$sample}->{$lane}->{1}->{$barcode}->{PctLane}, $sample);
-		foreach my $read (keys %{$baseQC->{$sample}->{$lane}}) {
-			if(!defined($reads->{$lane}->{$read})) {
-				$reads->{$lane}->{$read} = ();
-			}
-			$reads->{$lane}->{$read}->{$sample} = sprintf('%.0f:%.0f:%.0f:%.0f (%.0f:%.0f:%.0f:%.0f)',
-				$baseQC->{$sample}->{$lane}->{$read}->{$barcode}->{"a"}->{MEAN},
-				$baseQC->{$sample}->{$lane}->{$read}->{$barcode}->{"c"}->{MEAN},
-				$baseQC->{$sample}->{$lane}->{$read}->{$barcode}->{"g"}->{MEAN},
-				$baseQC->{$sample}->{$lane}->{$read}->{$barcode}->{"t"}->{MEAN},
-				$baseQC->{$sample}->{$lane}->{$read}->{$barcode}->{'a'}->{STDV},
-				$baseQC->{$sample}->{$lane}->{$read}->{$barcode}->{'c'}->{STDV},
-				$baseQC->{$sample}->{$lane}->{$read}->{$barcode}->{'g'}->{STDV},
-				$baseQC->{$sample}->{$lane}->{$read}->{$barcode}->{'t'}->{STDV});
-		}
 	    }
 	}
     }
@@ -187,17 +178,17 @@ foreach my $lane (sort {$a<=>$b} keys %{$RtaLaneStats}){
 			  $RtaLaneStats->{$lane}->{$read}->{ExcludedTiles});
 	my @fractionSorted = sort({sortLaneFrac($a,$b)} @{$laneFrac{$lane}});
 
-	my $dataString = "";
-	foreach my $sampleFrac (@fractionSorted) {
-		my ($sampleFrac, $sample) = split(/:/,$sampleFrac);q
-		$dataString .= $reads->{$lane}->{$read}->{$sample} . ",";
-	}
-	$dataString  =~ s/,$//;
-	print $repFh "\t" . $dataString;
+	my $result = $laneQC->{$lane}->{$read}->calculateQValuePerBase();
+	
+	print $repFh "\t";
+	printf $repFh sprintf('%.1f±%.1f,', $result->{"a"}->{MEAN},$result->{'a'}->{STDV});
+	printf $repFh sprintf('%.1f±%.1f,', $result->{"c"}->{MEAN},$result->{'c'}->{STDV});
+	printf $repFh sprintf('%.1f±%.1f,', $result->{"g"}->{MEAN},$result->{"g"}->{STDV});
+	printf $repFh sprintf('%.1f±%.1f', $result->{"t"}->{MEAN},$result->{'t'}->{STDV});
 	print $repFh "\t", join(',', @fractionSorted);
-#	if(exists $laneUnknown{$lane}){
-	    print $repFh "\t", (defined($laneUnknown{$lane}) ? $laneUnknown{$lane} : '');
-#	}
+
+	print $repFh "\t", (defined($laneUnknown{$lane}) ? $laneUnknown{$lane} : '');
+
 	print $repFh "\n";
     }
 }

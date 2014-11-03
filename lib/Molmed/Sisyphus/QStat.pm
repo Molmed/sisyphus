@@ -114,6 +114,10 @@ sub new{
 	$self->{SEQUENCES} = {};
     }
 
+    unless(defined $self->{SAMPLING_COUNTER}){
+	$self->{SAMPLING_COUNTER} = 100000;
+    }
+
     bless ($self, $class);
     return $self;
 }
@@ -195,7 +199,7 @@ sub addDataPoint{
     my $qstring = shift;
 
     chomp($seq);
-    chomp($qstring);
+    chomp($qstring);	
     $seq =~ tr/a-z/A-Z/;
 
     $self->countCopies($seq);
@@ -205,9 +209,13 @@ sub addDataPoint{
 	$self->addBaseDist($seq);
 	$self->countGC($seq);
 	$self->checkAdaptor($seq);
-	$self->addQValuePerBaseAndPosition($seq, $qstring);
+	if(0 < $self->{SAMPLING_COUNTER}) {
+		$self->{SAMPLING_COUNTER} = $self->{SAMPLING_COUNTER} - 1;
+		$self->addQValuePerBaseAndPosition($seq, $qstring);
+	}
     }
-    return 1;
+
+	    return 1;
 }
 
 =pod
@@ -686,6 +694,52 @@ sub add{
 	}elsif(exists $stat->{ADAPTER}){
 	    $new->{ADAPTER} = [ @{$stat->{ADAPTER}} ];
 	}
+
+	if(exists $stat->{QPERBASEANDPOSITION}){	
+	   for(my $i = 0; $i < scalar @{$stat->{QPERBASEANDPOSITION}}; $i++){
+	       if(!defined($new->{QPERBASEANDPOSITION}->[$i])) {
+		   $new->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'Q'} = "";
+	           $new->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'sum'} = 0;
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'num'} = 0;
+
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'Q'} = "";
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'sum'} = 0;
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'num'} = 0;
+
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'Q'} = "";
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'sum'} = 0;
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'num'} = 0;
+
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'Q'} = "";
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'sum'} = 0;
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'num'} = 0;
+
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'Q'} = "";
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'sum'} = 0;
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'num'} = 0;   
+		} 
+                $new->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'Q'} .= $stat->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'Q'};
+	        $new->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'sum'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'sum'};
+                $new->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'num'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'num'};
+
+                $new->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'Q'} .= $stat->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'Q'};
+                $new->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'sum'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'sum'};
+                $new->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'num'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'num'};
+
+                $new->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'Q'} .= $stat->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'Q'};
+                $new->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'sum'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'sum'};
+                $new->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'num'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'num'};
+
+                $new->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'Q'} .= $stat->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'Q'};
+                $new->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'sum'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'sum'};
+                $new->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'num'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'num'};
+
+                $new->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'Q'} .= $stat->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'Q'};
+                $new->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'sum'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'sum'};
+                $new->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'num'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'num'};  
+		      
+            }
+        }
     }
     return $new;
 }
@@ -710,9 +764,23 @@ sub metrics{
 		  );
 
     if($self->hasData){
+        $self->calculateQValuePerBase();
+
 	my $hist = $self->{QHIST};
 	my $q = pdl(0..40); # The possible Q-values
 	my $q30lengths = $self->{Q30LENGTH};
+	
+        my $QValuePerBaseAMean = $self->{QPERBASEANDPOSITIONRESULT}->{'a'}->{MEAN};
+	my $QValuePerBaseAStdv = $self->{QPERBASEANDPOSITIONRESULT}->{'a'}->{STDV};
+
+	my $QValuePerBaseCMean = $self->{QPERBASEANDPOSITIONRESULT}->{'c'}->{MEAN};
+	my $QValuePerBaseCStdv = $self->{QPERBASEANDPOSITIONRESULT}->{'c'}->{STDV};
+
+	my $QValuePerBaseTMean = $self->{QPERBASEANDPOSITIONRESULT}->{'t'}->{MEAN};
+	my $QValuePerBaseTStdv = $self->{QPERBASEANDPOSITIONRESULT}->{'t'}->{STDV};
+
+	my $QValuePerBaseGMean = $self->{QPERBASEANDPOSITIONRESULT}->{'g'}->{MEAN};
+	my $QValuePerBaseGStdv = $self->{QPERBASEANDPOSITIONRESULT}->{'g'}->{STDV};
 
 	my $cycles = $hist->getdim(1) || confess("Could not get number of cycles from q-histogram\n");
 	my $clusters = $hist->slice("0:40,1")->sum || confess("Could not get number of clusters from q-histogram\n");
@@ -745,6 +813,14 @@ sub metrics{
 		    "Q30LengthStdDev" => sprintf('%.1f', $lStddev),
 		    "Q30Fraction" => sprintf('%.1f', $q30*100),
 		    "Cycles" => $cycles,
+		    "QValuePerBaseAMean" => sprintf('%.1f', $QValuePerBaseAMean),
+		    "QValuePerBaseAStdv" => sprintf('%.1f', $QValuePerBaseAStdv),
+		    "QValuePerBaseCMean" => sprintf('%.1f', $QValuePerBaseCMean),
+		    "QValuePerBaseCStdv" => sprintf('%.1f', $QValuePerBaseCStdv),
+		    "QValuePerBaseGMean" => sprintf('%.1f', $QValuePerBaseGMean),
+		    "QValuePerBaseGStdv" => sprintf('%.1f', $QValuePerBaseGStdv),
+		    "QValuePerBaseTMean" => sprintf('%.1f', $QValuePerBaseTMean),
+		    "QValuePerBaseTStdv" => sprintf('%.1f', $QValuePerBaseTStdv)
 		   );
     }else{
 	# No data in stats set zeroes
@@ -754,7 +830,15 @@ sub metrics{
 		    "Q30LengthMean"   => 0,
 		    "Q30LengthStdDev" => 0,
 		    "Q30Fraction" => 0,
-		    "Cycles" => 0
+		    "Cycles" => 0,
+		    "QValuePerBaseAMean" => 0,
+		    "QValuePerBaseAStdv" => 0,
+		    "QValuePerBaseCMean" => 0,
+		    "QValuePerBaseCStdv" => 0,
+		    "QValuePerBaseGMean" => 0,
+		    "QValuePerBaseGStdv" => 0,
+		    "QValuePerBaseTMean" => 0,
+		    "QValuePerBaseTStdv" => 0
 		   );
     }
 
@@ -1012,7 +1096,10 @@ sub getQ30LengthHist{
 
 sub getQValuePerBaseXY{
     my $self = shift;
-    use Data::Dumper;
+
+    if(exists $self->{QPERBASEANDPOSITION} && !exists $self->{QPERBASEANDPOSITIONRESULT}) {
+	$self->calculateQValuePerBase();
+    }
     if(exists $self->{QPERBASEANDPOSITIONRESULT}){
 	my @ary;
 	foreach my $base ('a','c','g','t') {
@@ -1130,6 +1217,10 @@ sub copy{
     if(exists $self->{QPERBASEANDPOSITION}){
 	$new->{QPERBASEANDPOSITION} = dclone $self->{QPERBASEANDPOSITION};
     }
+    if(exists $self->{QPERBASEANDPOSITION}) {
+	$new->{QPERBASEANDPOSITION} = dclone $self->{QPERBASEANDPOSITION};
+    }
+
     if(exists $self->{QPERBASEANDPOSITIONRESULT}) {
 	$new->{QPERBASEANDPOSITIONRESULT} = dclone $self->{QPERBASEANDPOSITIONRESULT};
     }
@@ -1219,7 +1310,12 @@ sub saveData{
     if(exists $self->{QPERBASEANDPOSITION} || exists $self->{QPERBASEANDPOSITIONRESULT}){
 	if(!exists $self->{QPERBASEANDPOSITIONRESULT}) {
 		$self->calculateQValuePerBase();
+
+		my $item = $zip->addString(Dumper($self->{QPERBASEANDPOSITION}),  "QPERBASEANDPOSITION");
+		$item->desiredCompressionMethod( COMPRESSION_DEFLATED );
+		$item->desiredCompressionLevel( 1 );
 	}
+	
 	my $item = $zip->addString(Dumper($self->{QPERBASEANDPOSITIONRESULT}),  "QPERBASEANDPOSITIONRESULT");
 	$item->desiredCompressionMethod( COMPRESSION_DEFLATED );
 	$item->desiredCompressionLevel( 1 );
@@ -1361,6 +1457,18 @@ sub loadData{
 	    my $VAR1;
 	    eval $data; confess $@ if $@;
 	    $self->{QPERBASEANDPOSITIONRESULT}= $VAR1;
+	}else{
+	    die "The archive $filename seems corrupted. Failed to verify crc32 on ADAPTER\n";
+	}
+    }
+
+    if(my $item = $zip->memberNamed("QPERBASEANDPOSITION")){
+	print STDERR $item->fileName(), "\n" if($self->{DEBUG});
+	my $data = $item->contents();
+	if(Archive::Zip::computeCRC32($data) == $item->crc32){
+	    my $VAR1;
+	    eval $data; confess $@ if $@;
+	    $self->{QPERBASEANDPOSITION}= $VAR1;
 	}else{
 	    die "The archive $filename seems corrupted. Failed to verify crc32 on ADAPTER\n";
 	}
