@@ -41,7 +41,7 @@
 			<version>Version2</version>
 			<unidentified>5.0</unidentified>
 			<numberOfCluster>10</numberOfCluster>
-			<overridePoolingRequirement>1</overridePoolingRequirement>
+			<overridePoolingRequirement>0</overridePoolingRequirement>
 			<lengths>
 				<l251>
 					<q30>1.8</q30>
@@ -62,7 +62,7 @@
 			<version>Version3</version>
 			<unidentified>5.0</unidentified>
 			<numberOfCluster>18</numberOfCluster>
-			<overridePoolingRequirement>1</overridePoolingRequirement>
+			<overridePoolingRequirement>0</overridePoolingRequirement>
 			<lengths>
 				<l301>
 					<q30>3.7</q30>
@@ -75,4 +75,45 @@
 			</lengths>
 		</platform>
 	</platforms>
+	<overrides>
+		<warning>
+			
+		</warning>
+		<pass>
+			<lane1>
+				<numberOfCluster>139</numberOfCluster>
+				<unidentified>6.0</unidentified>
+			</lane1>
+			<lane2>
+				<unidentified>2.9</unidentified>
+				<l101>
+					<q30>10</q30>
+				</l101>
+			</lane2>
+			<lane3>
+				<l101>
+					<q30>21.3</q30>
+					<errorRate>2.1</errorRate>
+				</l101>
+			</lane3>
+			<lane4>
+				<unidentified>7.5</unidentified>
+			</lane4>
+			<lane5>
+				<numberOfCluster>218</numberOfCluster>
+				<unidentified>8.0</unidentified>
+			</lane5>
+			<lane6>
+				<l101>
+					<errorRate>0.31</errorRate>
+				</l101>
+			</lane6>
+			<lane7>
+				<overridePoolingRequirement>1</overridePoolingRequirement>
+			</lane7>
+			<lane8>
+				<overridePoolingRequirement>1</overridePoolingRequirement>
+			</lane8>
+		</pass>
+	</overrides>
 </QCrequirements>

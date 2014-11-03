@@ -75,4 +75,14 @@
 			</lengths>
 		</platform>
 	</platforms>
+	<overrides>
+		<warning>
+			<lane1>
+			</lane1>
+		</warning>
+		<pass>
+			<lane1>
+			</lane1>
+		</pass>
+	</overrides>
 </QCrequirements>
