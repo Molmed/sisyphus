@@ -364,7 +364,7 @@ check_errs()
 # Get Sisyphus version
 echo -n "Sisyphus version: "
 if [ -e "$FindBin::Bin/.git" ]; then
-   git --git-dir $FindBin::Bin/.git describe
+   git --git-dir $FindBin::Bin/.git describe --tags
 elif [ -e "$FindBin::Bin/SISYPHUS_VERSION" ]; then
    cat "$FindBin::Bin/SISYPHUS_VERSION"
 else
