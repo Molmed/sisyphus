@@ -649,7 +649,7 @@ set style line 4 lt 8 lw 2
 set style data lines
 set key bottom
 
-plot datafile using 1:2:3 title 'A' w yerrorbars ls 1, datafile using 1:4:5 title 'C' w yerrorbars  ls 2, datafile using 1:6:7 title 'G' w yerrorbars  ls 3, datafile using 1:8:9 title 'A' w yerrorbars  ls 4
+plot datafile using 1:2:3 title 'A' w yerrorbars ls 1, datafile using 1:4:5 title 'C' w yerrorbars  ls 2, datafile using 1:6:7 title 'G' w yerrorbars  ls 3, datafile using 1:8:9 title 'T' w yerrorbars  ls 4
 
 );
     close($gpl);
