@@ -8,6 +8,7 @@ use Data::Dumper;
 use Archive::Zip qw( :ERROR_CODES :CONSTANTS );
 use File::Basename;
 use Molmed::Sisyphus::Common qw(mkpath);
+use Storable 'dclone';
 
 our $AUTOLOAD;
 
@@ -95,7 +96,6 @@ sub new{
 
     $self->{ADAPTERS}->{TRUSEQ} = ["AGATCGGAAGAGCACACGTC",
                                    "AGATCGGAAGAGCGTCGTGT"];
-
     # Set default max number of samplings
     unless(exists $self->{MAXSAMPLES}){
 	$self->{MAXSAMPLES} = 1e5;
@@ -112,6 +112,10 @@ sub new{
     # Init sequence counter
     unless(defined $self->{SEQUENCES}){
 	$self->{SEQUENCES} = {};
+    }
+
+    unless(defined $self->{SAMPLING_COUNTER}){
+	$self->{SAMPLING_COUNTER} = 100000;
     }
 
     bless ($self, $class);
@@ -195,7 +199,7 @@ sub addDataPoint{
     my $qstring = shift;
 
     chomp($seq);
-    chomp($qstring);
+    chomp($qstring);	
     $seq =~ tr/a-z/A-Z/;
 
     $self->countCopies($seq);
@@ -205,8 +209,164 @@ sub addDataPoint{
 	$self->addBaseDist($seq);
 	$self->countGC($seq);
 	$self->checkAdaptor($seq);
+	if(0 < $self->{SAMPLING_COUNTER}) {
+		$self->{SAMPLING_COUNTER} = $self->{SAMPLING_COUNTER} - 1;
+		$self->addQValuePerBaseAndPosition($seq, $qstring);
+	}
     }
-    return 1;
+
+	    return 1;
+}
+
+=pod
+
+=head2 addQValuePerBaseAndPosition()
+
+ Title   : addQValuePerBaseAndPosition
+ Usage   : $qstat->addQValuePerBaseAndPosition($seq,$qstring)
+ Function: Parses a FASTQ quality string per base and adds it to the statistics
+ Example : $qstat->qValuePerBaseAndePosition($seq,$qstring)
+ Returns : nothing
+ Args    : a sequence string and a FASTQ quality string
+
+=cut
+
+sub addQValuePerBaseAndPosition{
+    my $self = shift;
+    my $seqString = shift;
+    my $qualString = shift;
+
+    die "Missing OFFSET for parsing of Q-value strings\n" unless(exists $self->{OFFSET});
+    my $base = "";
+    my $qual;
+    if(exists $self->{QPERBASEANDPOSITION}){
+        for (my $i = 0; $i < length($seqString); $i++) {
+            $base = lc(substr($seqString,$i,1));
+            $qual = ord(substr($qualString,$i,1)) - $self->{OFFSET};
+            $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'Q'} .= pack("c",$qual);
+            $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'sum'} += $qual;
+            $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'num'}++;
+        }
+    }else{
+        for(my $i = 0; $i < length($seqString); $i++){
+            $self->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'Q'} = "";
+	    $self->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'sum'} = 0;
+	    $self->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'num'} = 0;
+
+	    $self->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'Q'} = "";
+	    $self->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'sum'} = 0;
+	    $self->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'num'} = 0;
+
+	    $self->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'Q'} = "";
+	    $self->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'sum'} = 0;
+	    $self->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'num'} = 0;
+
+	    $self->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'Q'} = "";
+	    $self->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'sum'} = 0;
+	    $self->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'num'} = 0;
+
+	    $self->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'Q'} = "";
+	    $self->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'sum'} = 0;
+	    $self->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'num'} = 0;
+
+	    $base = lc(substr($seqString,$i,1));
+	    $qual = ord(substr($qualString,$i,1)) - $self->{OFFSET};
+
+	    $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'Q'} = pack("c",$qual);
+	    $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'sum'} = $qual;
+	    $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'num'} = 1;
+	}
+    }
+}
+
+=pod
+
+=head2 calculateQValuePerBase()
+
+ Title   : calculateQValuePerBase
+ Usage   : $qstat->calculateQValuePerBase()
+ Function: calculate statistic using information that have been added using addQValuePerBaseAndPosition
+ Example : $qstat->calculateQValuePerBase()
+ Returns : nothing
+ Args    : nothing
+
+=cut
+
+sub calculateQValuePerBase {
+    my $self = shift;
+
+    if(exists $self->{QPERBASEANDPOSITION}){
+	my $result;
+
+	for(my $position = 0; $position < scalar @{$self->{QPERBASEANDPOSITION}}; $position++){
+            foreach my $base ('a', 'c', 'g', 't', 'n') {
+                if(defined($result->{$base}->{SUM})){
+		    $result->{$base}->{POS}->{$position}->{SUM} = $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'sum'};
+                    $result->{$base}->{SUM} += $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'sum'};
+		    $result->{$base}->{POS}->{$position}->{NUM} = $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'num'};
+                    $result->{$base}->{NUM} += $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'num'};
+                } else {
+		    $result->{$base}->{POS}->{$position}->{SUM} = $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'sum'};
+                    $result->{$base}->{SUM} = $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'sum'};
+		    $result->{$base}->{POS}->{$position}->{NUM} = $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'num'};
+                    $result->{$base}->{NUM} = $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'num'};
+                }
+            }
+	}
+
+	foreach my $base ('a', 'c', 'g', 't', 'n') {
+            if($result->{$base}->{NUM} == 0) {
+                $result->{$base}->{MEAN} = 0;
+            } else {
+                $result->{$base}->{MEAN} = $result->{$base}->{SUM} / $result->{$base}->{NUM};
+            }
+	    for(my $position = 0; $position < scalar @{$self->{QPERBASEANDPOSITION}}; $position++) {
+		if($result->{$base}->{POS}->{$position}->{NUM} == 0) {
+			$result->{$base}->{POS}->{$position}->{MEAN} = 0;
+		}else{
+			$result->{$base}->{POS}->{$position}->{MEAN} = $result->{$base}->{POS}->{$position}->{SUM} / $result->{$base}->{POS}->{$position}->{NUM};
+		}
+	    }
+	}
+
+        for(my $position = 0; $position < scalar @{$self->{QPERBASEANDPOSITION}}; $position++){
+           foreach my $base ('a', 'c', 'g', 't', 'n') {
+                for (my $i = 0; $i < $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'num'}; $i++) {
+                    if(defined($result->{$base}->{VAR})){
+                        $result->{$base}->{VAR} += ((unpack('c',substr($self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'Q'},$i,1)))[0] - $result->{$base}->{MEAN})**2;
+                    } else {
+                        $result->{$base}->{VAR} = ((unpack('c',substr($self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'Q'},$i,1)))[0] - $result->{$base}->{MEAN})**2;
+                    }
+		    if(defined($result->{$base}->{POS}->{$position}->{VAR})) {
+		       $result->{$base}->{POS}->{$position}->{VAR} += ((unpack('c',substr($self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'Q'},$i,1)))[0] - $result->{$base}->{POS}->{$position}->{MEAN})**2;
+		    } else {
+                       $result->{$base}->{POS}->{$position}->{VAR} = ((unpack('c',substr($self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'Q'},$i,1)))[0] - $result->{$base}->{POS}->{$position}->{MEAN})**2;
+		    }
+                }
+            }
+        }
+	foreach my $base ('a', 'c', 'g', 't', 'n') {
+		if(defined($result->{$base}->{NUM}) && defined($result->{$base}->{VAR})) {
+			$result->{$base}->{VAR} = $result->{$base}->{VAR} * (1 / ($result->{$base}->{NUM} - 1));
+			$result->{$base}->{STDV} = sqrt($result->{$base}->{VAR});
+		} else {
+			$result->{$base}->{VAR} = 0;
+			$result->{$base}->{STDV} = 0;
+		}
+		foreach my $position (keys %{$result->{$base}->{POS}}) {
+			if(defined($result->{$base}->{POS}->{$position}->{VAR}) && $result->{$base}->{POS}->{$position}->{NUM} > 1) {
+				$result->{$base}->{POS}->{$position}->{VAR} = $result->{$base}->{POS}->{$position}->{VAR} * (1 / ($result->{$base}->{POS}->{$position}->{NUM} - 1));
+				$result->{$base}->{POS}->{$position}->{STDV} = sqrt($result->{$base}->{POS}->{$position}->{VAR});
+			} else {
+				$result->{$base}->{POS}->{$position}->{VAR} = 0;
+				$result->{$base}->{POS}->{$position}->{STDV} = 0;
+			}
+		}
+	}
+	$self->{QPERBASEANDPOSITIONRESULT} = $result;
+        return $result;
+    }
+    return undef;
 }
 
 =pod
@@ -534,6 +694,52 @@ sub add{
 	}elsif(exists $stat->{ADAPTER}){
 	    $new->{ADAPTER} = [ @{$stat->{ADAPTER}} ];
 	}
+
+	if(exists $stat->{QPERBASEANDPOSITION}){	
+	   for(my $i = 0; $i < scalar @{$stat->{QPERBASEANDPOSITION}}; $i++){
+	       if(!defined($new->{QPERBASEANDPOSITION}->[$i])) {
+		   $new->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'Q'} = "";
+	           $new->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'sum'} = 0;
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'num'} = 0;
+
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'Q'} = "";
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'sum'} = 0;
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'num'} = 0;
+
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'Q'} = "";
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'sum'} = 0;
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'num'} = 0;
+
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'Q'} = "";
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'sum'} = 0;
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'num'} = 0;
+
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'Q'} = "";
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'sum'} = 0;
+                   $new->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'num'} = 0;   
+		} 
+                $new->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'Q'} .= $stat->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'Q'};
+	        $new->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'sum'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'sum'};
+                $new->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'num'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'num'};
+
+                $new->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'Q'} .= $stat->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'Q'};
+                $new->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'sum'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'sum'};
+                $new->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'num'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'num'};
+
+                $new->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'Q'} .= $stat->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'Q'};
+                $new->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'sum'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'sum'};
+                $new->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'num'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'num'};
+
+                $new->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'Q'} .= $stat->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'Q'};
+                $new->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'sum'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'sum'};
+                $new->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'num'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'num'};
+
+                $new->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'Q'} .= $stat->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'Q'};
+                $new->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'sum'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'sum'};
+                $new->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'num'} += $stat->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'num'};  
+		      
+            }
+        }
     }
     return $new;
 }
@@ -558,9 +764,23 @@ sub metrics{
 		  );
 
     if($self->hasData){
+        $self->calculateQValuePerBase();
+
 	my $hist = $self->{QHIST};
 	my $q = pdl(0..40); # The possible Q-values
 	my $q30lengths = $self->{Q30LENGTH};
+	
+        my $QValuePerBaseAMean = $self->{QPERBASEANDPOSITIONRESULT}->{'a'}->{MEAN};
+	my $QValuePerBaseAStdv = $self->{QPERBASEANDPOSITIONRESULT}->{'a'}->{STDV};
+
+	my $QValuePerBaseCMean = $self->{QPERBASEANDPOSITIONRESULT}->{'c'}->{MEAN};
+	my $QValuePerBaseCStdv = $self->{QPERBASEANDPOSITIONRESULT}->{'c'}->{STDV};
+
+	my $QValuePerBaseTMean = $self->{QPERBASEANDPOSITIONRESULT}->{'t'}->{MEAN};
+	my $QValuePerBaseTStdv = $self->{QPERBASEANDPOSITIONRESULT}->{'t'}->{STDV};
+
+	my $QValuePerBaseGMean = $self->{QPERBASEANDPOSITIONRESULT}->{'g'}->{MEAN};
+	my $QValuePerBaseGStdv = $self->{QPERBASEANDPOSITIONRESULT}->{'g'}->{STDV};
 
 	my $cycles = $hist->getdim(1) || confess("Could not get number of cycles from q-histogram\n");
 	my $clusters = $hist->slice("0:40,1")->sum || confess("Could not get number of clusters from q-histogram\n");
@@ -593,6 +813,14 @@ sub metrics{
 		    "Q30LengthStdDev" => sprintf('%.1f', $lStddev),
 		    "Q30Fraction" => sprintf('%.1f', $q30*100),
 		    "Cycles" => $cycles,
+		    "QValuePerBaseAMean" => sprintf('%.1f', $QValuePerBaseAMean),
+		    "QValuePerBaseAStdv" => sprintf('%.1f', $QValuePerBaseAStdv),
+		    "QValuePerBaseCMean" => sprintf('%.1f', $QValuePerBaseCMean),
+		    "QValuePerBaseCStdv" => sprintf('%.1f', $QValuePerBaseCStdv),
+		    "QValuePerBaseGMean" => sprintf('%.1f', $QValuePerBaseGMean),
+		    "QValuePerBaseGStdv" => sprintf('%.1f', $QValuePerBaseGStdv),
+		    "QValuePerBaseTMean" => sprintf('%.1f', $QValuePerBaseTMean),
+		    "QValuePerBaseTStdv" => sprintf('%.1f', $QValuePerBaseTStdv)
 		   );
     }else{
 	# No data in stats set zeroes
@@ -602,7 +830,15 @@ sub metrics{
 		    "Q30LengthMean"   => 0,
 		    "Q30LengthStdDev" => 0,
 		    "Q30Fraction" => 0,
-		    "Cycles" => 0
+		    "Cycles" => 0,
+		    "QValuePerBaseAMean" => 0,
+		    "QValuePerBaseAStdv" => 0,
+		    "QValuePerBaseCMean" => 0,
+		    "QValuePerBaseCStdv" => 0,
+		    "QValuePerBaseGMean" => 0,
+		    "QValuePerBaseGStdv" => 0,
+		    "QValuePerBaseTMean" => 0,
+		    "QValuePerBaseTStdv" => 0
 		   );
     }
 
@@ -847,6 +1083,39 @@ sub getQ30LengthHist{
     return undef;
 }
 
+=head2 getQValuePerBaseXY
+
+ Title   : getQValuePerBaseXY
+ Usage   : $stat->getQValuePerBaseXY()
+ Function: Returns a x and values for each base and cycle
+ Example : $stat->getQValuePerBaseXY();
+ Returns : Arrayref with length as index and count as value
+ Args    : None
+
+=cut
+
+sub getQValuePerBaseXY{
+    my $self = shift;
+
+    if(exists $self->{QPERBASEANDPOSITION} && !exists $self->{QPERBASEANDPOSITIONRESULT}) {
+	$self->calculateQValuePerBase();
+    }
+    if(exists $self->{QPERBASEANDPOSITIONRESULT}){
+	my @ary;
+	foreach my $base ('a','c','g','t') {
+		foreach my $position (sort {$a <=> $b} keys %{$self->{QPERBASEANDPOSITIONRESULT}->{$base}->{POS}}){
+			if($base ne 'a') {
+				$ary[$position] .= "\t" . $self->{QPERBASEANDPOSITIONRESULT}->{$base}->{POS}->{$position}->{MEAN} . "\t" . $self->{QPERBASEANDPOSITIONRESULT}->{$base}->{POS}->{$position}->{STDV};
+			} else {
+				$ary[$position] = "$position\t" . $self->{QPERBASEANDPOSITIONRESULT}->{$base}->{POS}->{$position}->{MEAN} . "\t" . $self->{QPERBASEANDPOSITIONRESULT}->{$base}->{POS}->{$position}->{STDV};
+			}
+		}
+	}
+	return \@ary;
+    }
+    return undef;
+}
+
 
 =head2 getBaseComposition
 
@@ -945,6 +1214,17 @@ sub copy{
     if(exists $self->{ADAPTER}){
 	$new->{ADAPTER} = [ @{$self->{ADAPTER}} ];
     }
+    if(exists $self->{QPERBASEANDPOSITION}){
+	$new->{QPERBASEANDPOSITION} = dclone $self->{QPERBASEANDPOSITION};
+    }
+    if(exists $self->{QPERBASEANDPOSITION}) {
+	$new->{QPERBASEANDPOSITION} = dclone $self->{QPERBASEANDPOSITION};
+    }
+
+    if(exists $self->{QPERBASEANDPOSITIONRESULT}) {
+	$new->{QPERBASEANDPOSITIONRESULT} = dclone $self->{QPERBASEANDPOSITIONRESULT};
+    }
+
     return $new;
 }
 
@@ -1023,6 +1303,20 @@ sub saveData{
     # Adapter
     if(exists $self->{ADAPTER}){
 	my $item = $zip->addString(Dumper($self->{ADAPTER}),  "ADAPTER");
+	$item->desiredCompressionMethod( COMPRESSION_DEFLATED );
+	$item->desiredCompressionLevel( 1 );
+    }
+
+    if(exists $self->{QPERBASEANDPOSITION} || exists $self->{QPERBASEANDPOSITIONRESULT}){
+	if(!exists $self->{QPERBASEANDPOSITIONRESULT}) {
+		$self->calculateQValuePerBase();
+
+		my $item = $zip->addString(Dumper($self->{QPERBASEANDPOSITION}),  "QPERBASEANDPOSITION");
+		$item->desiredCompressionMethod( COMPRESSION_DEFLATED );
+		$item->desiredCompressionLevel( 1 );
+	}
+	
+	my $item = $zip->addString(Dumper($self->{QPERBASEANDPOSITIONRESULT}),  "QPERBASEANDPOSITIONRESULT");
 	$item->desiredCompressionMethod( COMPRESSION_DEFLATED );
 	$item->desiredCompressionLevel( 1 );
     }
@@ -1156,6 +1450,30 @@ sub loadData{
 	    die "The archive $filename seems corrupted. Failed to verify crc32 on ADAPTER\n";
 	}
     }
+    if(my $item = $zip->memberNamed("QPERBASEANDPOSITIONRESULT")){
+	print STDERR $item->fileName(), "\n" if($self->{DEBUG});
+	my $data = $item->contents();
+	if(Archive::Zip::computeCRC32($data) == $item->crc32){
+	    my $VAR1;
+	    eval $data; confess $@ if $@;
+	    $self->{QPERBASEANDPOSITIONRESULT}= $VAR1;
+	}else{
+	    die "The archive $filename seems corrupted. Failed to verify crc32 on ADAPTER\n";
+	}
+    }
+
+    if(my $item = $zip->memberNamed("QPERBASEANDPOSITION")){
+	print STDERR $item->fileName(), "\n" if($self->{DEBUG});
+	my $data = $item->contents();
+	if(Archive::Zip::computeCRC32($data) == $item->crc32){
+	    my $VAR1;
+	    eval $data; confess $@ if $@;
+	    $self->{QPERBASEANDPOSITION}= $VAR1;
+	}else{
+	    die "The archive $filename seems corrupted. Failed to verify crc32 on ADAPTER\n";
+	}
+    }
+
     return 1;
 }
 

@@ -172,7 +172,7 @@ foreach my $proj (keys %{$sampleSheet}){
 					       EXECDIR=>$rfPath,      # Directory from which to run the script
 					       NAME=>"$proj-$rfShort",# Name of job, also used in script name
 					       PROJECT=>$uProj,       # project for resource allocation
-					       TIME=>"0-03:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
+					       TIME=>"0-06:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
 					       QOS=>$uQos,            # High priority
 					       PARTITION=>'core',      # core or node (or devel));
                  MAIL_USER=>$email,
