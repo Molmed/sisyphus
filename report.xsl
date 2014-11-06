@@ -267,7 +267,7 @@
 		</xsl:choose>
 	      </xsl:variable>
 	      <tr class="{$row-class}">
-		<td colspan="19" class="SampleName"><xsl:value-of select="@Id"/></td>
+		<td colspan="20" class="SampleName"><xsl:value-of select="@Id"/></td>
 	      </tr>
 	      <xsl:for-each select="./Tag">
 		<xsl:for-each select="./Lane">
