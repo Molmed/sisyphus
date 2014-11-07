@@ -346,7 +346,7 @@ sub calculateQValuePerBase {
             }
         }
 	foreach my $base ('a', 'c', 'g', 't', 'n') {
-		if(defined($result->{$base}->{NUM}) && defined($result->{$base}->{VAR})) {
+		if(defined($result->{$base}->{NUM}) && $result->{$base}->{NUM} > 1 && defined($result->{$base}->{VAR})) {
 			$result->{$base}->{VAR} = $result->{$base}->{VAR} * (1 / ($result->{$base}->{NUM} - 1));
 			$result->{$base}->{STDV} = sqrt($result->{$base}->{VAR});
 		} else {

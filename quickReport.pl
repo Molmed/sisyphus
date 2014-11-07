@@ -92,21 +92,21 @@ my $baseQC;
 sub findFastq{
     my $files = shift;
     my $file = $_;
-    if($file !~ /Undetermined_indices/){
+    if($file !~ /Undetermined_indices/ && $file !~ /\/Data\//){
         if($file =~ m/\.fastq(\.gz)?$/){
             my @path = split '/', $file;
             my $project = $path[-3];
             $project =~ s/^Project_//;
             my $sample = $path[-2];
             $sample =~ s/^Sample_//;
-            if($file =~ m/.*\/(.+)_([ACTG]+-?[ACGT]*)_L(\d{3})_R(\d)_(\d{3})\./){
+            if($file =~ m/.*\/(.+)_([ACTG]+-?[ACGT]*)_L(\d{3})_R(\d)_(\d{3})\.fastq\.gz$/){
                 $files->{$3}{$1}{$2}{$4}{$5} = $file;
             }
         }
     }
 }
 use File::Find;
-find({wanted => sub{findFastq(\%files)}, no_chdir => 1}, $rfPath);
+find({wanted => sub{findFastq(\%files)}, no_chdir => 1, follow => 1}, $rfPath);
 
 my $laneQC;
 

@@ -55,6 +55,14 @@ Continue even if data is missing. Adds --ignore-missing-stats, --ignore-missing-
 
 Also upload the entire MiSeq runfolder to a subfolder in the runfolder on Uppmax
 
+=item -ignoreQCResult
+
+Proceed with the data processing, even though one or multiple QC criteria have failed.
+
+=item -noUppmaxProcessing
+
+Will not upload any data to Uppmax or start any jobs on Uppmax
+
 =item -debug
 
 Print debugging information
@@ -92,6 +100,8 @@ my $rfPath = undef;
 my $miseq = 0;
 my $exec = 1;
 my $wait = 1;
+my $ignoreQCResult = 0;
+my $noUppmaxProcessing = 0;
 my $force = 0;
 our $debug = 0;
 my $threads = `cat /proc/cpuinfo |grep "^processor"|wc -l`;
@@ -105,6 +115,8 @@ GetOptions('help|?'=>\$help,
        'miseq!' => \$miseq,
 	   'exec!' => \$exec,
 	   'wait!' => \$wait,
+	   'ignoreQCResult!' => \$ignoreQCResult,
+	   'noUppmaxProcessing!' => \$noUppmaxProcessing,
 	   'force!' => \$force,
 	   'debug' => \$debug,
 	   'j=i' => \$threads,
@@ -505,11 +517,14 @@ if (defined $config->{MAIL}) {
     print $scriptFh "quickReport.pl -runfolder $rfPath -mail $config->{MAIL} -sender $config->{SENDER}\n\n";
     print $scriptFh "qcValidateRun.pl -runfolder $rfPath -mail $config->{MAIL} -sender $config->{SENDER}\n\n";
 
+unless($ignoreQCResult) {
     print $scriptFh <<EOF;
 check_errs \$? "FAILED QC"
 EOF
 }
+}
 
+unless($noUppmaxProcessing) {
 print $scriptFh <<EOF;
 
 
@@ -578,7 +593,10 @@ until [ \$PERM_OK = 0 ]; do
 done
 check_errs \$PERM_OK "FAILED"
 echo OK
+EOF
+}
 
+print $scriptFh <<EOF;
 # Extract the information to put in Seq-Summaries
 cd $rfRoot
 check_errs \$? "Failed to cd to $rfRoot"
@@ -598,6 +616,7 @@ echo OK
 
 EOF
 
+unless($noUppmaxProcessing) {
 # The rest of the processing is done at UPPMAX
 print $scriptFh <<EOF;
 cd $rfRoot
@@ -650,9 +669,10 @@ echo OK
 check_errs $? "FAILED to start aeacus-reports.pl in $rPath/$rfName at $rHost";
 
 EOF
+}
 
 close $scriptFh;
-
+print("Start...\n");
 chmod(0755, "$rfPath/sisyphus.sh");
 
 if($exec){
