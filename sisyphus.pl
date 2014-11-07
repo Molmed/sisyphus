@@ -672,7 +672,7 @@ EOF
 }
 
 close $scriptFh;
-print("Start...\n");
+
 chmod(0755, "$rfPath/sisyphus.sh");
 
 if($exec){
