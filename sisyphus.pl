@@ -63,6 +63,10 @@ Proceed with the data processing, even though one or multiple QC criteria have f
 
 Will not upload any data to Uppmax or start any jobs on Uppmax
 
+=item -noSeqStatSync
+
+Will not sync Seq-Summaries data
+
 =item -debug
 
 Print debugging information
@@ -102,6 +106,7 @@ my $exec = 1;
 my $wait = 1;
 my $ignoreQCResult = 0;
 my $noUppmaxProcessing = 0;
+my $noSeqStatSync = 0;
 my $force = 0;
 our $debug = 0;
 my $threads = `cat /proc/cpuinfo |grep "^processor"|wc -l`;
@@ -117,6 +122,7 @@ GetOptions('help|?'=>\$help,
 	   'wait!' => \$wait,
 	   'ignoreQCResult!' => \$ignoreQCResult,
 	   'noUppmaxProcessing!' => \$noUppmaxProcessing,
+	   'noSeqStatSync!' => \$noSeqStatSync,
 	   'force!' => \$force,
 	   'debug' => \$debug,
 	   'j=i' => \$threads,
@@ -596,6 +602,7 @@ echo OK
 EOF
 }
 
+unless($noSeqStatSync) {
 print $scriptFh <<EOF;
 # Extract the information to put in Seq-Summaries
 cd $rfRoot
@@ -615,7 +622,7 @@ check_errs \$RSYNC_OK "FAILED"
 echo OK
 
 EOF
-
+}
 unless($noUppmaxProcessing) {
 # The rest of the processing is done at UPPMAX
 print $scriptFh <<EOF;
