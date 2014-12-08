@@ -128,6 +128,7 @@ foreach my $proj (keys %{$sampleSheet}){
 
 			my $seq = "";
 			my $qual = "";
+			my $counter = 0;
 
 			while(<$filehandle>) {
 				$seq = <$filehandle>;
@@ -136,7 +137,11 @@ foreach my $proj (keys %{$sampleSheet}){
 				$qual = <$filehandle>;
 				chomp($qual);
 				if(rand() < $stat->{SAMPLING_DENSITY}) {
+					$counter = $counter + 1;
 					$stat->addQValuePerBaseAndPosition($seq,$qual);
+					if($counter == $stat->{SAMPLING_COUNTER}) {
+						last;
+					}
 				}
 			}
 			close($filehandle);
