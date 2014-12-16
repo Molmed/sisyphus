@@ -20,28 +20,6 @@
 		</platform>
 		<platform>
 			<controlSoftware>HiSeq Control Software</controlSoftware>
-			<version>HiSeq Flow Cell v4</version>
-			<mode>RapidHighOutput</mode>
-			<unidentified>5.0</unidentified>
-			<numberOfCluster>180</numberOfCluster>
-			<overridePoolingRequirement>0</overridePoolingRequirement>
-			<lengths>
-				<l125>
-					<q30>18</q30>
-					<errorRate>2.0</errorRate>
-				</l125>
-				<l100>
-					<q30>14</q30>
-					<errorRate>2.0</errorRate>
-				</l100>
-				<l50>
-					<q30>7.0</q30>
-					<errorRate>1.0</errorRate>
-				</l50>
-			</lengths>
-		</platform>
-		<platform>
-			<controlSoftware>HiSeq Control Software</controlSoftware>
 			<version>HiSeq Rapid Flow Cell v1</version>
 			<mode>RapidRun</mode>
 			<unidentified>5.0</unidentified>
@@ -67,15 +45,15 @@
 			<lengths>
 				<l251>
 					<q30>1.8</q30>
-					<errorRate>2.0</errorRate>
+					<errorRate>5.0</errorRate>
 				</l251>
 				<l151>
 					<q30>1.1</q30>
-					<errorRate>1.5</errorRate>
+					<errorRate>5.0</errorRate>
 				</l151>
 				<l26>
 					<q30>0.2</q30>
-					<errorRate>1.0</errorRate>
+					<errorRate>5.0</errorRate>
 				</l26>
 			</lengths>
 		</platform>
@@ -88,11 +66,11 @@
 			<lengths>
 				<l301>
 					<q30>3.7</q30>
-					<errorRate>2.5</errorRate>
+					<errorRate>5.0</errorRate>
 				</l301>
 				<l75>
 					<q30>1.1</q30>
-					<errorRate>1.5</errorRate>
+					<errorRate>5.0</errorRate>
 				</l75>
 			</lengths>
 		</platform>
@@ -100,11 +78,61 @@
 	<overrides>
 		<warning>
 			<lane1>
+				<numberOfCluster>145</numberOfCluster>
 			</lane1>
+			<lane2>
+				<unidentified>3.0</unidentified>
+				<l101>
+					<q30>11</q30>
+				</l101>
+			</lane2>
+			<lane3>
+				<l101>
+					<errorRate>2.0</errorRate>
+				</l101>
+			</lane3>
+			<lane4>
+				<unidentified>7.0</unidentified>
+			</lane4>
+			<lane5>
+				<unidentified>7.8</unidentified>
+			</lane5>
+			<lane8>
+				<overridePoolingRequirement>1</overridePoolingRequirement>
+			</lane8>
 		</warning>
 		<pass>
 			<lane1>
+				<numberOfCluster>139</numberOfCluster>
+				<unidentified>6.0</unidentified>
 			</lane1>
+			<lane2>
+				<unidentified>2.9</unidentified>
+				<l101>
+					<q30>10</q30>
+				</l101>
+			</lane2>
+			<lane3>
+				<l101>
+					<q30>21.3</q30>
+					<errorRate>2.1</errorRate>
+				</l101>
+			</lane3>
+			<lane4>
+				<unidentified>7.5</unidentified>
+			</lane4>
+			<lane5>
+				<numberOfCluster>218</numberOfCluster>
+				<unidentified>8.0</unidentified>
+			</lane5>
+			<lane6>
+				<l101>
+					<errorRate>0.31</errorRate>
+				</l101>
+			</lane6>
+			<lane7>
+				<overridePoolingRequirement>1</overridePoolingRequirement>
+			</lane7>
 		</pass>
 	</overrides>
 </QCrequirements>

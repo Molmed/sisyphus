@@ -42,7 +42,8 @@ my $qc = Molmed::Sisyphus::QCRequirementValidation->new();
 isa_ok($qc, 'Molmed::Sisyphus::QCRequirementValidation', "New qcValidation object created");
 ##Loading QC requirement
 $qc->loadQCRequirement("$testFolder/sisyphus_qc.xml");
-ok($qc->validateSequenceRun($sis,"$testFolder/quickReport.txt") == $qc->RUN_TYPE_NOT_FOUND, "QC: application not found");
+my ($result, $warning) = $qc->validateSequenceRun($sis,"$testFolder/quickReport.txt");
+ok($result == $qc->RUN_TYPE_NOT_FOUND, "QC: application not found");
 
 
 

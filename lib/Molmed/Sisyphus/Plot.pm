@@ -577,6 +577,94 @@ plot "$datName" using 2
     return($plotName,$thumbName);
 }
 
+=pod
+
+=head2 plotQ30Length()
+
+ Title   : plotQPerBase
+ Usage   : $plotter->plotQPerBase($stats,$outfile,$title)
+ Function: Creates a plot with mean Q value for each base at 
+           every cycle .
+ Example : my($plot, $thumb) = $plotter->plotQPerBase($stats,$outfile,$title)
+ Returns : The name of the plot and thumbnail files
+ Args    : A Molmed::Sisyphus::Qstat object to plot,
+           a string with the base name of the plot file to generate
+           (a .png extension will be added)
+           The plot title
+
+=cut
+
+sub plotQPerBase{
+    my $self = shift;
+    my $stat = shift;
+    my $plotName = shift;
+    my $plotTitle = shift;
+    my $datName = "$plotName.dat";
+    my $scriptName = "$plotName.gpl";
+    my $thumbName = "${plotName}_thumb.png";
+    $plotName = "$plotName.png";
+
+    # Handle empty stat data
+    unless($stat->hasData()){
+	return('NA','NA');
+    }
+
+    my $dirName = dirname($plotName);
+    unless(-e $dirName){
+	mkpath($dirName, 2770);
+    }
+
+    open(my $datFh, ">", $datName) or die "Failed to create $datName: $!\n";
+    print $datFh "#Cycle\tMean A\tSTDV A\tMean C\tSTDV C\tMean G\tSTDV G\tMean T\tSTDV T\n";
+    my $xy = $stat->getQValuePerBaseXY();
+    
+    unless(defined($xy)){
+	confess "Got empty Q per base list!\n";
+    }
+    for(my $i=0; $i<@{$xy}; $i++){
+	print $datFh (defined($xy->[$i]) ? $xy->[$i] : 0) . "\n";
+    }
+    close($datFh);
+
+    open(my $gpl, ">", $scriptName) or die "Failed to create $scriptName: $!\n";
+    print $gpl qq(
+set terminal png font Vera 9 size 800,600
+set output "$plotName"
+datafile="$datName"
+set title "$plotTitle"
+
+set yrange [0:45]
+
+set xlabel "Cycle number"
+set ylabel "Mean Q value"
+set xtics nomirror
+set ytics 10 nomirror
+set grid ytics lt 0
+set border 3
+
+set style line 1 lt 20 lw 2
+set style line 2 lt 2 lw 2
+set style line 3 lt 1 lw 2
+set style line 4 lt 8 lw 2
+set style data lines
+set key bottom
+
+plot datafile using 1:2:3 title 'A' w yerrorbars ls 1, datafile using 1:4:5 title 'C' w yerrorbars  ls 2, datafile using 1:6:7 title 'G' w yerrorbars  ls 3, datafile using 1:8:9 title 'T' w yerrorbars  ls 4
+
+);
+    close($gpl);
+    $ENV{GDFONTPATH} = "$FindBin::Bin/Fonts";
+    # Make the plot
+    $self->sysWrap(0, "gnuplot", "$scriptName") == 0 or confess "Gnuplot failed on $scriptName: $!\n";
+    # And a thumbnail
+    $self->sysWrap(0, "convert", "-strip", "-quality", "95", "PNG8:$plotName", "-resize", "120x80", $thumbName) == 0 or confess "Convert to thumb failed on $plotName: $!\n";
+    #compress the script and data
+    $self->sysWrap(0, 'bzip2', $scriptName)==0 or die "Failed to compress $scriptName";
+    $self->sysWrap(0, 'bzip2', $datName)==0 or die "Failed to compress $scriptName";
+    return($plotName,$thumbName);
+}
+
+
 sub sysWrap{
     my $self = shift;
     my $try = shift;
