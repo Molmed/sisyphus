@@ -461,7 +461,7 @@ echo OK
 
 # Save the sisyphus version
 if [ -e "$rfPath/Sisyphus/.git" ]; then
-   git --git-dir "$rfPath/Sisyphus/.git" describe > "$rfPath/Sisyphus/SISYPHUS_VERSION"
+   git --git-dir "$rfPath/Sisyphus/.git" describe --tags > "$rfPath/Sisyphus/SISYPHUS_VERSION"
    check_errs \$? "Failed to get sisyphus version from $rfPath/Sisyphus/.git"
 fi
 
