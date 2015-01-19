@@ -60,7 +60,7 @@ TEMP_PATH: /gulo/proj_nobackup/a2009002/private/tmp
 SUMMARY_HOST: mm-xlas002
 
 # The directory on ARCHIVE_HOST to put the runfolder in
-SUMMARY_PATH: /mnt/Seq-Summaries/2014/
+SUMMARY_PATH: /mnt/Seq-Summaries/2015/
 
 # The path, relative to the runfolder, where MiSeq analysis output is deposited
 ANALYSIS_PATH: ../MiSeqAnalysis/
