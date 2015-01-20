@@ -646,7 +646,7 @@ sub version{
     my $version = $class::VERSION;
 
     if(-e "$FindBin::Bin/.git"){
-	$version = `git --git-dir $FindBin::Bin/.git describe`;
+	$version = `git --git-dir $FindBin::Bin/.git describe --tags`;
     }elsif(-e "$FindBin::Bin/SISYPHUS_VERSION"){
 	$version = `cat "$FindBin::Bin/SISYPHUS_VERSION"`;
     }
