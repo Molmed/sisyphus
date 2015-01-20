@@ -127,6 +127,186 @@ The following selectors are available:
 
 =cut
 
+=pod
+
+=head2 convertHiSeqXOutputFolder()
+
+ Title   : convertHiSeqXOutputFolder
+ Usage   : $sisyphus->convertHiSeqXOutputFolder()
+ Function: convert the output folder created by bcl2fastq 2.15 into
+           the format created by bcl2fastq 1.8
+ Example :
+ Returns :
+ Args    : none
+
+=cut
+
+sub convertHiSeqXOutputFolder{
+    my $self = shift;
+    #Input and output directory for data
+    my $unaligned = "$self->{PATH}/Unaligned";
+    confess "Failed to find folder $unaligned\n" unless -e $unaligned;
+
+    #Import the sampleSheet, will be used to process the files.
+    my $sampleSheet = $self->readSampleSheet();
+    my $sampleSheetHeader = $self->getSampleSheetHeader();
+
+    #Create a list of all files and folders in the input directory.
+    opendir(DH, $unaligned) or die "Couldn't open dir: $unaligned!";
+    my @files = readdir(DH);
+    closedir(DH);
+    #Loop through all found files/folders.
+    foreach my $file (@files) {
+        #Ignore folders that will be created by this function. The expected input folder shouldn't
+        #contain any of these folders.
+        if($file =~/^\.*$|^Undetermined_indices$|^Project_.*$|^sisyphus-temp$|^Basecall_Stats/) {
+            next;
+        } elsif($file =~ /Undetermined_S[0-9]*_L([0-9]*)_R[1|2|3]{1}_[0-9]{3}\.fastq\.gz/) {
+            #All fastq files that only contain unidentified reads will be moved into a folder named
+            #Sample_lane"index", which will be located inside a folder named Undetermined_indices.
+            my $laneId = $1;
+            $laneId =~ s/^[0]+//g;
+            $laneId =~ s/^[0]+//g;
+            #Create the folder if it doesn't exist.
+            mkdir "$unaligned/Undetermined_indices" unless -e "$unaligned/Undetermined_indices";
+            mkdir "$unaligned/Undetermined_indices/Sample_lane$laneId" unless -e "$unaligned/Undetermined_indices/Sample_lane$laneId";
+            #Move the file.
+            File::Copy::move("$unaligned/$file","$unaligned/Undetermined_indices/Sample_lane$laneId/")
+                or die "Couldn't move $unaligned/$file into $unaligned/Undetermined_indices/Sample_lane$laneId/";
+        } elsif($file =~ /^Stats$|^Reports$/) {
+            #Statistics and reports will be placed in a folder named Basecall_Stats_"flowcellId".
+            #Create folder
+            mkdir "$unaligned/Basecall_Stats_" . $self->fcId() unless -e "$unaligned/Basecall_Stats_" . $self->fcId();
+            #Move folder
+            File::Copy::move("$unaligned/$file","$unaligned/Basecall_Stats_" . $self->fcId() . "/$file");
+        } else {
+            #Process a project folder and rename it with prefix "Project_"
+            my $newFile = "Project_$file";
+            #Rename the folder.
+            File::Copy::move("$unaligned/$file","$unaligned/$newFile");
+            #Folders with Sample_Name that differ from Sample_ID will be placed in a
+            #additional subfolder and will be have to be processed seperatly.
+            my $subSetSampleSheetIdNotEqualToName;
+            my $subSetSampleSheetIdEqualToName;
+            #Extract the entries that belong to the current project.
+            foreach my $laneKeys (keys %{$sampleSheet->{$file}}) {
+               foreach my $indexKey (keys %{$sampleSheet->{$file}->{$laneKeys}}) {
+                   if($sampleSheet->{$file}->{$laneKeys}->{$indexKey}->{'SampleName'} eq $sampleSheet->{$file}->{$laneKeys}->{$indexKey}->{'SampleID'}) {
+                      $subSetSampleSheetIdEqualToName->{$laneKeys} = $sampleSheet->{$file}->{$laneKeys};
+                    } else {
+                       $subSetSampleSheetIdNotEqualToName->{$laneKeys} = $sampleSheet->{$file}->{$laneKeys};
+                    }
+                }
+            }
+            #Variable used to store entries from SampleSheet.
+            my %sampleSheetRowsToPrint;
+
+            #Find all folders and files in project folder.
+            opendir(DH, "$unaligned/$newFile") or die "Couldn't open dir: $unaligned/$newFile!";
+            my @projectFiles = readdir(DH);
+            closedir(DH);
+
+            #Loop through all found files/folders.
+            foreach my $projectFile (@projectFiles) {
+                #Ignore files and folders named with prefix "Sample_", output folder should't contain this prefix
+                if($projectFile !~/^\.*$|^Sample_/) {
+                    #Move and rename fastq file and save the entry from the SampleSheet.
+                    if($projectFile  =~ /fastq$|fastq.gz$/) {
+                        $self->processHiSeqXProjectFile($subSetSampleSheetIdEqualToName,
+                                                  %sampleSheetRowsToPrint,
+                                                  "$unaligned/$newFile",
+                                                  $projectFile,
+                                                  "$unaligned/$newFile");
+                    } else {
+                        #Enter subfolder and process the content.
+                        opendir(DH, "$unaligned/$newFile/$projectFile") or die "Couldn't open dir: $unaligned/$newFile/$projectFile!";
+                        my @subProjectFiles = readdir(DH);
+                        closedir(DH);
+
+                        foreach my $subProjectFile (@subProjectFiles) {
+                            if($subProjectFile !~/^\.*$/) {
+                                #Move and rename fastq file and save the entry from the SampleSheet.
+                                if($subProjectFile  =~ /fastq$|fastq.gz$/) {
+                                    $self->processHiSeqXProjectFile($subSetSampleSheetIdNotEqualToName,
+                                                              \%sampleSheetRowsToPrint,
+                                                              "$unaligned/$newFile/$projectFile",
+                                                              $subProjectFile,
+                                                              "$unaligned/$newFile");
+                                }
+                            }
+                        }
+                        #Remove the subfolder.
+                        rmdir "$unaligned/$newFile/$projectFile"
+                    }
+                }
+           }
+
+           #Print the extracted SampleSheet entries to the Sample_"Name" folder.
+           foreach my $sample (keys %sampleSheetRowsToPrint) {
+               my $sampleFile = "$unaligned/$newFile/Sample_" . $sample . "/SampleSheet.csv";
+               open SAMPLESHEET, "> $sampleFile" or die "Couldn't open output file: $sampleFile!";
+               print SAMPLESHEET $sampleSheetHeader;
+               foreach my $lane (sort keys %{$sampleSheetRowsToPrint{$sample}}) {
+                   foreach my $number (sort keys %{$sampleSheetRowsToPrint{$sample}->{$lane}}) {
+                       print SAMPLESHEET $sampleSheetRowsToPrint{$sample}->{$lane}->{$number};
+                   }
+               }
+               close(SAMPLESHEET);
+           }
+       }
+   }
+}
+
+=pod
+
+=head2 processHiSeqXProjectFile()
+
+ Title   : processHiSeqXProjectFile
+ Usage   : $sisyphus->processHiSeqXProjectFile()
+ Function: process a provided fastq file,
+              rename it,
+              move it
+             and save the SampleSheet entry.
+ Example :
+ Returns :
+ Args    : none
+
+=cut
+
+sub processHiSeqXProjectFile {
+    my $self = shift;
+    my $subsetSampleSheet = shift;
+    my $outputSampleSheet = shift;
+    my $inputDir = shift;
+    my $projectFile = shift;
+    my $outputDir = shift;
+
+    #Extract information from fastq file
+    my ($name, $number, $lane, $read, $part) = ($projectFile =~ m/^(.*)_S([0-9]*)_(L[0-9]{3})_(R[123]{1})_([0-9]{3})\.fastq\.gz$/g);
+    my $shortLaneId = $lane;
+    $shortLaneId =~ s/^L0*//g;
+    my $found = 0;
+
+    #Fastq files will be stored in a folder with name "Sample_"+SAMPLENAME
+    my $dir = "$outputDir/Sample_$name";
+
+    mkdir $dir unless -e $dir;
+
+    #Find Sample and index combination in SampleSheet, move and rename fastq-file.
+    foreach my $indexKey (keys %{$subsetSampleSheet->{$shortLaneId}}) {
+        if($subsetSampleSheet->{$shortLaneId}->{$indexKey}->{'SampleName'} eq $name &&
+            $subsetSampleSheet->{$shortLaneId}->{$indexKey}->{'SampleNumber'} == $number) {
+            my $newFastqFile = $subsetSampleSheet->{$shortLaneId}->{$indexKey}->{'SampleName'} . "_" .
+                               $subsetSampleSheet->{$shortLaneId}->{$indexKey}->{'Index'} . "_" .
+                               $lane . "_" . $read . "_001.fastq.gz";
+            $found = 1;
+            $outputSampleSheet->{$name}->{$shortLaneId}->{$number} =
+                $subsetSampleSheet->{$shortLaneId}->{$indexKey}->{'Row'} . "\n";
+            File::Copy::move("$inputDir/$projectFile","$dir/$newFastqFile");
+        }
+    }
+    die "Couldn't find sample in SampleSheeet $name!\n" if($found == 0);
+}
 
 =pod
 
@@ -1117,28 +1297,175 @@ sub readSampleSheet{
     }else{
 	open($sheet, '<', $sheetPath) or die "Failed to open $sheetPath: $!\n";
     }
-    while(<$sheet>){
-	if(m/^$fcId,/i){
-	    next if(m/^#/); # Skip comments
-	    my $row = $_;
-	    chomp($row);
-	    $row=~ s/[\012\015]*$//; # Strip CR & LF
-	    my @r = split /,/, $row;
-	    $r[4] = 'Undetermined' unless($r[4] =~ m/\S/); # Use 'Undetermined' for unspecified index tags
-	    unless($r[6] =~ m/^y/i){ # Skip the controls
-		# Use project + lane + index tag as keys
-		$sampleSheet{$r[9]}->{$r[1]}->{$r[4]} = {'SampleID'=>$r[2],'SampleRef'=>$r[3],'Index'=>$r[4],
-						'Description'=>$r[5],'Control'=>$r[6], 'Lane'=>$r[1],
-						'SampleProject'=>$r[9], 'Row'=>$row};
-		# Extract some extras from the description
-		# The format used is KEY1:value1;KEY2:value2...
-		while($r[5] =~ m/([^:]*):([^;]*)[;\s]*/g){
-		    $sampleSheet{$r[9]}->{$r[1]}->{$r[4]}->{$1} = $2;
-		}
-	    }
-	}
+    if($self->machineType eq 'hiseqx') {
+        while(<$sheet>){
+            if(m/^\[Data\]/) {
+                my $row = <$sheet>;
+                chomp($row);
+                $row=~ s/[\012\015]*$//;
+                my @columns = split(/,/,$row);
+                my $length = @columns;
+                my $columnMap;
+                for( my $i = 0; $i < $length; $i++) {
+                    $columnMap->{$columns[$i]} = $i;
+                }
+                my $sampleCounter;
+                while(<$sheet>){
+                    if(/^#/){
+                        next;
+                    }
+                    my $dataRow = $_;
+                    chomp($dataRow);
+                    $dataRow=~ s/[\012\015]*$//;
+                    my @r = split /,/, $dataRow;
+                    $r[$columnMap->{'index'}] = 'unknown' if($r[$columnMap->{'index'}] !~ m/^[ACGT-]+$/); # Use 'unknown' for unspecified index tags
+                    unless($r[6] =~ m/^y/i){ # Skip the controls
+                    # Use project + lane + index tag    as keys
+                    if(defined($sampleCounter->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'Sample_Name'}]})) {
+                        #Calculate sample number
+                        if(!defined($sampleCounter->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'Sample_ID'}]})) {
+                            $sampleCounter->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'Sample_Name'}]}->{'counter'} =
+                                $sampleCounter->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'Sample_Name'}]}->{'counter'} + 1;
+                            $sampleCounter->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'Sample_ID'}]} =
+                                $sampleCounter->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'Sample_Name'}]}->{'counter'};
+                            } else {
+                                die "Unhandled case!!!\n";
+                            }
+                        } else {
+			    #Sample name haven't been seen before
+                            $sampleCounter->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'Sample_Name'}]}->{'counter'} = $r[$columnMap->{'index'}] eq 'unknown' ? 0 : 1;
+                            $sampleCounter->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'Sample_ID'}]} = $r[$columnMap->{'index'}] eq 'unknown' ? 0 : 1;
+                        }
+                        #Save information in hash
+                        $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'index'}]} =
+                            {'SampleID'=>$r[$columnMap->{'Sample_ID'}],
+                             'SampleName'=>$r[$columnMap->{'Sample_Name'}],
+                             'Index'=>$r[$columnMap->{'index'}],
+                             'Description'=>$r[$columnMap->{'Description'}],
+                             'SampleWell'=>$r[$columnMap->{'Sample_Well'}],
+                             'SampleNumber'=>$sampleCounter->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'Sample_ID'}]},
+                             'SamplePlate'=>$r[$columnMap->{'Sample_Plate'}],
+                             'Lane'=>$r[$columnMap->{'Lane'}],
+                             'SampleProject'=>$r[$columnMap->{'Sample_Project'}],
+                             'Row'=>$dataRow};
+                        # Extract some extras from the description
+                        # The format used is KEY1:value1;KEY2:value2...
+                        while($r[$columnMap->{'Description'}] =~ m/([^:]*):([^;]*)[;\s]*/g){
+                           $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'index'}]}->{$1} = $2;
+                       }
+                   }
+               }
+           }
+       }
+    } else {
+        while(<$sheet>){
+           if(m/^$fcId,/i){
+               next if(m/^#/); # Skip comments
+               my $row = $_;
+               chomp($row);
+               $row=~ s/[\012\015]*$//; # Strip CR & LF
+               my @r = split /,/, $row;
+               $r[4] = 'Undetermined' unless($r[4] =~ m/\S/); # Use 'Undetermined' for unspecified index tags
+               unless($r[6] =~ m/^y/i){ # Skip the controls
+                    # Use project + lane + index tag   as keys
+                    $sampleSheet{$r[9]}->{$r[1]}->{$r[4]} = {'SampleID'=>$r[2],'SampleRef'=>$r[3],'Index'=>$r[4],
+                                                             'Description'=>$r[5],'Control'=>$r[6], 'Lane'=>$r[1],
+                                                             'SampleProject'=>$r[9], 'Row'=>$row};
+                    # Extract some extras from the description
+                    # The format used is KEY1:value1;KEY2:value2...
+                    while($r[5] =~ m/([^:]*):([^;]*)[;\s]*/g){
+                        $sampleSheet{$r[9]}->{$r[1]}->{$r[4]}->{$1} = $2;
+                   }
+                }
+            }
+        }
     }
     return(\%sampleSheet);
+}
+
+=pod
+
+=head2 getSampleSheetHeader()
+
+ Title   : getSampleSheetHeader
+ Usage   : $sis->getSampleSheetHeader()
+ Function: Reads header data from $rfPath/Samples.csv
+ Example :
+ Returns : hashref with info
+ Args    : none
+
+=cut
+
+sub getSampleSheetHeader{
+    my $self = shift;
+    my $rfPath = $self->PATH;
+    # Boldly assuming CASAVA 1.8, skipping legacy cruft from old demultiplexing
+    my $sheetPath = "$rfPath/SampleSheet.csv";
+    my $sampleSheetHeader = undef;
+
+    # Get the flowcell id
+    my $fcId = $self->fcId();
+
+    #Expected file format is
+    #FCID,Lane,SampleID,SampleRef,Index,Description,Control,Recipe,Operator,SampleProject
+    my $sheet;
+    if(-e "$sheetPath.gz" && ! -e $sheetPath){
+       open($sheet, '<:gzip', "$sheetPath.gz") or die "Failed to open $sheetPath.gz: $!\n";
+    }else{
+       open($sheet, '<', $sheetPath) or die "Failed to open $sheetPath: $!\n";
+    }
+    if($self->machineType eq 'hiseqx') {
+        LOOP: while(<$sheet>){
+            if(m/^\[Data\]/) {
+                $sampleSheetHeader .= $_;
+                last;
+            }else {
+                if(!defined($sampleSheetHeader)){
+                    $sampleSheetHeader = $_;
+                } else {
+                    $sampleSheetHeader .= $_;
+                }
+            }
+        }
+    } else {
+         while(<$sheet>){
+            if(m/^FCID,/i){
+                $sampleSheetHeader = $_;
+                last;
+            }
+        }
+    }
+    return($sampleSheetHeader);
+}
+
+=pod
+
+=head2 getIndexUsingSampleNumber()
+
+ Title   : tmpdir
+ Usage   : $sis->getIndexUsingSampleNumber($lane,$project,$sample,$sampleNumber,$sampleSheet)
+ Function: Returns index for the sample with the provided information.
+ Example :
+ Returns : index (String)
+ Args    : lane, sample and sampleNumber
+
+=cut
+
+sub getIndexUsingSampleNumber{
+    my $self = shift;
+    my $lane = shift;
+    my $project = shift;
+    my $sample = shift;
+    my $sampleNumber = shift;
+    my $sampleSheet = shift;
+
+    foreach my $index (keys %{$sampleSheet->{$project}->{$lane}}) {
+        if($sampleSheet->{$project}->{$lane}->{$index}->{'SampleNumber'} eq $sampleNumber &&
+            $sampleSheet->{$project}->{$lane}->{$index}->{'SampleName'} eq $sample) {
+            return $index
+        } 
+    }
+    die "Couldn't find index for the provided sample information!\n";
 }
 
 =pod
@@ -1236,8 +1563,9 @@ sub complete{
 	    }
             foreach my $c (@cycles){
                 if( opendir(CYCLE, "$ldir/$c") ){
-                    my @tiles = grep /s.*\.(bcl|stats)/, readdir(CYCLE);
-		    my $nTiles = (@tiles + 0)/2;
+                    my @tiles = grep /s.*\.(bcl|bcl\.gz)/, readdir(CYCLE);
+                    my $nTiles = @tiles + 0;
+
 		    if($nTiles < $expectedTiles){
 			print STDERR "Too few tiles for lane $lane, cycle $c. Found $nTiles, expected $expectedTiles.\n" if($self->{DEBUG});
 			return 0;
@@ -1757,7 +2085,12 @@ sub resultStats{
 	}
     }
 
-    my $sampleData = $self->readDemultiplexStats($self->{PATH} . '/Unaligned/Basecall_Stats_' . $fc .'/Flowcell_demux_summary.xml', \%nCycles, \%laneData);
+    my $sampleData;
+    if($self->machineType eq 'hiseqx') {
+	$sampleData = $self->readDemultiplexStatsHiSeqX($self->{PATH} . '/Unaligned/Stats/DemultiplexingStats.xml', $self->{PATH} . '/Unaligned/Stats/ConversionStats.xml', \%nCycles, \%laneData);
+    } else {
+	$sampleData = $self->readDemultiplexStats($self->{PATH} . '/Unaligned/Basecall_Stats_' . $fc .'/Flowcell_demux_summary.xml', \%nCycles, \%laneData);
+    }
 
     $self->{RESULTSTATS}->{LANEDATA} = \%laneData;
     $self->{RESULTSTATS}->{SAMPLEDATA} = $sampleData;
@@ -1901,6 +2234,171 @@ sub readDemultiplexStats{
 	    }
 	}
    }
+
+    return \%sampleData;
+}
+
+sub readDemultiplexStatsHiSeqX{
+    my $self = shift;
+    my $xmlDemFile = shift;
+    my $conversionFile = shift;
+    my $nCycles = shift;
+    my $laneData = shift;
+
+    my %sampleData;
+    my $laneDataTmp;
+
+    if(-e "$conversionFile.gz" && !-e $conversionFile){
+       system("gunzip", "$conversionFile.gz")==0 or die "Failed to gunzip $conversionFile.gz:$!\n";
+    }
+    if(-e $conversionFile){
+        my $stats = XMLin($conversionFile,ForceArray=>['Read','Tile','Lane','Project', 'Sample', 'Flowcell', 'Barcode'], KeyAttr => {item => 'name'}) || confess "Failed to read $conversionFile\n";        
+        foreach my $flowcell (@{$stats->{Flowcell}}){
+            my $flowcellId = $flowcell->{'flowcell-id'};
+            foreach my $project (@{$flowcell->{'Project'}}){
+                my $projectName = $project->{name};
+                foreach my $sample (@{$project->{Sample}}){
+                    my $sampleName = $sample->{name};
+                    foreach my $barcode (@{$sample->{Barcode}}){
+                        my $tag = $barcode->{name};
+                        $tag = '' if($tag eq 'NoIndex');
+                        foreach my $lane (@{$barcode->{Lane}}){
+                            my $lid = $lane->{number};
+                            foreach my $tile (@{$lane->{Tile}}){
+                                my $pf = $tile->{Pf};
+                                foreach my $read (@{$pf->{Read}}){
+                                    my $rId = $read->{number};
+                                    if(!($tag eq 'all')) {
+                                        $sampleData{$sampleName}->{$lid}->{$rId}->{$tag}->{PF} += $pf->{ClusterCount};
+                                        $sampleData{$sampleName}->{$lid}->{$rId}->{$tag}->{YieldQ30} += $read->{YieldQ30};
+                                        $sampleData{$sampleName}->{$lid}->{$rId}->{$tag}->{QscoreSum} += $read->{QualityScoreSum};
+                                        $sampleData{$sampleName}->{$lid}->{$rId}->{$tag}->{YieldPF} += $read->{Yield};
+                                        $laneDataTmp->{$lid}->{$rId}->{YieldQ30} += $read->{YieldQ30};
+                                        $laneDataTmp->{$lid}->{$rId}->{QscoreSum} += $read->{QualityScoreSum};
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }else{
+        confess "Failed to extract data from $xmlDemFile: file does not exist\n";
+    }
+    if(-e "$xmlDemFile.gz" && !-e $xmlDemFile){
+        system("gunzip", "$xmlDemFile.gz")==0 or die "Failed to gunzip $xmlDemFile.gz:$!\n";
+    }
+    if(-e $xmlDemFile){
+        my $xmlDemStat = XMLin($xmlDemFile,ForceArray=>['Lane','Project', 'Sample', 'Flowcell', 'Barcode'], KeyAttr => {item => 'name'}) || confess "Failed to read $conversionFile\n";
+        foreach my $flowcell (@{$xmlDemStat->{Flowcell}}){
+            my $flowcellId = $flowcell->{'flowcell-id'};
+            foreach my $project (@{$flowcell->{'Project'}}){
+                my $projectName = $project->{name};
+                foreach my $sample (@{$project->{Sample}}){
+                    my $sampleName = $sample->{name};
+                    foreach my $barcode (@{$sample->{Barcode}}){
+                        my $tag = $barcode->{name};
+                        $tag = '' if($tag eq 'NoIndex');
+                        if(!($tag eq 'all')) {
+                            foreach my $lane (@{$barcode->{Lane}}){
+                                my $lid = $lane->{number};
+                                foreach my $rId (keys %{$sampleData{$sampleName}->{$lid}}) {
+                                    $sampleData{$sampleName}->{$lid}->{$rId}->{$tag}->{mismatchCnt1} += $lane->{OneMismatchBarcodeCount};
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }else{
+        confess "Failed to extract data from $xmlDemFile: file does not exist\n";
+    }
+
+    # Calculate per lane metrics
+    foreach my $lid (keys %{$laneDataTmp}){
+        foreach my $rId (keys %{$laneDataTmp->{$lid}}){
+            my $lane = $laneDataTmp->{$lid};
+            if(exists $laneData->{$lid}){
+                $lane->{$rId}->{YieldPF} = exists($laneData->{$lid}->{$rId}->{PF}) ? $laneData->{$lid}->{$rId}->{PF} * $nCycles->{$rId} : 0;
+                $lane->{$rId}->{PctQ30} = exists($lane->{$rId}->{YieldQ30}) && exists($lane->{$rId}->{YieldPF}) && $lane->{$rId}->{YieldPF} > 0 ?
+                    $lane->{$rId}->{YieldQ30} / $lane->{$rId}->{YieldPF} : 0;
+                $lane->{$rId}->{AvgQ} = exists($lane->{$rId}->{QscoreSum}) && exists($lane->{$rId}->{YieldPF}) && $lane->{$rId}->{YieldPF} > 0 ?
+                    $lane->{$rId}->{QscoreSum} / $lane->{$rId}->{YieldPF} : 0;
+            }else{
+                $lane->{$rId}->{YieldQ30} = 0;
+                $lane->{$rId}->{QscoreSum} = 0;
+                $lane->{$rId}->{YieldQPF} = 0;
+                $lane->{$rId}->{PctQ30} = 0;
+                $lane->{$rId}->{AvgQ} = 0;
+            }
+        }
+    }
+
+    # And some more per sample metrics
+    foreach my $name (keys %sampleData){
+        foreach my $lid (keys %{$sampleData{$name}}){
+            foreach my $rId (keys %{$sampleData{$name}->{$lid}}){
+                foreach my $tag (keys %{$sampleData{$name}->{$lid}->{$rId}}){
+                    $tag = '' if($tag eq 'NoIndex');
+                    if(exists $sampleData{$name}->{$lid}->{$rId}->{$tag}->{PF} &&
+                        $sampleData{$name}->{$lid}->{$rId}->{$tag}->{PF} > 0){
+                        $sampleData{$name}->{$lid}->{$rId}->{$tag}->{TagErr} =
+                            $sampleData{$name}->{$lid}->{$rId}->{$tag}->{mismatchCnt1} /
+                            $sampleData{$name}->{$lid}->{$rId}->{$tag}->{PF}*100;
+
+                        $sampleData{$name}->{$lid}->{$rId}->{$tag}->{PctLane} =
+                            $sampleData{$name}->{$lid}->{$rId}->{$tag}->{PF} /
+                            $laneData->{$lid}->{$rId}->{PF} * 100;
+                    }
+                    if(exists $sampleData{$name}->{$lid}->{$rId}->{$tag}->{YieldPF} &&
+                        $sampleData{$name}->{$lid}->{$rId}->{$tag}->{YieldPF} > 0){
+
+                        $sampleData{$name}->{$lid}->{$rId}->{$tag}->{AvgQ} =
+                            $sampleData{$name}->{$lid}->{$rId}->{$tag}->{QscoreSum} /
+                            $sampleData{$name}->{$lid}->{$rId}->{$tag}->{YieldPF};
+
+                        $sampleData{$name}->{$lid}->{$rId}->{$tag}->{PctQ30} =
+                            $sampleData{$name}->{$lid}->{$rId}->{$tag}->{YieldQ30} /
+                            $sampleData{$name}->{$lid}->{$rId}->{$tag}->{YieldPF} * 100;
+                    }
+                }
+            }
+        }
+    }
+
+    # Set sample info for failed lanes
+    my $sampleSheet = $self->readSampleSheet();
+    foreach my $proj (keys %{$sampleSheet}){
+        foreach my $lid (keys %{$sampleSheet->{$proj}}){
+            foreach my $tag (keys %{$sampleSheet->{$proj}->{$lid}}){
+                my $name = $sampleSheet->{$proj}->{$lid}->{$tag}->{SampleID};
+                unless(exists $sampleData{$name}->{$lid}){
+                    foreach my $rId (keys %{$laneData->{$lid}}){
+                        $sampleData{$name}->{$lid}->{$rId}->{$tag}->{YieldQ30} = 0;
+                        $sampleData{$name}->{$lid}->{$rId}->{$tag}->{QscoreSum} = 0;
+                        $sampleData{$name}->{$lid}->{$rId}->{$tag}->{PF} = 0;
+                        $sampleData{$name}->{$lid}->{$rId}->{$tag}->{YieldPF} = 0;
+                        $sampleData{$name}->{$lid}->{$rId}->{$tag}->{mismatchCnt1} = 0;
+                        $sampleData{$name}->{$lid}->{$rId}->{$tag}->{TagErr} = 0;
+                        $sampleData{$name}->{$lid}->{$rId}->{$tag}->{PctLane} = 0;
+                        $sampleData{$name}->{$lid}->{$rId}->{$tag}->{AvgQ} = 0;
+                        $sampleData{$name}->{$lid}->{$rId}->{$tag}->{PctQ30} = 0;
+                    }
+                }
+            }
+        }
+    }
+
+    # Copy data from $laneDataTmp to $laneData
+    foreach my $lane (keys %{$laneDataTmp}){
+        foreach my $rId (keys %{$laneDataTmp->{$lane}}){
+            foreach my $key (keys %{$laneDataTmp->{$lane}->{$rId}}){
+                $laneData->{$lane}->{$rId}->{$key} = $laneDataTmp->{$lane}->{$rId}->{$key};
+            }
+        }
+    }
 
     return \%sampleData;
 }
@@ -2314,6 +2812,44 @@ sub fixSampleSheet{
 	    }
 	}
 	close($ssfh);
+    }elsif($type eq 'hiseqx'){
+        my $dataFound = 0;
+        open ADAPTORS, "> $rfPath/Adaptors.txt" or die "Couldn't open output file: $rfPath/Adaptors.txt\n";
+        while(<$ssfh>){
+            chomp;
+            s/\xA0//g; # Clean up some Windows/Excel copy paste remnant
+            $l++;
+            # Clean up empty rows and carrige return
+            next unless(m/\w/);
+            s/[\s\r\n]//g; # Remove any whitespaces (incl newline)
+            $_ .= "\n"; # Add proper newline
+            if(m/^\[Data\]/){ # Skip header
+                $dataFound = 1;
+                $output .= $_;
+            }elsif($dataFound != 1){ # Skip comments
+                if(/^Adapter/) {
+                    my @r = split /,/, $_;
+                    if($r[1] =~ /^[ACGT]+$/) {
+                        print ADAPTORS $r[0] . "," . $r[1] ."\n";
+                        $r[1] = "";
+                        $output .= join ',', @r;
+                    } else {
+                        $output .= $_;
+                    }
+                } else {
+                    $output .= $_; # or should we rather delete them?
+                }
+            }else{
+                my @r = split /,/, $_;
+                # remove unallowed characters from sample name
+                $r[1] =~ s/[\?\(\)\[\]\/\\\=\+\<\>\:\;\"\'\,\*\^\|\&\.]/_/g;
+                $r[2] =~ s/[\?\(\)\[\]\/\\\=\+\<\>\:\;\"\'\,\*\^\|\&\.]/_/g;
+                $output .= join ',', @r;
+                $lanes{$r[0]}->{$r[6]}++;
+            }
+        }
+        close(ADAPTORS);
+        close($ssfh);
     }elsif($type eq 'miseq'){
 	my $dataStart=0;
 	my $projName='MiSeq';
@@ -2459,6 +2995,8 @@ sub machineType{
     my $runParams = $self->runParameters();
     if($runParams->{Setup}->{ApplicationName} =~ m/miseq/i){
 	$type = "miseq";
+    } elsif($runParams->{Setup}->{ApplicationName} =~ m/HiSeq X/i) {
+        $type = "hiseqx";
     }
     return $type;
 }
@@ -2507,7 +3045,7 @@ sub positionsFormat{
     if( @{[glob "$rfPath/Data/Intensities/*/*.clocs"]} > 0){
 	return '.clocs';
     }
-    if( @{[glob "$rfPath/Data/Intensities/*/*.locs"]} > 0){
+    if( @{[glob "$rfPath/Data/Intensities/*/*.locs"]} > 0 || @{[glob "$rfPath/Data/Intensities/*.locs"]} > 0){
 	return '.locs';
     }
     if( @{[glob "$rfPath/Data/Intensities/*/*.pos.txt"]} > 0){

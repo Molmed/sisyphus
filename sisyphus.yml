@@ -10,6 +10,9 @@ SENDER: pontus.larsson@medsci.uu.se
 # CASAVA binaries
 CASAVA: /opt/CASAVA/1.8.4/bin/
 
+#Path to bcl2fastq binaries
+BCL2FASTQ: /usr/local/bin/bcl2fastq-v2.15.0.4
+
 # Demultiplex mismatches, set to 1 or 0 for each lane individually
 # Default is to allow one mismatch in all lanes
 MISMATCH:
