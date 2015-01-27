@@ -99,8 +99,10 @@ sub findFastq{
             $project =~ s/^Project_//;
             my $sample = $path[-2];
             $sample =~ s/^Sample_//;
-            if($file =~ m/.*\/(.+)_([ACTG]+-?[ACGT]*)_L(\d{3})_R(\d)_(\d{3})\.fastq\.gz$/){
-                $files->{$3}{$1}{$2}{$4}{$5} = $file;
+            if($file =~ m/.*\/(.+)_([ACTG]+-?[ACGT]*|NoIndex)_L(\d{3})_R(\d)_(\d{3})\.fastq\.gz$/){
+		my ($sample,$index,$laneId,$read,$segment) = ($1,$2,$3,$4,$5);
+		$index =~ s/NoIndex/Undetermined/ if($index =~ /NoIndex/);
+		$files->{$laneId}{$sample}{$index}{$read}{$segment} = $file;
             }
         }
     }
@@ -115,6 +117,7 @@ foreach my $proj (keys %{$sampleSheet}){
         foreach my $tag (keys %{$sampleSheet->{$proj}->{$lid}}){
             my $info = $sampleSheet->{$proj}->{$lid}->{$tag};
 	    my $laneId = ("0" x (3 - length($lid))) . $lid;
+	    my $fastQFilesFound = 0;
             foreach my $read (keys %{$files{$laneId}{$info->{SampleID}}{$info->{Index}}}){
 		foreach my $pctLane (keys %{$files{$laneId}{$info->{SampleID}}{$info->{Index}}{$read}}){
 			my $stat = Molmed::Sisyphus::QStat->new(OFFSET=>$OFFSET, DEBUG=>$debug);
@@ -125,7 +128,7 @@ foreach my $proj (keys %{$sampleSheet}){
 			} else {
 				open($filehandle,'-|', "grep fastq.gz $files{$laneId}{$info->{SampleID}}{$info->{Index}}{$read}{$pctLane}") or die "Failed to open $files{$laneId}{$info->{SampleID}}{$info->{Index}}{$read}{$pctLane}: $!";
 			}
-
+			$fastQFilesFound = 1;
 			my $seq = "";
 			my $qual = "";
 			my $counter = 0;
@@ -150,6 +153,10 @@ foreach my $proj (keys %{$sampleSheet}){
 			$laneQC->{$lid}->{$read} = $laneQC->{$lid}->{$read}->add($stat);
 		}
 	    }
+            if($fastQFilesFound == 0) {
+                print "Couldn't find fastq files(s) for lane $laneId, $info->{SampleID}\n";
+                exit 1;
+            }
         }
     }
 }
