@@ -132,17 +132,20 @@ foreach my $proj (keys %{$sampleSheet}){
 	    my $laneId = ("0" x (3 - length($lid))) . $lid;
 	    my $fastQFilesFound = 0;
             my $indexOrSampleCounter = $machineType eq 'hiseqx' ? $info->{SampleNumber} : $info->{Index};
+	    my $fastQFilesFound = 0;
             foreach my $read (keys %{$files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}}){
                 foreach my $pctLane (keys %{$files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}}){
+			print "$info->{SampleID}!\n";
 			my $stat = Molmed::Sisyphus::QStat->new(OFFSET=>$OFFSET, DEBUG=>$debug);
                         $samples->{$info->{SampleID}}->{$lid}->{$info->{Index}} = 1;
 			my $filehandle;
 
                         if($files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane} =~ /fastq.gz$/) {
                             open($filehandle, "zcat $files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane} |") or die "Failed to open $files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane}: $!";
-			} else {
+			} elsif($files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane} =~ /fastq$/) {
                             open($filehandle,'-|', "grep fastq.gz $files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane}") or die "Failed to open $files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane}: $!";
-			}
+			} 
+			
 			$fastQFilesFound = 1;
 			my $seq = "";
 			my $qual = "";
@@ -168,10 +171,10 @@ foreach my $proj (keys %{$sampleSheet}){
 			$laneQC->{$lid}->{$read} = $laneQC->{$lid}->{$read}->add($stat);
 		}
 	    }
-            if($fastQFilesFound == 0) {
-                print "Couldn't find fastq files(s) for lane $laneId, $info->{SampleID}\n";
-                exit 1;
-            }
+	    if($fastQFilesFound == 0) {
+		print "Couldn't find fastq files(s) for lane $laneId, $info->{SampleID}\n";
+		exit 1;
+	    }
         }
     }
 }
