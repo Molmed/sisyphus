@@ -231,6 +231,11 @@ foreach my $lane (1..$numLanes){
 	    my @dplot = $plotter->plotDuplications($stat,"$outDir/Plots/LanePlots/L00$lane-R$read-Duplicate", "Duplications $plotTitle");
 	    ($metrics{DupPlot} = $dplot[0]) =~ s/^$outDir\///;
 	    ($metrics{DupPlotThumb} = $dplot[1]) =~ s/^$outDir\///;
+
+            my @qpbplot = $plotter->plotQPerBase($stat,"$outDir/Plots/LanePlots/L00$lane-R$read-QvaluePerBase", "Q value per base $plotTitle");
+            ($metrics{QValuePerBase} = $qpbplot[0]) =~ s/^$outDir\///;
+            ($metrics{QValuePerBaseThumb} = $qpbplot[1]) =~ s/^$outDir\///;
+
 	}
         push @{$laneXmlData->{Lane}->{$lane}->{Read}}, \%metrics;
     }
@@ -295,6 +300,10 @@ foreach my $project (@projects){
         ($metrics{DupPlot} = $dplot[0]) =~ s/^$outDir\///;
         ($metrics{DupPlotThumb} = $dplot[1]) =~ s/^$outDir\///;
 
+        my @qpbplot = $plotter->plotQPerBase($stat,"$outDir/Plots/ProjPlots/$project-R$read-QvaluePerBase", "Q value per base $plotTitle");
+        ($metrics{QValuePerBase} = $qpbplot[0]) =~ s/^$outDir\///;
+        ($metrics{QValuePerBaseThumb} = $qpbplot[1]) =~ s/^$outDir\///;
+
 	foreach my $lane (sort{$a<=>$b} @lanes){
 	    next unless(exists $lStat{$lane}); # The undetermined_indices will not have data for lanes where no index was used
 	    my $lstat = $lStat{$lane}->{$read};
@@ -334,6 +343,10 @@ foreach my $project (@projects){
 	    my @dplot = $plotter->plotDuplications($lstat,"$outDir/Plots/ProjPlots/Lane$lane/$project-R$read-Duplicate", "Duplications $plotTitle");
 	    ($lmetrics{DupPlot} = $dplot[0]) =~ s/^$outDir\///;
 	    ($lmetrics{DupPlotThumb} = $dplot[1]) =~ s/^$outDir\///;
+
+            my @qpbplot = $plotter->plotQPerBase($lstat,"$outDir/Plots/ProjPlots/Lane$lane/$project-R$read-QvaluePerBase", "Q value per base $plotTitle");
+            ($lmetrics{QValuePerBase} = $qpbplot[0]) =~ s/^$outDir\///;
+            ($lmetrics{QValuePerBaseThumb} = $qpbplot[1]) =~ s/^$outDir\///;
 
 	    push @{$metrics{Lane}}, \%lmetrics;
 	}

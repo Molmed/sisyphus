@@ -92,6 +92,7 @@
 		  <th>Q&#8805;30(%)</th>
 		  <th>Yield<br/>Q&#8805;30 (bp)</th>
 		  <th>MeanQ</th>
+                  <th>Q-score per base<br />A/C/G/T</th>
 		  <th>PhiX<br/>Error<br />(Excluded)</th>
 		  <th>Q-score<br/>distribution</th>
 		  <th>Base<br/>composition</th>
@@ -99,6 +100,7 @@
 		  <th>Contiguous Length<br/>with Q&#8805;30 (bp)</th>
 		  <th>Duplicates</th>
 		  <th>Adapter<br/>sequences</th>
+                  <th>Q-score per base<br/>and position</th>
 		</tr>
 	      </thead>
 	      <tbody>
@@ -164,6 +166,12 @@
 
 		      <td><xsl:value-of select="@QMean"/><span class="stddev">&#177;<xsl:value-of select="@QStdDev"/></span></td>
 		      <td>
+                         <xsl:value-of select="@QValuePerBaseAMean"/><span class="stddev">&#177;<xsl:value-of select="@QValuePerBaseAStdv"/></span><br/>
+                         <xsl:value-of select="@QValuePerBaseCMean"/><span class="stddev">&#177;<xsl:value-of select="@QValuePerBaseCStdv"/></span><br/>
+                         <xsl:value-of select="@QValuePerBaseGMean"/><span class="stddev">&#177;<xsl:value-of select="@QValuePerBaseGStdv"/></span><br/>
+                         <xsl:value-of select="@QValuePerBaseTMean"/><span class="stddev">&#177;<xsl:value-of select="@QValuePerBaseTStdv"/></span>
+                       </td>
+                      <td>
 			<xsl:attribute name="style">
 			  <xsl:choose>
 			    <xsl:when test="@ErrRate &gt; 2">
@@ -236,6 +244,14 @@
 			</xsl:otherwise>
 		      </xsl:choose>
 
+                      <xsl:choose>
+                       <xsl:when test="@QValuePerBase = &apos;NA&apos;">
+                         <td>NA</td>
+                       </xsl:when>
+                       <xsl:otherwise>
+                         <td><a href="{concat('./',@QValuePerBase)}"><img alt="Q-value per base" src="{concat('./',@QValuePerBaseThumb)}"/></a></td>
+                       </xsl:otherwise>
+                     </xsl:choose>
 		    </tr>
 		  </xsl:for-each>
 		</xsl:for-each>
@@ -257,18 +273,20 @@
 		  <th>Q&#8805;30(%)</th>
 		  <th>Yield<br/>Q&#8805;30 (bp)</th>
 		  <th>MeanQ</th>
+                  <th>Q-score per base<br />A/C/G/T</th>
 		  <th>Q-score<br/>distribution</th>
 		  <th>Base<br/>composition</th>
 		  <th>GC<br/>distribution</th>
 		  <th>Contiguous Length<br/>with Q&#8805;30 (bp)</th>
 		  <th>Duplicates</th>
 		  <th>Adapter<br/>sequences</th>
+                  <th>Q-score per base<br/> and position</th>
 		</tr>
 	      </thead>
 	      <tbody>
 		<xsl:for-each select="ProjectMetrics/Project">
 		  <tr class="SampleName">
-		    <td colspan="13" class="SampleName"><a href="{concat('./', @Id, '/report.html')}"><xsl:value-of select="@Id"/></a></td>
+                    <td colspan="15" class="SampleName"><a href="{concat('./', @Id, '/report.html')}"><xsl:value-of select="@Id"/></a></td>
 		  </tr>
 		  <xsl:for-each select="./Read">
 		    <xsl:variable name="row-class">
@@ -314,7 +332,12 @@
 			  </xsl:call-template>
 			</td>
 			<td><xsl:value-of select="@QMean"/><span class="stddev">&#177;<xsl:value-of select="@QStdDev"/></span></td>
-
+                        <td>
+                          <xsl:value-of select="@QValuePerBaseAMean"/><span class="stddev">&#177;<xsl:value-of select="@QValuePerBaseAStdv"/></span><br/>
+                          <xsl:value-of select="@QValuePerBaseCMean"/><span class="stddev">&#177;<xsl:value-of select="@QValuePerBaseCStdv"/></span><br/>
+                          <xsl:value-of select="@QValuePerBaseGMean"/><span class="stddev">&#177;<xsl:value-of select="@QValuePerBaseGStdv"/></span><br/>
+                          <xsl:value-of select="@QValuePerBaseTMean"/><span class="stddev">&#177;<xsl:value-of select="@QValuePerBaseTStdv"/></span>
+                        </td>
 			<xsl:choose>
 			  <xsl:when test="@QscorePlot = &apos;NA&apos;">
 			    <td>NA</td>
@@ -368,6 +391,15 @@
 			    <td><a href="{concat('./',@AdapterPlot)}"><img alt="Adapter Plot" src="{concat('./',@AdapterPlotThumb)}"/></a></td>
 			  </xsl:otherwise>
 			</xsl:choose>
+
+                        <xsl:choose>
+                         <xsl:when test="@QValuePerBase = &apos;NA&apos;">
+                           <td>NA</td>
+                         </xsl:when>
+                         <xsl:otherwise>
+                           <td><a href="{concat('./',@QValuePerBase)}"><img alt="Q-value per base" src="{concat('./',@QValuePerBaseThumb)}"/></a></td>
+                         </xsl:otherwise>
+                       </xsl:choose>
 
 		      </tr>
 		    </xsl:for-each>

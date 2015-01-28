@@ -218,7 +218,7 @@
 		      <td>NA</td>
 		    </xsl:when>
 		    <xsl:otherwise>
-		      <td><a href="{concat('./',@QValuePerBase)}"><img alt="Adapter Plot" src="{concat('./',@QValuePerBaseThumb)}"/></a></td>
+                     <td><a href="{concat('./',@QValuePerBase)}"><img alt="Q-value per base" src="{concat('./',@QValuePerBaseThumb)}"/></a></td>
 		    </xsl:otherwise>
 		  </xsl:choose>
 
@@ -289,14 +289,14 @@
                             <xsl:value-of select="@FragmentSize"/>
                           </xsl:if>
 			</td>
-			<td rowspan="{$LaneRows}"><xsl:value-of select="round(100*@PctLane) div 100"/></td>
+                        <td rowspan="{$LaneRows}"><xsl:value-of select="round(100*@PctLane) div 100"/></td>
 			<td rowspan="{$LaneRows}">
 			  <xsl:call-template name="format-suffix">
 			    <xsl:with-param name="myval" select="@PF" />
 			    <xsl:with-param name="precision" select="1" />
 			  </xsl:call-template>
 			</td>
-			<td rowspan="{$LaneRows}"><xsl:value-of select="round(100*@TagErr) div 100"/></td>
+                        <td rowspan="{$LaneRows}"><xsl:value-of select="format-number(round(100*@TagErr) div 100,'##.0')"/></td>
 		      </xsl:if>
 		      <td><xsl:value-of select="@Id"/></td>
 		      <td>
@@ -379,7 +379,7 @@
 			  <td>NA</td>
 			</xsl:when>
 			<xsl:otherwise>
-			  <td><a href="{concat('./',@QValuePerBase)}"><img alt="Adapter Plot" src="{concat('./',@QValuePerBaseThumb)}"/></a></td>
+                          <td><a href="{concat('./',@QValuePerBase)}"><img alt="Q-value per base" src="{concat('./',@QValuePerBaseThumb)}"/></a></td>
 			</xsl:otherwise>
 		      </xsl:choose>
 
