@@ -169,6 +169,9 @@ sub validateSequenceRun {
 						{
 							$failedRuns->{$row[$qcResultHeaderMap->{'Lane'}]}->{$row[$qcResultHeaderMap->{'Read'}]} = $result;
 						}
+						elsif(defined($result) && $result == SEQUENCED_LENGTH_NOT_FOUND) {
+							return SEQUENCED_LENGTH_NOT_FOUND;
+						}
 					}
 				}
 			}
