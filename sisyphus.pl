@@ -228,14 +228,19 @@ $rPath =~ s:/*$::;
 $oPath =~ s:/*$::;
 $aPath =~ s:/*$::;
 $sPath =~ s:/*$::;
-$anPath =~ s:/*$::;
+if($miseq){
+    $anPath =~ s:/*$::;
+}
 
 # Set combined paths
 my $targetPath = "$rHost:$rPath";
 my $summaryPath = "$sHost:$sPath";
 my $archivePath = "$aHost:$aPath";
 my $rBin = "$rPath/$rfName/Sisyphus";
-my $analysisPath = "$anPath/$rfName";
+my $analysisPath = undef;
+if($miseq){
+    my $analysisPath = "$anPath/$rfName";
+}
 
 if($debug){
     print "\$rHost => $rHost\n";
