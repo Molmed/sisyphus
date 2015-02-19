@@ -365,11 +365,15 @@ $metaData{SisyphusVersion} = $sisyphus->version();
 $metaData{CsVersion} = $sisyphus->getCSversion();
 $metaData{InstrumentModel} = $sisyphus->machineType();
 $metaData{RtaVersion} = $sisyphus->getRTAversion();
-$metaData{FlowCellVer} = $sisyphus->getFlowCellVersion();
 $metaData{FlowCellId} = $sisyphus->fcId();
-$metaData{SBSversion} = $sisyphus->getSBSversion();
 $metaData{ClusterKitVersion} = $sisyphus->getClusterKitVersion();
 $metaData{Qoffset} = $offset;
+# metaData information only available for HiSeq
+if($sisyphus->machineType() ne 'miseq'){
+   $metaData{FlowCellVer} = $sisyphus->getFlowCellVersion();
+   $metaData{SBSversion} = $sisyphus->getSBSversion();
+}
+
 my $runInfo = $sisyphus->getRunInfo();
 for(my $i=0; $i<@{$runInfo->{reads}}; $i++){
     my $read = $runInfo->{reads}->[$i];
