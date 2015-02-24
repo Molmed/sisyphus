@@ -897,6 +897,41 @@ sub getRTAversion{
 
 =pod
 
+=head2 getBcl2FastqVersion()
+
+ Title   : getBcl2FastqVersion
+ Usage   : $sis->getBcl2FastqVersion()
+ Function: Reads the bcl2fast version from the runfolder
+ Example :
+ Returns : Version of bcl2fastq
+ Args    : none
+
+=cut
+
+sub getBcl2FastqVersion{
+    my $self = shift;
+    my $rfPath = $self->{PATH};
+    if(defined $self->{BCL2FASTQVERSION}){
+	return $self->{BCL2FASTQVERSION};
+    }
+
+    my $file = "$rfPath/bcl2fastq.version";
+    if(-e $file){
+	open FILE, $file or die "Failed to open $file!\n";
+	$self->{BCL2FASTQVERSION} = <FILE>;
+	close(FILE);
+    }elsif(-e "$file.gz"){
+	open(FILE, '<:gzip', "$file.gz") || confess "Failed to open $file.gz\n";
+	$self->{BCL2FASTQVERSION} = <FILE>;
+	close(FILE);
+    }
+    
+    return $self->{BCL2FASTQVERSION};
+}
+
+
+=pod
+
 =head2 getCasavaVersion()
 
  Title   : getCasavaVersion
@@ -2373,7 +2408,7 @@ sub readDemultiplexStatsHiSeqX{
     foreach my $proj (keys %{$sampleSheet}){
         foreach my $lid (keys %{$sampleSheet->{$proj}}){
             foreach my $tag (keys %{$sampleSheet->{$proj}->{$lid}}){
-                my $name = $sampleSheet->{$proj}->{$lid}->{$tag}->{SampleID};
+                my $name = $sampleSheet->{$proj}->{$lid}->{$tag}->{SampleName};
                 unless(exists $sampleData{$name}->{$lid}){
                     foreach my $rId (keys %{$laneData->{$lid}}){
                         $sampleData{$name}->{$lid}->{$rId}->{$tag}->{YieldQ30} = 0;
@@ -2842,8 +2877,10 @@ sub fixSampleSheet{
             }else{
                 my @r = split /,/, $_;
                 # remove unallowed characters from sample name
-                $r[1] =~ s/[\?\(\)\[\]\/\\\=\+\<\>\:\;\"\'\,\*\^\|\&\.]/_/g;
-                $r[2] =~ s/[\?\(\)\[\]\/\\\=\+\<\>\:\;\"\'\,\*\^\|\&\.]/_/g;
+                $r[1] =~ s/[\?\(\)\[\]\/\\\=\+\<\>\:\;\"\'\,\*\^\|\&\._]/-/g if(!($r[0] eq "Lane"));
+                $r[2] =~ s/[\?\(\)\[\]\/\\\=\+\<\>\:\;\"\'\,\*\^\|\&\._]/-/g if(!($r[0] eq "Lane"));
+		$r[1] = "Sample_" . $r[1] if($r[1] eq $r[2]);
+		$r[1] =~ s/Sample-/Sample_/;
                 $output .= join ',', @r;
                 $lanes{$r[0]}->{$r[6]}++;
             }

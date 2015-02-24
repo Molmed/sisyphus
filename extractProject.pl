@@ -413,7 +413,11 @@ $metaData{RtaVersion} = $sisyphus->getRTAversion();
 $metaData{FlowCellVer} = $sisyphus->getFlowCellVersion();
 $metaData{FlowCellId} = $sisyphus->fcId();
 $metaData{SBSversion} = $sisyphus->getSBSversion();
-$metaData{CasavaVersion} = $sisyphus->getCasavaVersion();
+if($machineType eq "hiseqx") {
+   $metaData{Bcl2fastqVersion} = $sisyphus->getBcl2FastqVersion();
+}else {
+   $metaData{CasavaVersion} = $sisyphus->getCasavaVersion();
+}
 $metaData{ClusterKitVersion} = $sisyphus->getClusterKitVersion();
 
 $metaData{Qoffset} = $offset;

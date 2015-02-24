@@ -270,7 +270,12 @@
 		</xsl:choose>
 	      </xsl:variable>
 	      <tr class="{$row-class}">
-		<td colspan="20" class="SampleName"><xsl:value-of select="@Id"/></td>
+		<xsl:if test="not(@SampleNumber='')">
+			<td colspan="21" class="SampleName"><xsl:value-of select="@Id"/></td>
+		</xsl:if>
+		<xsl:if test="@SampleNumber=''">
+			<td colspan="20" class="SampleName"><xsl:value-of select="@Id"/></td>
+		</xsl:if>
 	      </tr>
 	      <xsl:for-each select="./Tag">
 		<xsl:for-each select="./Lane">

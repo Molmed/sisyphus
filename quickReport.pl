@@ -114,7 +114,9 @@ sub findFastq{
 		$index =~ s/NoIndex/Undetermined/ if($index =~ /NoIndex/);
 		$files->{$laneId}{$sample}{$index}{$read}{$segment} = $file;
             }elsif($file =~ m/.*\/(.+)_S(\d*)_L(\d{3})_R(\d)_(\d{3})\.fastq\.gz$/){
-                $files->{$3}{$1}{$2}{$4}{$5} = $file;
+		my ($sample,$index,$laneId,$read,$segment) = ($1,$2,$3,$4,$5);
+                $sample = "Sample_" . $sample;
+		$files->{$laneId}{$sample}{$index}{$read}{$segment} = $file;
             }
         }
     }
@@ -132,12 +134,10 @@ foreach my $proj (keys %{$sampleSheet}){
 	    my $laneId = ("0" x (3 - length($lid))) . $lid;
 	    my $fastQFilesFound = 0;
             my $indexOrSampleCounter = $machineType eq 'hiseqx' ? $info->{SampleNumber} : $info->{Index};
-	    my $fastQFilesFound = 0;
             foreach my $read (keys %{$files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}}){
                 foreach my $pctLane (keys %{$files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}}){
-			print "$info->{SampleID}!\n";
 			my $stat = Molmed::Sisyphus::QStat->new(OFFSET=>$OFFSET, DEBUG=>$debug);
-                        $samples->{$info->{SampleID}}->{$lid}->{$info->{Index}} = 1;
+                        $samples->{$machineType eq 'hiseqx' ? $info->{SampleName} : $info->{SampleID}}->{$lid}->{$info->{Index}} = 1;
 			my $filehandle;
 
                         if($files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane} =~ /fastq.gz$/) {

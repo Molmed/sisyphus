@@ -169,7 +169,7 @@ foreach my $project(keys %files){
                 $tag = $1;
                 $lane = $2 + 0;
                 $read = $3;
-	    elsif($file =~ m/_L(\d{3})_R(\d)_\d{3}/){
+	    }elsif($file =~ m/_L(\d{3})_R(\d)_\d{3}/){
 		$lane = $1 + 0;
 		$read = $2;
 	    }else{

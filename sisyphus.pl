@@ -422,6 +422,8 @@ if [ ! -e "$rfPath/Unaligned" ]; then
    ln -s "$fastqPath/Unaligned" "$rfPath/Unaligned"
 fi
 
+$config->{BCL2FASTQ} -v 2>&1 | awk '{if(/^bcl2fastq/){print \$2}}' > $rfPath/bcl2fastq.version
+
 echo "Demultiplexing/Converting to FastQ"
 
 $config->{BCL2FASTQ} --input-dir '$rfPath/Data/Intensities/BaseCalls' --output-dir '$fastqPath/Unaligned' --use-bases-mask '$readMask' --barcode-mismatches '$mismatches' ${ignore} --tiles $includeTiles &> BclToFastq.log
