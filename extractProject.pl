@@ -172,34 +172,19 @@ $plotDir .= '/Plots';
 
 # Link all fastq-files
 opendir(my $pDirFh, $seqDir) or die "Failed to open '$seqDir': $!\n";
-if($machineType eq "hiseqx") {
-    foreach my $fastqFiles (readdir($pDirFh)){
-        if($fastqFiles =~ /fastq$|fastq.gz/) {
-            if($fastqFiles =~ m/\/?(.+)_S\d+_L00(\d)_R\d_001.fastq/) {
-                my $sampleDir = $1;
-                mkpath("$outDir/$sampleDir/",2770) unless(-e "$outDir/$sampleDir/");
-                link("$seqDir/$fastqFiles", "$outDir/$sampleDir/$fastqFiles") || die "Failed to link '$seqDir/$fastqFiles' to '$outDir/$sampleDir/$fastqFiles': $!\n";
-                $checksums{"$fastqFiles"} = $sisyphus->getMd5("$seqDir/$fastqFiles");
-            } else {
-               die "Incorrect name format for fastq file: $fastqFiles!\n";
-            }
-       }
-    }
-} else {
-    foreach my $sampleDir (readdir($pDirFh)){
-        next unless (-d "$seqDir/$sampleDir" && !($sampleDir eq ".."));
-        opendir(my $seqDirFh, "$seqDir/$sampleDir") or die "Failed to open '$seqDir/$sampleDir': $!\n";
-        foreach my $fastq (grep /fastq.gz$/, readdir($seqDirFh)){
-          if($fastq =~ m/L00(\d)_R\d_001.fastq/){
-        next if($skipLanes{$1});
-          }else{
-        die "Failed to extract lane from fastq name '$fastq'";
-          }
-          mkpath("$outDir/$sampleDir/",2770) unless(-e "$outDir/$sampleDir/");
-          link("$seqDir/$sampleDir/$fastq", "$outDir/$sampleDir/$fastq") || die "Failed to link '$seqDir/$sampleDir/$fastq' to '$outDir/$sampleDir/$fastq': $!\n";
-          $checksums{"$sampleDir/$fastq"} = $sisyphus->getMd5("$seqDir/$sampleDir/$fastq");
+foreach my $sampleDir (readdir($pDirFh)){
+    next unless (-d "$seqDir/$sampleDir" && !($sampleDir eq ".."));
+    opendir(my $seqDirFh, "$seqDir/$sampleDir") or die "Failed to open '$seqDir/$sampleDir': $!\n";
+    foreach my $fastq (grep /fastq.gz$/, readdir($seqDirFh)){
+        if($fastq =~ m/L00(\d)_R\d_001.fastq/){
+            next if($skipLanes{$1});
+        }else{
+            die "Failed to extract lane from fastq name '$fastq'";
         }
-     }
+        mkpath("$outDir/$sampleDir/",2770) unless(-e "$outDir/$sampleDir/");
+        link("$seqDir/$sampleDir/$fastq", "$outDir/$sampleDir/$fastq") || die "Failed to link '$seqDir/$sampleDir/$fastq' to '$outDir/$sampleDir/$fastq': $!\n";
+        $checksums{"$sampleDir/$fastq"} = $sisyphus->getMd5("$seqDir/$sampleDir/$fastq");
+    }
 }
 closedir($pDirFh);
 
