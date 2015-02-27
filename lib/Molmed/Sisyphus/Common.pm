@@ -151,6 +151,12 @@ sub convertHiSeqXOutputFolder{
     my $sampleSheet = $self->readSampleSheet();
     my $sampleSheetHeader = $self->getSampleSheetHeader();
 
+    my $projectPrefix = "Project_";
+    my $samplePrefix = "Sample_";
+    my $sampleLanePrefix = "Sample_lane";
+    my $undeterminedFolder = "Undetermined_indices";
+    my $basecallStatsPrefix = "Basecall_Stats_";
+    
     #Create a list of all files and folders in the input directory.
     opendir(DH, $unaligned) or die "Couldn't open dir: $unaligned!";
     my @files = readdir(DH);
@@ -168,20 +174,20 @@ sub convertHiSeqXOutputFolder{
             $laneId =~ s/^[0]+//g;
             $laneId =~ s/^[0]+//g;
             #Create the folder if it doesn't exist.
-            mkdir "$unaligned/Undetermined_indices" unless -e "$unaligned/Undetermined_indices";
-            mkdir "$unaligned/Undetermined_indices/Sample_lane$laneId" unless -e "$unaligned/Undetermined_indices/Sample_lane$laneId";
+            mkdir "$unaligned/$undeterminedFolder" unless -e "$unaligned/$undeterminedFolder";
+            mkdir "$unaligned/$undeterminedFolder/$sampleLanePrefix$laneId" unless -e "$unaligned/$undeterminedFolder/$sampleLanePrefix$laneId";
             #Move the file.
-            File::Copy::move("$unaligned/$file","$unaligned/Undetermined_indices/Sample_lane$laneId/")
-                or die "Couldn't move $unaligned/$file into $unaligned/Undetermined_indices/Sample_lane$laneId/";
+            File::Copy::move("$unaligned/$file","$unaligned/$undeterminedFolder/$sampleLanePrefix$laneId/")
+                or die "Couldn't move $unaligned/$file into $unaligned/$undeterminedFolder/$sampleLanePrefix$laneId/";
         } elsif($file =~ /^Stats$|^Reports$/) {
             #Statistics and reports will be placed in a folder named Basecall_Stats_"flowcellId".
             #Create folder
-            mkdir "$unaligned/Basecall_Stats_" . $self->fcId() unless -e "$unaligned/Basecall_Stats_" . $self->fcId();
+            mkdir "$unaligned/$basecallStatsPrefix" . $self->fcId() unless -e "$unaligned/$basecallStatsPrefix" . $self->fcId();
             #Move folder
-            File::Copy::move("$unaligned/$file","$unaligned/Basecall_Stats_" . $self->fcId() . "/$file");
+            File::Copy::move("$unaligned/$file","$unaligned/$basecallStatsPrefix" . $self->fcId() . "/$file");
         } else {
             #Process a project folder and rename it with prefix "Project_"
-            my $newFile = "Project_$file";
+            my $newFile = $projectPrefix . "" . $file;
             #Rename the folder.
             File::Copy::move("$unaligned/$file","$unaligned/$newFile");
             #Folders with Sample_Name that differ from Sample_ID will be placed in a
@@ -243,7 +249,7 @@ sub convertHiSeqXOutputFolder{
 
            #Print the extracted SampleSheet entries to the Sample_"Name" folder.
            foreach my $sample (keys %sampleSheetRowsToPrint) {
-               my $sampleFile = "$unaligned/$newFile/Sample_" . $sample . "/SampleSheet.csv";
+               my $sampleFile = "$unaligned/$newFile/$samplePrefix" . $sample . "/SampleSheet.csv";
                open SAMPLESHEET, "> $sampleFile" or die "Couldn't open output file: $sampleFile!";
                print SAMPLESHEET $sampleSheetHeader;
                foreach my $lane (sort keys %{$sampleSheetRowsToPrint{$sample}}) {
