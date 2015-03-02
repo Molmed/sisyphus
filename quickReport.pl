@@ -221,7 +221,7 @@ foreach my $lane (sort {$a<=>$b} keys %{$RtaLaneStats}){
         }
         print $repFh "\t", join(',', @fractionSorted);
 
-        print $repFh "\t", (defined($laneUnknown{$lane}) ? $laneUnknown{$lane} : '0');
+        print $repFh "\t", (defined($laneUnknown{$lane}) ? $laneUnknown{$lane} : 0);
  
         print $repFh "\n";
     }
