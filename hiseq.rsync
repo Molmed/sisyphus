@@ -32,6 +32,7 @@
 + Log.txt*
 + First_Base_Report.txt*
 + MiSeq_Runfolder.tar.gz
++ bcl2fastq.version
 
 # Exclude all .sentinel files
 - .sentinel
