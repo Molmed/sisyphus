@@ -10,6 +10,9 @@ SENDER: pontus.larsson@medsci.uu.se
 # CASAVA binaries
 CASAVA: /opt/CASAVA/1.8.4/bin/
 
+#Path to bcl2fastq binaries
+BCL2FASTQ: /usr/local/bin/bcl2fastq-v2.15.0.4
+
 # Demultiplex mismatches, set to 1 or 0 for each lane individually
 # Default is to allow one mismatch in all lanes
 MISMATCH:
@@ -38,6 +41,15 @@ PERL5LIB:
 
 # The directory on REMOTE_HOST to put the data for delivery in
 OUTBOX_PATH: DEFAULT
+
+# The host path to nestor where HiSeqX data should be delivered.
+NESTOR_HOST: nestor.uppmax.uu.se
+
+# The host path to nestor where HiSeqX data should be delivered.
+HISEQX_DATA_LOCATION_ON_NESTOR: /data/a2014205/achive
+
+# The project that should have access to the data.
+NESTOR_GROUP: a2014205
 
 # The host on which to archive the runfolder
 ARCHIVE_HOST: milou-b.uppmax.uu.se

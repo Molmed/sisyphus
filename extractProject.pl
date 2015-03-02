@@ -113,7 +113,8 @@ if(@skipLanes){
 my $sisyphus = Molmed::Sisyphus::Common->new(PATH=>$rfPath, DEBUG=>$debug);
 $rfPath = $sisyphus->PATH;
 my $statDir = "$rfPath/Statistics/Project_${project}";
-my $seqDir = "$rfPath/Unaligned/Project_${project}";
+my $machineType = $sisyphus->machineType();
+my $seqDir = $machineType eq "hiseqx" ? "$rfPath/Unaligned/${project}" : "$rfPath/Unaligned/Project_${project}";
 
 unless(defined $outDir){
     $outDir = "$rfPath/Projects/$project";
@@ -172,17 +173,17 @@ $plotDir .= '/Plots';
 # Link all fastq-files
 opendir(my $pDirFh, $seqDir) or die "Failed to open '$seqDir': $!\n";
 foreach my $sampleDir (readdir($pDirFh)){
-    next unless (-d "$seqDir/$sampleDir");
+    next unless (-d "$seqDir/$sampleDir" && !($sampleDir eq ".."));
     opendir(my $seqDirFh, "$seqDir/$sampleDir") or die "Failed to open '$seqDir/$sampleDir': $!\n";
     foreach my $fastq (grep /fastq.gz$/, readdir($seqDirFh)){
-      if($fastq =~ m/L00(\d)_R\d_001.fastq/){
-	next if($skipLanes{$1});
-      }else{
-	die "Failed to extract lane from fastq name '$fastq'";
-      }
-      mkpath("$outDir/$sampleDir/",2770) unless(-e "$outDir/$sampleDir/");
-      link("$seqDir/$sampleDir/$fastq", "$outDir/$sampleDir/$fastq") || die "Failed to link '$seqDir/$sampleDir/$fastq' to '$outDir/$sampleDir/$fastq': $!\n";
-      $checksums{"$sampleDir/$fastq"} = $sisyphus->getMd5("$seqDir/$sampleDir/$fastq");
+        if($fastq =~ m/L00(\d)_R\d_001.fastq/){
+            next if($skipLanes{$1});
+        }else{
+            die "Failed to extract lane from fastq name '$fastq'";
+        }
+        mkpath("$outDir/$sampleDir/",2770) unless(-e "$outDir/$sampleDir/");
+        link("$seqDir/$sampleDir/$fastq", "$outDir/$sampleDir/$fastq") || die "Failed to link '$seqDir/$sampleDir/$fastq' to '$outDir/$sampleDir/$fastq': $!\n";
+        $checksums{"$sampleDir/$fastq"} = $sisyphus->getMd5("$seqDir/$sampleDir/$fastq");
     }
 }
 closedir($pDirFh);
@@ -278,9 +279,23 @@ foreach my $sampleDir (readdir($sDirFh)){
     opendir(my $saDirFh, "$statDir/$sampleDir") or die "Failed to open '$statDir/$sampleDir': $!\n";
     foreach my $statfile (grep /\.statdump\.zip$/, readdir($saDirFh)){
 	# Dual index tags contains a hyphen
-	if($statfile =~ m/(.*)_(Undetermined|NoIndex|[ACGT]+-?[ACGT]*)_L00(\d)_R(\d)\.statdump.zip/){
-	    push @samples, {SAMPLE=>$1, TAG=>$2, LANE=>$3, READ=>$4, PATH=>"$statDir/$sampleDir/$statfile"};
-	}
+        if($statfile =~ m/(.*)_(S\d+|Undetermined|NoIndex|[ACGT]+-?[ACGT]*)_L00(\d)_R(\d)\.statdump.zip/){
+            my $sample = $1;
+            my $index = $2;
+            my $lane = $3;
+            my $read = $4;
+           $index =~ s/^S//;
+           if($machineType eq "hiseqx") {
+               push @samples, {SAMPLE=>$sample,
+                                TAG=>$sisyphus->getIndexUsingSampleNumber($lane, $project, $sample, $index, $sampleSheet),
+                                LANE=>$lane,
+                                READ=>$read,
+                                PATH=>"$statDir/$sampleDir/$statfile",
+                                SAMPLE_NUMBER=> $index };
+           } else {
+               push @samples, {SAMPLE=>$sample, TAG=>$index, LANE=>$lane, READ=>$read, PATH=>"$statDir/$sampleDir/$statfile"};
+           }
+        }
     }
     closedir($saDirFh);
 }
@@ -304,7 +319,7 @@ foreach my $sampleFile (sort sortSamples @samples){
     delete($metrics{Lane});
     my $lane = $sample->{LANE};
     my $smpl = $sample->{SAMPLE};
-    my $tag = $sample->{TAG};
+    my $tag = $machineType eq "hiseqx" ? $sampleFile->{TAG} : $sample->{TAG};
     my $read = $sample->{READ};
 
     # Add the RTA/CASAVA metrics
@@ -329,34 +344,38 @@ foreach my $sampleFile (sort sortSamples @samples){
       $sampleSheet->{$project}->{$lane}->{$barcode}->{LIBRARY_NAME} : '';
 
     my $plotTitle = $sample->SAMPLE . '\n' . $sisyphus->RUNFOLDER . ', Lane ' . $sample->LANE . ', Read ' . $sample->READ . ", Tag $tag";
+    $plotTitle .= ", Sample Number S" . $sampleFile->{SAMPLE_NUMBER} if($machineType eq "hiseqx");
+    my $tagOrSampleNumber = $machineType eq "hiseqx" ? "S".$sampleFile->{SAMPLE_NUMBER} : $sample->{TAG};
 
-    my @qplot = $plotter->plotQval($sample,"$plotDir/$smpl/$tag-L00$lane-R$read-Qscores", "Q-score distribution $plotTitle");
+    my @qplot = $plotter->plotQval($sample,"$plotDir/$smpl/$tagOrSampleNumber-L00$lane-R$read-Qscores", "Q-score distribution $plotTitle");
     ($metrics{QscorePlot} = $qplot[0]) =~ s:^$plotDir/:Plots/:;
     ($metrics{QscorePlotThumb} = $qplot[1]) =~ s:^$plotDir/:Plots/:;
 
-    my @aplot = $plotter->plotAdapters($sample,"$plotDir/$smpl/$tag-L00$lane-R$read-Adapters", "Adapter sequences $plotTitle");
+    my @aplot = $plotter->plotAdapters($sample,"$plotDir/$smpl/$tagOrSampleNumber-L00$lane-R$read-Adapters", "Adapter sequences $plotTitle");
     ($metrics{AdapterPlot} = $aplot[0]) =~ s:^$plotDir/:Plots/:;
     ($metrics{AdapterPlotThumb} = $aplot[1]) =~ s:^$plotDir/:Plots/:;
 
-    my @bplot = $plotter->plotBaseComposition($sample,"$plotDir/$smpl/$tag-L00$lane-R$read-BaseComp", "Base Composition $plotTitle");
+    my @bplot = $plotter->plotBaseComposition($sample,"$plotDir/$smpl/$tagOrSampleNumber-L00$lane-R$read-BaseComp", "Base Composition $plotTitle");
     ($metrics{BaseCompPlot} = $bplot[0]) =~ s:^$plotDir/:Plots/:;
     ($metrics{BaseCompPlotThumb} = $bplot[1]) =~ s:^$plotDir/:Plots/:;
 
-    my @gcplot = $plotter->plotGCdistribution($sample,"$plotDir/$smpl/$tag-L00$lane-R$read-GCdist", "GC Distribution $plotTitle");
+    my @gcplot = $plotter->plotGCdistribution($sample,"$plotDir/$smpl/$tagOrSampleNumber-L00$lane-R$read-GCdist", "GC Distribution $plotTitle");
     ($metrics{GCPlot} = $gcplot[0]) =~ s:^$plotDir/:Plots/:;
     ($metrics{GCPlotThumb} = $gcplot[1]) =~ s:^$plotDir/:Plots/:;
 
-    my @lplot = $plotter->plotQ30Length($sample,"$plotDir/$smpl/$tag-L00$lane-R$read-Q30Length", "Q30Length $plotTitle");
+    my @lplot = $plotter->plotQ30Length($sample,"$plotDir/$smpl/$tagOrSampleNumber-L00$lane-R$read-Q30Length", "Q30Length $plotTitle");
     ($metrics{Q30Plot} = $lplot[0]) =~ s:^$plotDir/:Plots/:;
     ($metrics{Q30PlotThumb} = $lplot[1]) =~ s:^$plotDir/:Plots/:;
 
-    my @dplot = $plotter->plotDuplications($sample,"$plotDir/$smpl/$tag-L00$lane-R$read-Duplicate", "Duplications $plotTitle");
+    my @dplot = $plotter->plotDuplications($sample,"$plotDir/$smpl/$tagOrSampleNumber-L00$lane-R$read-Duplicate", "Duplications $plotTitle");
     ($metrics{DupPlot} = $dplot[0]) =~ s:^$plotDir/:Plots/:;
     ($metrics{DupPlotThumb} = $dplot[1]) =~ s:^$plotDir/:Plots/:;
 
-    my @qpbplot = $plotter->plotQPerBase($sample,"$plotDir/$smpl/$tag-L00$lane-R$read-QvaluePerBase", "Q value per base $plotTitle");
+    my @qpbplot = $plotter->plotQPerBase($sample,"$plotDir/$smpl/$tagOrSampleNumber-L00$lane-R$read-QvaluePerBase", "Q value per base $plotTitle");
     ($metrics{QValuePerBase} = $qpbplot[0]) =~ s:^$plotDir/:Plots/:;
     ($metrics{QValuePerBaseThumb} = $qpbplot[1]) =~ s:^$plotDir/:Plots/:;
+
+    $metrics{SampleNumber} = "S" . $sampleFile->{SAMPLE_NUMBER} if($machineType eq "hiseqx");
 
     push @{$sampleXmlDataAll->{Sample}->{$smpl}->{Tag}->{$tag}->{Lane}->{$lane}->{Read}}, \%metrics;
 
@@ -379,7 +398,11 @@ $metaData{RtaVersion} = $sisyphus->getRTAversion();
 $metaData{FlowCellVer} = $sisyphus->getFlowCellVersion();
 $metaData{FlowCellId} = $sisyphus->fcId();
 $metaData{SBSversion} = $sisyphus->getSBSversion();
-$metaData{CasavaVersion} = $sisyphus->getCasavaVersion();
+if($machineType eq "hiseqx") {
+   $metaData{Bcl2fastqVersion} = $sisyphus->getBcl2FastqVersion();
+}else {
+   $metaData{CasavaVersion} = $sisyphus->getCasavaVersion();
+}
 $metaData{ClusterKitVersion} = $sisyphus->getClusterKitVersion();
 
 $metaData{Qoffset} = $offset;

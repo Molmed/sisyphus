@@ -84,6 +84,7 @@ unless(defined $rfPath && -e $rfPath){
 # Create a new sisyphus object for common functions
 my $sisyphus = Molmed::Sisyphus::Common->new(PATH=>$rfPath, DEBUG=>$debug);
 $rfPath = $sisyphus->PATH;
+my $machineType = $sisyphus->machineType();
 
 # Set the output path
 my $outDir = "$rfPath/Summary";
@@ -255,7 +256,7 @@ foreach my $project (@projects){
     my %pStat;
     my %pCasava;
     my %lCasava;
-    sumProject(\%dumps, \%pStat, \%lStat, \%pCasava, \%lCasava, $project, $RtaSampleStats);
+    sumProject(\%dumps, \%pStat, \%lStat, \%pCasava, \%lCasava, $project, $RtaSampleStats, $sisyphus);
 
     my @lanes = keys %lStat;
 
@@ -532,6 +533,9 @@ sub sumProject{
 		defined $rtaStat->{$sample}->{$l}->{$read}->{'NoIndex'}){
 		$tag = 'NoIndex';
 	    }
+
+            $tag = $sisyphus->getIndexUsingSampleNumber($l, $proj, $sample, substr($tag,1), $sampleSheet) if($machineType eq "hiseqx");
+
 	    my $data;
 	    if($proj eq 'Undetermined_indices'){
 		$data = $rtaStat->{$sample}->{$l}->{$read}->{Undetermined};
