@@ -121,7 +121,7 @@ ok(!defined($qcResult->{'5'}->{'2'}->{'unidentified'}->{'res'}), "Pass: To much 
 ok(!defined($warning->{'5'}->{'2'}->{'unidentified'}->{'res'}), "Warning: To much unidentified overrided");
 
 ok(!defined($qcResult->{'7'}->{'2'}->{'sampleFraction'}->{'SLE_H_FF_pool140_tag3'}->{'res'}), "Pass: Found sample without data overrided");
-ok($warning->{'8'}->{'2'}->{'sampleFraction'}->{'SLE_H_FF_pool141_tag12'}->{'res'} eq "0" , "Warning: Found sample without data overrided");
+ok($qcResult->{'8'}->{'2'}->{'sampleFraction'}->{'SLE_H_FF_pool141_tag12'}->{'res'} eq "0" , "Warning: Found sample without data overrided");
 
 done_testing();
 END{

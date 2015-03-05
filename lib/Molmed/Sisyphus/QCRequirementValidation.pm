@@ -360,19 +360,27 @@ sub checkUnidentified {
 	if((exists($passReq->{'unidentified'}) && $passReq->{'unidentified'} < $result->[$resultMapping->{'Unidentified'}]) ||
            (!exists($passReq->{'unidentified'}) && $qcRequirements->{'unidentified'} < $result->[$resultMapping->{'Unidentified'}]))
 	{
-		print "Failed unidentified requirement: $result->[$resultMapping->{'Unidentified'}] ($qcRequirements->{'unidentified'})!\n" if($self->{VERBOSE});
 		#Save failed values.
-		$failures->{unidentified}->{'req'} = $qcRequirements->{'unidentified'};
-		$failures->{unidentified}->{'res'} = $result->[$resultMapping->{'Unidentified'}];
-	}
-	else
-	{
-		#Check if a warning should saved, it will be saved if the result passes standard/override parameters but are bigger then the warning value.
-		if(exists($warningReq->{'unidentified'}) && $warningReq->{'unidentified'} < $result->[$resultMapping->{'Unidentified'}]) {	
-			$warnings->{unidentified}->{'req'} = $qcRequirements->{'unidentified'};
-			$warnings->{unidentified}->{'res'} = $result->[$resultMapping->{'Unidentified'}];
+		if(exists($passReq->{'unidentified'})) {
+			$failures->{unidentified}->{'req'} = $passReq->{'unidentified'};
+		} else {
+			$failures->{unidentified}->{'req'} = $qcRequirements->{'unidentified'};
 		}
-		print "Passed unidentified requirement: $result->[$resultMapping->{'Unidentified'}] ($qcRequirements->{'unidentified'})!\n" if($self->{VERBOSE});
+		$failures->{unidentified}->{'res'} = $result->[$resultMapping->{'Unidentified'}];
+		print "Failed unidentified requirement: $failures->{unidentified}->{'res'} ($failures->{unidentified}->{'rer'})!\n" if($self->{VERBOSE});
+	}
+	
+	if((exists($warningReq->{'unidentified'}) && $warningReq->{'unidentified'} < $result->[$resultMapping->{'Unidentified'}]) ||
+           (!exists($warningReq->{unidentified}) && exists($qcRequirements->{warning}) && exists($qcRequirements->{warning}->{'unidentified'}) && $qcRequirements->{warning}->{'unidentified'} < $result->[$resultMapping->{'Unidentified'}]))
+        {
+		#Check if a warning should saved, it will be saved if the result passes standard/override parameters but are bigger then the warning value.
+		if(exists($warningReq->{'unidentified'})) {	
+			$warnings->{unidentified}->{'req'} = $warningReq->{'unidentified'}
+		} else {
+			$warnings->{unidentified}->{'req'} = $qcRequirements->{'unidentified'};
+		}
+                $warnings->{unidentified}->{'res'} = $result->[$resultMapping->{'Unidentified'}];
+		print "Failed unidentified warning requirement: $warnings->{unidentified}->{'res'} ($warnings->{unidentified}->{'req'})!\n" if($self->{VERBOSE});
 	}
 
 	#Return failures and warnings
@@ -418,19 +426,27 @@ sub checkNumberOfClusters{
 	if((exists($passReq->{'numberOfCluster'}) && $passReq->{'numberOfCluster'} > $result->[$resultMapping->{'ReadsPF (M)'}]) ||
 	   (!exists($passReq->{'numberOfCluster'}) && $qcRequirements->{'numberOfCluster'} > $result->[$resultMapping->{'ReadsPF (M)'}]))
         {
-		print "Failed generated cluster requirement: $result->[$resultMapping->{'ReadsPF (M)'}] ($qcRequirements->{'numberOfCluster'})!\n" if($self->{VERBOSE});
 		#Save failed values.
-		$failures->{numberOfCluster}->{'req'} = $qcRequirements->{'numberOfCluster'};
-	        $failures->{numberOfCluster}->{'res'} = $result->[$resultMapping->{'ReadsPF (M)'}];
-        }
-	else
-	{
-		#Check if a warning should saved, it will be saved if the result passes standard/override parameters but are smaller then the warning value.
-		if(exists($warningReq->{'numberOfCluster'}) && $warningReq->{'numberOfCluster'} > $result->[$resultMapping->{'ReadsPF (M)'}]) {
-			$warnings->{numberOfCluster}->{'req'} = $qcRequirements->{'numberOfCluster'};
-	                $warnings->{numberOfCluster}->{'res'} = $result->[$resultMapping->{'ReadsPF (M)'}];
+		if(exists($passReq->{'numberOfCluster'})) {
+			$failures->{numberOfCluster}->{'req'} = $passReq->{'numberOfCluster'};
+		} else {
+			$failures->{numberOfCluster}->{'req'} = $qcRequirements->{'numberOfCluster'};
 		}
-		print "Passed generated cluster requirement: $result->[$resultMapping->{'ReadsPF (M)'}] ($qcRequirements->{'numberOfCluster'})!\n" if($self->{VERBOSE});
+		$failures->{numberOfCluster}->{'res'} = $result->[$resultMapping->{'ReadsPF (M)'}];
+		print "Failed generated cluster requirement: $failures->{numberOfCluster}->{'req'} ($failures->{numberOfCluster}->{'res'})!\n" if($self->{VERBOSE});
+        }
+	
+	if((exists($warningReq->{'numberOfCluster'}) && $warningReq->{'numberOfCluster'} > $result->[$resultMapping->{'ReadsPF (M)'}]) ||
+           (!exists($warningReq->{'numberOfCluster'}) && exists($qcRequirements->{'warning'}->{'numberOfCluster'}) && $qcRequirements->{'warning'}->{'numberOfCluster'} > $result->[$resultMapping->{'ReadsPF (M)'}]))
+       	{
+		#Check if a warning should saved, it will be saved if the result passes standard/override parameters but are smaller then the warning value.
+		if(exists($warningReq->{'numberOfCluster'})) {
+			$warnings->{numberOfCluster}->{'req'} = $warningReq->{'numberOfCluster'};
+		} else {
+			$warnings->{numberOfCluster}->{'req'} = $qcRequirements->{'warning'}->{'numberOfCluster'};
+		}
+		$warnings->{numberOfCluster}->{'res'} = $result->[$resultMapping->{'ReadsPF (M)'}];
+		print "Passed generated cluster requirement: $warnings->{numberOfCluster}->{'res'} ($warnings->{numberOfCluster}->{'req'})!\n" if($self->{VERBOSE});
 	}
 
 	#Return failures and warnings
@@ -474,24 +490,30 @@ sub checkQ30{
 
 	#First check if the standard criterias should be overridden. If so, use the override parameters to validate the result.
 	#Else the standard parameters should be used
-	if((exists($passReq->{$readLength}->{q30}) && $passReq->{$readLength}->{q30} > $result->[$resultMapping->{'Yield Q30 (G)'}]) ||
-	   (!exists($passReq->{$readLength}->{q30}) && $qcRequirements->{lengths}->{$readLength}->{q30} > $result->[$resultMapping->{'Yield Q30 (G)'}]))
+	if((exists($passReq->{lengths}->{$readLength}->{q30}) && $passReq->{lengths}->{$readLength}->{q30} > $result->[$resultMapping->{'Yield Q30 (G)'}]) ||
+	   (!exists($passReq->{lengths}->{$readLength}->{q30}) && $qcRequirements->{lengths}->{$readLength}->{q30} > $result->[$resultMapping->{'Yield Q30 (G)'}]))
 	{
-		print "Failed Q30 yield requirement: $result->[$resultMapping->{'Yield Q30 (G)'}] (" . $qcRequirements->{lengths}->{$readLength}->{q30} . ")!\n" if($self->{VERBOSE});
 		#Save failed values.
-		$failures->{q30}->{'req'} = $qcRequirements->{lengths}->{$readLength}->{q30};
-                $failures->{q30}->{'res'} = $result->[$resultMapping->{'Yield Q30 (G)'}];
+		if(exists($passReq->{lengths}->{$readLength}->{q30})){
+			$failures->{q30}->{'req'} = $passReq->{lengths}->{$readLength}->{q30};
+		} else {
+			$failures->{q30}->{'req'} = $qcRequirements->{lengths}->{$readLength}->{q30};
+		}
+		$failures->{q30}->{'res'} = $result->[$resultMapping->{'Yield Q30 (G)'}];
+		print "Failed Q30 yield requirement: $failures->{q30}->{'res'} (" . $failures->{q30}->{'req'} . ")!\n" if($self->{VERBOSE});
 	}
-	else
+
+	if((exists($warningReq->{lengths}->{$readLength}->{q30}) && $warningReq->{lengths}->{$readLength}->{q30} > $result->[$resultMapping->{'Yield Q30 (G)'}]) ||
+           (!exists($warningReq->{lengths}->{$readLength}->{q30}) && exists($qcRequirements->{warning}->{lengths}->{$readLength}->{q30}) && $qcRequirements->{warning}->{lengths}->{$readLength}->{q30} > $result->[$resultMapping->{'Yield Q30 (G)'}]))
 	{
 		#Check if a warning should saved, it will be saved if the result passes standard/override parameters but are smaller then the warning value.
-		if(exists($warningReq->{$readLength}->{q30}) && $warningReq->{$readLength}->{q30} > $result->[$resultMapping->{'Yield Q30 (G)'}]) {
-			$warnings->{q30}->{'req'} = exists($warningReq->{$readLength}->{q30}) ? 
-				$warningReq->{$readLength}->{q30} : $qcRequirements->{lengths}->{$readLength}->{q30};
-
-                	$warnings->{q30}->{'res'} = $result->[$resultMapping->{'Yield Q30 (G)'}];
+		if(exists($warningReq->{lengths}->{$readLength}->{q30})) {
+			$warnings->{q30}->{'req'} = $warningReq->{lengths}->{$readLength}->{q30};
+		} else {
+			$warnings->{q30}->{'req'} = $qcRequirements->{warning}->{lengths}->{$readLength}->{q30};
 		}
-		print "Passed Q30 yield requirement: $result->[$resultMapping->{'Yield Q30 (G)'}] (" . $qcRequirements->{lengths}->{$readLength}->{q30} . ")!\n" if($self->{VERBOSE});
+		$warnings->{q30}->{'res'} = $result->[$resultMapping->{'Yield Q30 (G)'}];
+		print "Passed Q30 yield requirement: $warnings->{q30}->{'res'} (" . $warnings->{q30}->{'req'} . ")!\n" if($self->{VERBOSE});
 	}
 	
 	#Return failures and warnings
@@ -534,37 +556,55 @@ sub checkErrorRate{
 	my $warnings = shift;
 	
 	#First check if the standard criterias should be overridden. If so, use the override parameters to validate the result.
-	if((exists($passReq->{$readLength}->{errorRate}) && 
+	if((exists($passReq->{lengths}->{$readLength}->{errorRate}) && 
 	    #Check if error rate is missing from result. If so, it must also be defined as 
             #missing in the qc file, for the override parameters, in order to pass
-            (($passReq->{$readLength}->{errorRate} eq '-' && $result->[$resultMapping->{'ErrRate'}] eq '-') ||
+            ((!($passReq->{lengths}->{$readLength}->{errorRate}) eq '-' && $result->[$resultMapping->{'ErrRate'}] eq '-') ||
 	    #If error rate isn't missing, compare the values  defined in the override tag.
-            (!($result->[$resultMapping->{'ErrRate'}] eq "-") && $passReq->{$readLength}->{errorRate} >= $result->[$resultMapping->{'ErrRate'}]))) ||
+            (!($result->[$resultMapping->{'ErrRate'}] eq "-") && $passReq->{lengths}->{$readLength}->{errorRate} < $result->[$resultMapping->{'ErrRate'}]))) ||
 	    #Use standard criterias
-	   (!exists($passReq->{$readLength}->{errorRate}) &&
+	   (!exists($passReq->{lengths}->{$readLength}->{errorRate}) &&
 		#Check if error rate is missing from result. If so, it must also be defined as 
                 #missing in the qc file, for the default parameters, in order to pass
-		(($result->[$resultMapping->{'ErrRate'}] eq '-' && $qcRequirements->{lengths}->{$readLength}->{errorRate} eq '-') || 
+		(($result->[$resultMapping->{'ErrRate'}] eq '-' && !($qcRequirements->{lengths}->{$readLength}->{errorRate} eq '-')) || 
 		#If error rate isn't missing, compare the values  defined in the standard tag.
-		((!($result->[$resultMapping->{'ErrRate'}] eq '-') && $qcRequirements->{lengths}->{$readLength}->{errorRate} > $result->[$resultMapping->{'ErrRate'}])))))
+		((!($result->[$resultMapping->{'ErrRate'}] eq '-') && $qcRequirements->{lengths}->{$readLength}->{errorRate} < $result->[$resultMapping->{'ErrRate'}])))))
         {
 		#Check if a warning should saved, it will be saved if the result passes standard/override parameters but are bigger then the warning value (or missing).
-		if(exists($warningReq->{$readLength}->{errorRate}) && $warningReq->{$readLength}->{errorRate} < $result->[$resultMapping->{'ErrRate'}])
-		{
-			$warnings->{errorRate}->{'req'} = exists($warningReq->{$readLength}->{errorRate}) ? 
-				$warningReq->{$readLength}->{errorRate} : 
-				$qcRequirements->{lengths}->{$readLength}->{errorRate};
-
-			$warnings->{errorRate}->{'res'} = $result->[$resultMapping->{'ErrRate'}];
+		if(exists($passReq->{lengths}->{$readLength}->{errorRate})) { 
+			$failures->{errorRate}->{'req'} = $passReq->{lengths}->{$readLength}->{errorRate};
+		} else {
+			$failures->{errorRate}->{'req'} = $qcRequirements->{lengths}->{$readLength}->{errorRate}
 		}
-		print "Passed ErrorRate requirement: $result->[$resultMapping->{'ErrRate'}] (".$qcRequirements->{lengths}->{$readLength}->{errorRate}.")!\n" if($self->{VERBOSE});
+		$failures->{errorRate}->{'res'} = $result->[$resultMapping->{'ErrRate'}];
+		print "Failed ErrorRate requirement: $failures->{errorRate}->{'res'} (" . $failures->{errorRate}->{'req'} . ")!\n" if($self->{VERBOSE});
         }
-	else
+
+	#First check if the standard criterias should be overridden. If so, use the override parameters to validate the result.
+        if((exists($warningReq->{lengths}->{$readLength}->{errorRate}) &&
+            #Check if error rate is missing from result. If so, it must also be defined as 
+            #missing in the qc file, for the override parameters, in order to pass
+            ((!($warningReq->{lengths}->{$readLength}->{errorRate} eq '-') && $result->[$resultMapping->{'ErrRate'}] eq '-') ||
+            #If error rate isn't missing, compare the values  defined in the override tag.
+            (!($result->[$resultMapping->{'ErrRate'}] eq "-") && $warningReq->{lengths}->{$readLength}->{errorRate} < $result->[$resultMapping->{'ErrRate'}]))) ||
+            #Use standard criterias
+           (!exists($warningReq->{lengths}->{$readLength}->{errorRate}) &&
+		exists($qcRequirements->{warning}->{lengths}->{$readLength}->{errorRate}) &&
+                #Check if error rate is missing from result. If so, it must also be defined as 
+                #missing in the qc file, for the default parameters, in order to pass
+                (($result->[$resultMapping->{'ErrRate'}] eq '-' && !($qcRequirements->{warning}->{lengths}->{$readLength}->{errorRate} eq '-')) ||
+                #If error rate isn't missing, compare the values  defined in the standard tag.
+                ((!($result->[$resultMapping->{'ErrRate'}] eq '-') && $qcRequirements->{warning}->{lengths}->{$readLength}->{errorRate} < $result->[$resultMapping->{'ErrRate'}])))))
 	{
-                print "Failed ErrorRate requirement: $result->[$resultMapping->{'ErrRate'}] (" . $qcRequirements->{lengths}->{$readLength}->{errorRate} . ")!\n" if($self->{VERBOSE});
 		#Save failed values.
-		$failures->{errorRate}->{'req'} = $qcRequirements->{lengths}->{$readLength}->{errorRate};
-                $failures->{errorRate}->{'res'} = $result->[$resultMapping->{'ErrRate'}];
+		if(exists($warningReq->{lengths}->{$readLength}->{errorRate})) {
+			$warnings->{errorRate}->{'req'} = $warningReq->{lengths}->{$readLength}->{errorRate};
+		} else {
+			$warnings->{errorRate}->{'req'} = $qcRequirements->{warning}->{lengths}->{$readLength}->{errorRate};
+		}
+		$warnings->{errorRate}->{'res'} = $result->[$resultMapping->{'ErrRate'}];
+		print "Failed ErrorRate requirement: $warnings->{errorRate}->{'res'} (" . $warnings->{errorRate}->{'req'} . ")!\n" if($self->{VERBOSE});
+
         }
 	
 	#Return failures and warnings
@@ -606,7 +646,8 @@ sub checkPooling{
 	my $warnings = shift;
 
 	#First check if pooling should be ignored for the entire run.
-	unless(defined($qcRequirements->{overridePoolingRequirement}) && $qcRequirements->{overridePoolingRequirement} eq 1) {
+	if((defined($qcRequirements->{overridePoolingRequirement}) && $qcRequirements->{overridePoolingRequirement} eq 0) ||
+               (defined($passReq->{overridePoolingRequirement}) && $passReq->{overridePoolingRequirement} eq 0)) {
 		#Calculate min data for each sample.
 		my @samples = split(/,[ ]/,$result->[$resultMapping->{'Sample Fractions'}]);
 		my $numberOfSamples = @samples;
@@ -616,22 +657,39 @@ sub checkPooling{
 			$_ =~ s/^[ ]+//;
 			my @info = split(/:/,$_);
 			#First check if pooling value should be ignored.
-			if((!(exists($passReq->{overridePoolingRequirement}) && $passReq->{overridePoolingRequirement}) == 1) && 
+			if((!(exists($passReq->{overridePoolingRequirement}) && $passReq->{overridePoolingRequirement} == 1)) && 
+			     #Check if the pool haven't recieved enough data.
+                             ($info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}]) < $minData)
+			{
+				$failures->{sampleFraction}->{$info[1]}->{'req'} = $minData;
+        	        	$failures->{sampleFraction}->{$info[1]}->{'res'} = $info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}];
+				print "Sample $info[1] haven't received sufficient amount data: " . ($info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}]) . " ($minData)\n" if($self->{VERBOSE});
+			}
+			else
+			{
+				print "Sample $info[1] have received sufficient amount of data: " . ($info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}]) . " ($minData)\n" if($self->{VERBOSE}); 
+			}
+		}
+	}
+	if((defined($qcRequirements->{warning}->{overridePoolingRequirement}) && $qcRequirements->{warning}->{overridePoolingRequirement} eq 0) ||
+           (defined($warningReq->{overridePoolingRequirement}) && $warningReq->{overridePoolingRequirement} eq 0)){
+		#Calculate min data for each sample.
+		my @samples = split(/,[ ]/,$result->[$resultMapping->{'Sample Fractions'}]);
+		my $numberOfSamples = @samples;
+		my $minData = $qcRequirements->{warning}->{'numberOfCluster'} / 2 / $numberOfSamples;
+		#Validate that each sample have enough data (or have been defined to ignore pooling values)
+		foreach(@samples) {
+			$_ =~ s/^[ ]+//;
+			my @info = split(/:/,$_);
+			#First check if pooling value should be ignored.
+			if((!(exists($warningReq->{overridePoolingRequirement}) && $warningReq->{overridePoolingRequirement} == 1)) && 
 			     #Check if the pool haven't recieved enough data.
                              ($info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}]) < $minData)
 			{
 				print "Sample $info[1] haven't received sufficient amount data: " . ($info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}]) . " ($minData)\n" if($self->{VERBOSE});
 				#Check if a warning should be saved instead of a failure
-				if(exists($warningReq->{overridePoolingRequirement}) && $warningReq->{overridePoolingRequirement} == 1) {
-					$warnings->{sampleFraction}->{$info[1]}->{'req'} = $minData;
-        	        		$warnings->{sampleFraction}->{$info[1]}->{'res'} = $info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}];
-				}
-				else
-				{
-					#Save failed values.
-					$failures->{sampleFraction}->{$info[1]}->{'req'} = $minData;
-                                        $failures->{sampleFraction}->{$info[1]}->{'res'} = $info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}];
-				}
+				$warnings->{sampleFraction}->{$info[1]}->{'req'} = $minData;
+        	        	$warnings->{sampleFraction}->{$info[1]}->{'res'} = $info[0]/100*$result->[$resultMapping->{'ReadsPF (M)'}];
 			}
 			else
 			{
