@@ -12,7 +12,7 @@ use warnings;
 
 use constant FAILED_QC_REQUIREMENTS => 101;
 
-my $sender = undef;
+my $sender = 'seq@medsci.uu.se';
 my $mail = undef;
 my $rfPath = undef;
 my $qcFile = undef;
