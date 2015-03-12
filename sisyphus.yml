@@ -5,7 +5,7 @@
 MAIL: medsci-molmed-bioinfo@googlegroups.com
 
 # Sender address for quick report
-SENDER: pontus.larsson@medsci.uu.se
+SENDER: seq@medsci.uu.se
 
 # CASAVA binaries
 CASAVA: /opt/CASAVA/1.8.4/bin/
