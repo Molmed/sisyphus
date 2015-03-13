@@ -14,6 +14,10 @@ use constant RUN_TYPE_NOT_FOUND => 102;
 use constant SEQUENCED_LENGTH_NOT_FOUND => 103;
 use constant ERROR_READING_QUICKREPORT => 104;
 use constant ERROR_READING_QC_CRITERIAS => 105;
+use constant SEQUENCED_UNIDENTIFIED_NOT_FOUND => 106;
+use constant SEQUENCED_NUMBER_OF_CLUSTERS_NOT_FOUND => 107;
+use constant SEQUENCED_Q30_NOT_FOUND => 108;
+use constant SEQUENCED_ERROR_RATE_NOT_FOUND => 109;
 
 use Scalar::Util;
 
@@ -169,8 +173,13 @@ sub validateSequenceRun {
 						{
 							$failedRuns->{$row[$qcResultHeaderMap->{'Lane'}]}->{$row[$qcResultHeaderMap->{'Read'}]} = $result;
 						}
-						elsif(defined($result) && $result == SEQUENCED_LENGTH_NOT_FOUND) {
-							return SEQUENCED_LENGTH_NOT_FOUND;
+						elsif(defined($result) && (
+						      $result == SEQUENCED_LENGTH_NOT_FOUND ||
+						      $result == SEQUENCED_UNIDENTIFIED_NOT_FOUND ||
+						      $result == SEQUENCED_NUMBER_OF_CLUSTERS_NOT_FOUND ||
+						      $result == SEQUENCED_Q30_NOT_FOUND ||
+						      $result == SEQUENCED_ERROR_RATE_NOT_FOUND)) {
+							return $result;
 						}
 					}
 				}
@@ -297,23 +306,56 @@ sub validateResult {
 	my $warningReq = $qcXML->{overrides}->{warning}->{"lane" . $result->[$resultMapping->{'Lane'}]};
 
 	#Validate that not too many unidentified have been generated
+	if(!(exists($passReq->{'unidentified'})) &&
+	    !exists($qcRequirements->{'unidentified'}) &&
+	   !(exists($warningReq->{'unidentified'})) &&
+	    !exists($qcRequirements->{warning}->{'unidentified'})) {
+		print STDERR "Couldn't find any criterias for unidentified in the sisyphus_qc.xml file!\n";
+		return SEQUENCED_UNIDENTIFIED_NOT_FOUND;
+	}
 	($failures ,$warnings) = $self->checkUnidentified($qcRequirements, $passReq, $warningReq, $result, $resultMapping, $failures, $warnings);
+
 	#Validate that enough clusters have been generated.
+	if(!(exists($passReq->{'numberOfCluster'})) &&
+	    !exists($qcRequirements->{'numberOfCluster'}) &&
+	   !(exists($warningReq->{'numberOfCluster'})) &&
+	    !exists($qcRequirements->{warning}->{'numberOfCluster'})) {
+		print STDERR "Couldn't find any criterias for number of clusters in the sisyphus_qc.xml file!\n";
+		return SEQUENCED_NUMBER_OF_CLUSTERS_NOT_FOUND;
+	}
 	($failures ,$warnings) = $self->checkNumberOfClusters($qcRequirements, $passReq, $warningReq, $result, $resultMapping, $failures, $warnings);
 
 	#Retrieve the read length that have been used
 	my $readLength = $result->[$resultMapping->{Read}] == 1 ? "l" . $sisyphus->getRead1Length() : "l" . $sisyphus->getRead2Length();
 	#Validate that the read length that have been used, exists as default or a override instance
 	if(!(exists($passReq->{$readLength})) &&
-	    !exists($qcRequirements->{lengths}->{$readLength})) {
+	    !exists($qcRequirements->{lengths}->{$readLength}) &&
+	   !(exists($warningReq->{$readLength})) &&
+	    !exists($qcRequirements->{warning}->{lengths}->{$readLength})) {
 		print STDERR "Couldn't find the used read length $readLength in the sisyphus_qc.xml file!\n";
 		return SEQUENCED_LENGTH_NOT_FOUND;
 	}
 
 	#Validate that the Q30 yield is big enough.
+	if(!(exists($passReq->{lengths}->{$readLength}->{q30})) &&
+	    !exists($qcRequirements->{lengths}->{$readLength}->{q30}) &&
+	   !(exists($warningReq->{lengths}->{$readLength}->{q30})) &&
+	    !exists($qcRequirements->{warning}->{lengths}->{$readLength}->{q30})) {
+		print STDERR "Couldn't find any criterias for Q30 and read length $readLength sisyphus_qc.xml file!\n";
+		return SEQUENCED_Q30_NOT_FOUND;
+	}
 	($failures ,$warnings) = $self->checkQ30($qcRequirements, $passReq, $warningReq, $readLength, $result, $resultMapping, $failures, $warnings);
+
 	#Validate that the error rate isn't too high.
+	if(!(exists($passReq->{lengths}->{$readLength}->{errorRate})) &&
+	    !exists($qcRequirements->{lengths}->{$readLength}->{errorRate}) &&
+	   !(exists($warningReq->{lengths}->{$readLength}->{errorRate})) &&
+	    !exists($qcRequirements->{warning}->{lengths}->{$readLength}->{errorRate})) {
+		print STDERR "Couldn't find any criterias for error rate and read length $readLength sisyphus_qc.xml file!\n";
+		return SEQUENCED_ERROR_RATE_NOT_FOUND;
+	}
 	($failures ,$warnings) = $self->checkErrorRate($qcRequirements, $passReq, $warningReq, $readLength, $result, $resultMapping, $failures, $warnings);
+
 	#Check that all samples have enough data.
 	($failures ,$warnings) = $self->checkPooling($qcRequirements, $passReq, $warningReq, $result, $resultMapping, $failures, $warnings);
 	
@@ -358,7 +400,7 @@ sub checkUnidentified {
 	#First check if the standard criterias should be overridden. If so, use the override parameters to validate the result.
 	#Else the standard parameters should be used
 	if((exists($passReq->{'unidentified'}) && $passReq->{'unidentified'} < $result->[$resultMapping->{'Unidentified'}]) ||
-           (!exists($passReq->{'unidentified'}) && $qcRequirements->{'unidentified'} < $result->[$resultMapping->{'Unidentified'}]))
+           (!exists($passReq->{'unidentified'}) && exists($qcRequirements->{'unidentified'}) && $qcRequirements->{'unidentified'} < $result->[$resultMapping->{'Unidentified'}]))
 	{
 		#Save failed values.
 		if(exists($passReq->{'unidentified'})) {
@@ -424,7 +466,7 @@ sub checkNumberOfClusters{
 	#First check if the standard criterias should be overridden. If so, use the override parameters to validate the result.
 	#Else the standard parameters should be used
 	if((exists($passReq->{'numberOfCluster'}) && $passReq->{'numberOfCluster'} > $result->[$resultMapping->{'ReadsPF (M)'}]) ||
-	   (!exists($passReq->{'numberOfCluster'}) && $qcRequirements->{'numberOfCluster'} > $result->[$resultMapping->{'ReadsPF (M)'}]))
+	   (!exists($passReq->{'numberOfCluster'}) && exists($qcRequirements->{'numberOfCluster'}) && $qcRequirements->{'numberOfCluster'} > $result->[$resultMapping->{'ReadsPF (M)'}]))
         {
 		#Save failed values.
 		if(exists($passReq->{'numberOfCluster'})) {
@@ -491,7 +533,7 @@ sub checkQ30{
 	#First check if the standard criterias should be overridden. If so, use the override parameters to validate the result.
 	#Else the standard parameters should be used
 	if((exists($passReq->{lengths}->{$readLength}->{q30}) && $passReq->{lengths}->{$readLength}->{q30} > $result->[$resultMapping->{'Yield Q30 (G)'}]) ||
-	   (!exists($passReq->{lengths}->{$readLength}->{q30}) && $qcRequirements->{lengths}->{$readLength}->{q30} > $result->[$resultMapping->{'Yield Q30 (G)'}]))
+	   (!exists($passReq->{lengths}->{$readLength}->{q30}) && exists($qcRequirements->{lengths}->{$readLength}->{q30}) && $qcRequirements->{lengths}->{$readLength}->{q30} > $result->[$resultMapping->{'Yield Q30 (G)'}]))
 	{
 		#Save failed values.
 		if(exists($passReq->{lengths}->{$readLength}->{q30})){
@@ -564,6 +606,7 @@ sub checkErrorRate{
             (!($result->[$resultMapping->{'ErrRate'}] eq "-") && $passReq->{lengths}->{$readLength}->{errorRate} < $result->[$resultMapping->{'ErrRate'}]))) ||
 	    #Use standard criterias
 	   (!exists($passReq->{lengths}->{$readLength}->{errorRate}) &&
+            exists($qcRequirements->{lengths}->{$readLength}->{errorRate}) &&
 		#Check if error rate is missing from result. If so, it must also be defined as 
                 #missing in the qc file, for the default parameters, in order to pass
 		(($result->[$resultMapping->{'ErrRate'}] eq '-' && !($qcRequirements->{lengths}->{$readLength}->{errorRate} eq '-')) || 
@@ -646,7 +689,7 @@ sub checkPooling{
 	my $warnings = shift;
 
 	#First check if pooling should be ignored for the entire run.
-	if((defined($qcRequirements->{overridePoolingRequirement}) && $qcRequirements->{overridePoolingRequirement} eq 0) ||
+	if(defined($qcRequirements->{'numberOfCluster'}) && (defined($qcRequirements->{overridePoolingRequirement}) && $qcRequirements->{overridePoolingRequirement} eq 0) ||
                (defined($passReq->{overridePoolingRequirement}) && $passReq->{overridePoolingRequirement} eq 0)) {
 		#Calculate min data for each sample.
 		my @samples = split(/,[ ]/,$result->[$resultMapping->{'Sample Fractions'}]);
