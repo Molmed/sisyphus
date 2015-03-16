@@ -238,6 +238,9 @@
 	    <tr>
 	      <th>Lane</th>
 	      <th>Tag</th>
+              <xsl:if test="not(@SampleNumber='')">
+                <th>Sample Number</th>
+              </xsl:if>
 	      <th>Library</th>
 	      <th>Insert<br/>size(bp)</th>
 	      <th>Fraction<br/>of lane(%)</th>
@@ -267,7 +270,12 @@
 		</xsl:choose>
 	      </xsl:variable>
 	      <tr class="{$row-class}">
-		<td colspan="20" class="SampleName"><xsl:value-of select="@Id"/></td>
+		<xsl:if test="not(@SampleNumber='')">
+			<td colspan="21" class="SampleName"><xsl:value-of select="@Id"/></td>
+		</xsl:if>
+		<xsl:if test="@SampleNumber=''">
+			<td colspan="20" class="SampleName"><xsl:value-of select="@Id"/></td>
+		</xsl:if>
 	      </tr>
 	      <xsl:for-each select="./Tag">
 		<xsl:for-each select="./Lane">
@@ -280,6 +288,9 @@
 		      <xsl:if test="count(preceding-sibling::Read) = 0">
 			<td rowspan="{$LaneRows}"><xsl:value-of select="../@Id"/></td>
 			<td rowspan="{$LaneRows}"><xsl:value-of select="../../@Id"/></td>
+                        <xsl:if test="not(@SampleNumber='')">
+                          <td rowspan="{$LaneRows}"><xsl:value-of select="@SampleNumber"/></td>
+                        </xsl:if>
 			<td rowspan="{$LaneRows}"><xsl:value-of select="@LibraryName"/></td>
 			<td rowspan="{$LaneRows}">
 			  <xsl:if test="not(@FragmentLower='') and not(@FragmentUpper='')">

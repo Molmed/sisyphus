@@ -84,6 +84,7 @@ unless(defined $rfPath && -e $rfPath){
 # Create a new sisyphus object for common functions
 my $sisyphus = Molmed::Sisyphus::Common->new(PATH=>$rfPath, DEBUG=>$debug);
 $rfPath = $sisyphus->PATH;
+my $machineType = $sisyphus->machineType();
 
 # Set the output path
 my $outDir = "$rfPath/Summary";
@@ -255,7 +256,7 @@ foreach my $project (@projects){
     my %pStat;
     my %pCasava;
     my %lCasava;
-    sumProject(\%dumps, \%pStat, \%lStat, \%pCasava, \%lCasava, $project, $RtaSampleStats);
+    sumProject(\%dumps, \%pStat, \%lStat, \%pCasava, \%lCasava, $project, $RtaSampleStats, $sisyphus);
 
     my @lanes = keys %lStat;
 
@@ -365,11 +366,15 @@ $metaData{SisyphusVersion} = $sisyphus->version();
 $metaData{CsVersion} = $sisyphus->getCSversion();
 $metaData{InstrumentModel} = $sisyphus->machineType();
 $metaData{RtaVersion} = $sisyphus->getRTAversion();
-$metaData{FlowCellVer} = $sisyphus->getFlowCellVersion();
 $metaData{FlowCellId} = $sisyphus->fcId();
-$metaData{SBSversion} = $sisyphus->getSBSversion();
 $metaData{ClusterKitVersion} = $sisyphus->getClusterKitVersion();
 $metaData{Qoffset} = $offset;
+# metaData information only available for HiSeq
+if($sisyphus->machineType() ne 'miseq'){
+   $metaData{FlowCellVer} = $sisyphus->getFlowCellVersion();
+   $metaData{SBSversion} = $sisyphus->getSBSversion();
+}
+
 my $runInfo = $sisyphus->getRunInfo();
 for(my $i=0; $i<@{$runInfo->{reads}}; $i++){
     my $read = $runInfo->{reads}->[$i];
@@ -528,6 +533,9 @@ sub sumProject{
 		defined $rtaStat->{$sample}->{$l}->{$read}->{'NoIndex'}){
 		$tag = 'NoIndex';
 	    }
+
+            $tag = $sisyphus->getIndexUsingSampleNumber($l, $proj, $sample, substr($tag,1), $sampleSheet) if($machineType eq "hiseqx");
+
 	    my $data;
 	    if($proj eq 'Undetermined_indices'){
 		$data = $rtaStat->{$sample}->{$l}->{$read}->{Undetermined};

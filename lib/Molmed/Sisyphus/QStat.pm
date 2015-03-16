@@ -215,7 +215,7 @@ sub addDataPoint{
 	}
     }
 
-	    return 1;
+    return 1;
 }
 
 =pod
@@ -239,43 +239,21 @@ sub addQValuePerBaseAndPosition{
     die "Missing OFFSET for parsing of Q-value strings\n" unless(exists $self->{OFFSET});
     my $base = "";
     my $qual;
-    if(exists $self->{QPERBASEANDPOSITION}){
-        for (my $i = 0; $i < length($seqString); $i++) {
-            $base = lc(substr($seqString,$i,1));
-            $qual = ord(substr($qualString,$i,1)) - $self->{OFFSET};
+    for (my $i = 0; $i < length($seqString); $i++) {
+        $base = lc(substr($seqString,$i,1));
+        $qual = ord(substr($qualString,$i,1)) - $self->{OFFSET};
+
+        if(defined($self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'sum'})) {
             $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'Q'} .= pack("c",$qual);
             $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'sum'} += $qual;
             $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'num'}++;
+        } else {
+            $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'Q'} = pack("c",$qual);
+            $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'sum'} = $qual;
+            $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'num'} = 1;
         }
-    }else{
-        for(my $i = 0; $i < length($seqString); $i++){
-            $self->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'Q'} = "";
-	    $self->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'sum'} = 0;
-	    $self->{QPERBASEANDPOSITION}->[$i]->{'a'}->{'num'} = 0;
 
-	    $self->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'Q'} = "";
-	    $self->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'sum'} = 0;
-	    $self->{QPERBASEANDPOSITION}->[$i]->{'c'}->{'num'} = 0;
-
-	    $self->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'Q'} = "";
-	    $self->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'sum'} = 0;
-	    $self->{QPERBASEANDPOSITION}->[$i]->{'g'}->{'num'} = 0;
-
-	    $self->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'Q'} = "";
-	    $self->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'sum'} = 0;
-	    $self->{QPERBASEANDPOSITION}->[$i]->{'t'}->{'num'} = 0;
-
-	    $self->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'Q'} = "";
-	    $self->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'sum'} = 0;
-	    $self->{QPERBASEANDPOSITION}->[$i]->{'n'}->{'num'} = 0;
-
-	    $base = lc(substr($seqString,$i,1));
-	    $qual = ord(substr($qualString,$i,1)) - $self->{OFFSET};
-
-	    $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'Q'} = pack("c",$qual);
-	    $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'sum'} = $qual;
-	    $self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'num'} = 1;
-	}
+        print "not defined!\n" unless defined($self->{QPERBASEANDPOSITION}->[$i]->{$base}->{'sum'});
     }
 }
 
@@ -300,11 +278,14 @@ sub calculateQValuePerBase {
 
 	for(my $position = 0; $position < scalar @{$self->{QPERBASEANDPOSITION}}; $position++){
             foreach my $base ('a', 'c', 'g', 't', 'n') {
-                if(defined($result->{$base}->{SUM})){
-		    $result->{$base}->{POS}->{$position}->{SUM} = $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'sum'};
-                    $result->{$base}->{SUM} += $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'sum'};
-		    $result->{$base}->{POS}->{$position}->{NUM} = $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'num'};
-                    $result->{$base}->{NUM} += $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'num'};
+               $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'Q'} = "" unless defined($self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'Q'});
+               $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'sum'} = 0 unless defined($self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'sum'});
+               $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'num'} = 0 unless defined($self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'num'});
+               if(exists($result->{$base}->{NUM})){
+                   $result->{$base}->{POS}->{$position}->{SUM} = $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'sum'};
+                   $result->{$base}->{SUM} += $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'sum'};
+		   $result->{$base}->{POS}->{$position}->{NUM} = $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'num'};
+                   $result->{$base}->{NUM} += $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'num'};
                 } else {
 		    $result->{$base}->{POS}->{$position}->{SUM} = $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'sum'};
                     $result->{$base}->{SUM} = $self->{QPERBASEANDPOSITION}->[$position]->{$base}->{'sum'};

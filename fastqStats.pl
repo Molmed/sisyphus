@@ -107,6 +107,8 @@ if(@{$lane}<1){
 my $sisyphus = Molmed::Sisyphus::Common->new(PATH=>$rfPath, DEBUG=>$debug);
 
 $rfPath = $sisyphus->PATH;
+my $machineType = $sisyphus->machineType();
+
 unless($inDir){
     $inDir = "$rfPath/Unaligned";
 }
@@ -143,8 +145,11 @@ srand($rseed);
 print STDERR "Using random seed $rseed based on fcId $fcid\n";
 
 my %files;
-find({wanted => sub{findFastq(\%files, $lane)}, no_chdir => 1}, $inDir);
-
+if($machineType eq "hiseqx") {
+    find({wanted => sub{findFastqHiSeqX(\%files, $lane)}, no_chdir => 1}, $inDir);
+} else {
+    find({wanted => sub{findFastq(\%files, $lane)}, no_chdir => 1}, $inDir);
+}
 
 my %checkSums;
 foreach my $project(keys %files){
@@ -160,8 +165,11 @@ foreach my $project(keys %files){
 		$tag = $1;
 		$lane = $2 + 0;
 		$read = $3;
-	    }
-	    elsif($file =~ m/_L(\d{3})_R(\d)_\d{3}/){
+	    }elsif($file =~ m/_(S\d+)_L(\d{3})_R(\d)_\d{3}/){
+                $tag = $1;
+                $lane = $2 + 0;
+                $read = $3;
+	    }elsif($file =~ m/_L(\d{3})_R(\d)_\d{3}/){
 		$lane = $1 + 0;
 		$read = $2;
 	    }else{
@@ -196,7 +204,7 @@ foreach my $project(keys %files){
 	    my $fileUncompressed = $file;
 	    if($file =~ m/\.gz$/){
 		$fileUncompressed =~ s/\.gz$//;
-		open($fhIn, "<:gzip", $file) or die "Failed to open '$file': $!\n";
+                open($fhIn, "zcat $file |") or die "Failed to open '$file': $!\n";
 	    }else{
 		open($fhIn, "<", $file) or die "Failed to open '$file': $!\n";
 	    }
@@ -275,6 +283,23 @@ sub findFastq{
 		push @{$files{$project}->{$sample}}, $_;
 	    }
 	}
+    }
+}
+
+sub findFastqHiSeqX{
+    my $files = shift;
+    my $lanes = shift;
+    my $file = $_;
+    if($file =~ m/\.fastq(\.gz)?$/){
+        foreach my $l (@{$lanes}){
+            if($file =~ m/.+\/(.+)_\w+_L00${l}_/){
+                my @path = split '/', $file;
+                my $shiftIndex = $path[-3] eq 'Unaligned' ?  1 : $path[-2] eq 'Unaligned' ? 2 : 0;
+                my $sample = $1;
+                my $project = $shiftIndex != 2 ? $path[-3 + $shiftIndex] : $sample;
+                push @{$files{$project}->{$sample}}, $_;
+            }
+        }
     }
 }
 
