@@ -102,19 +102,19 @@ if(defined($result)) {
 		print STDERR "Couldn't read quickReport.txt: $rfPath/quickReport.txt!\n";
 		print FAILED_QC "<h2>Couldn't read quickReport.txt</2>\n";
 		print FAILED_QC "File: $rfPath/quickReport.txt\n";
-	} elsif($result == SEQUENCED_UNIDENTIFIED_NOT_FOUND) {
+	} elsif($result == $qc->SEQUENCED_UNIDENTIFIED_NOT_FOUND) {
 		print STDERR "Couldn't find any criterias for unidentified using the supplied machine/reagent/runMode combination!\n";
 		print FAILED_QC "<h2>Missing QC criterias</2>\n";
 		print FAILED_QC "Couldn't find any criterias for unidentified using the supplied machine/reagent/runMode combination!\n";
-	} elsif($result == SEQUENCED_NUMBER_OF_CLUSTERS_NOT_FOUND) {
+	} elsif($result == $qc->SEQUENCED_NUMBER_OF_CLUSTERS_NOT_FOUND) {
 		print STDERR "Couldn't find any criterias for number of clusters using the supplied machine/reagent/runMode combination!\n";
 		print FAILED_QC "<h2>Missing QC criterias</2>\n";
 		print FAILED_QC "Couldn't find any criterias for number of clusters using the supplied machine/reagent/runMode combination!\n";
-	} elsif($result == SEQUENCED_Q30_NOT_FOUND) {
+	} elsif($result == $qc->SEQUENCED_Q30_NOT_FOUND) {
 		print STDERR "Couldn't find any criterias for Q30 using the supplied machine/reagent/runMode/length combination!\n";
 		print FAILED_QC "<h2>Missing QC criterias</2>\n";
 		print FAILED_QC "Couldn't find any criterias for Q30 using the supplied machine/reagent/runMode/length combination!\n";
-	} elsif($result == SEQUENCED_ERROR_RATE_NOT_FOUND)) {
+	} elsif($result == $qc->SEQUENCED_ERROR_RATE_NOT_FOUND) {
 		print STDERR "Couldn't find any criterias for error rate using the supplied machine/reagent/runMode/length combination!\n";
 		print FAILED_QC "<h2>Missing QC criterias</2>\n";
 		print FAILED_QC "Couldn't find any criterias for error rate using the supplied machine/reagent/runMode/length combination!\n";
