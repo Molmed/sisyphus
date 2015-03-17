@@ -210,5 +210,10 @@ if(defined $mail && $mail =~ m/\w\@\w/){
 	}
 }
 
-exit 1;
+
+if(defined($result)){
+	exit 1;
+}
+
+exit 0;
 

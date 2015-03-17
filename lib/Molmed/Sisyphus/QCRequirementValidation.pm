@@ -419,7 +419,7 @@ sub checkUnidentified {
 		if(exists($warningReq->{'unidentified'})) {	
 			$warnings->{unidentified}->{'req'} = $warningReq->{'unidentified'}
 		} else {
-			$warnings->{unidentified}->{'req'} = $qcRequirements->{'unidentified'};
+			$warnings->{unidentified}->{'req'} = $qcRequirements->{warning}->{'unidentified'};
 		}
                 $warnings->{unidentified}->{'res'} = $result->[$resultMapping->{'Unidentified'}];
 		print "Failed unidentified warning requirement: $warnings->{unidentified}->{'res'} ($warnings->{unidentified}->{'req'})!\n" if($self->{VERBOSE});
