@@ -534,11 +534,16 @@ sub sumProject{
 		$tag = 'NoIndex';
 	    }
 
-            $tag = $sisyphus->getIndexUsingSampleNumber($l, $proj, $sample, substr($tag,1), $sampleSheet) if($machineType eq "hiseqx");
+            $tag = $sisyphus->getIndexUsingSampleNumber($l, $proj, $sample, substr($tag,1), $sampleSheet) if($machineType eq "hiseqx" && $proj ne 'Undetermined_indices');
 
 	    my $data;
 	    if($proj eq 'Undetermined_indices'){
-		$data = $rtaStat->{$sample}->{$l}->{$read}->{Undetermined};
+	    	if($machineType eq "hiseqx"){
+            		$data = $rtaStat->{unknown}->{$l}->{$read}->{unknown};
+            	}
+            	else{
+                	$data = $rtaStat->{$sample}->{$l}->{$read}->{Undetermined};
+            	}
 	    }else{
 		$data = $rtaStat->{$sample}->{$l}->{$read}->{$tag};
 	    }
