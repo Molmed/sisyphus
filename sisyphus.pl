@@ -67,7 +67,7 @@ Will not upload any data to Uppmax or start any jobs on Uppmax
 
 Will not sync Seq-Summaries data
 
-=item -uploadForNGIanalysis
+=item -ngi
 
 Sync data to ngi-pipeline host
 
@@ -111,7 +111,7 @@ my $wait = 1;
 my $ignoreQCResult = 0;
 my $noUppmaxProcessing = 0;
 my $noSeqStatSync = 0;
-my $uploadForNGIanalysis = 0;
+my $ngi = 0;
 my $force = 0;
 our $debug = 0;
 my $threads = `cat /proc/cpuinfo |grep "^processor"|wc -l`;
@@ -128,7 +128,7 @@ GetOptions('help|?'=>\$help,
 	   'ignoreQCResult!' => \$ignoreQCResult,
 	   'noUppmaxProcessing!' => \$noUppmaxProcessing,
 	   'noSeqStatSync!' => \$noSeqStatSync,
-	   'uploadForNGIanalysis' => \$uploadForNGIanalysis,
+	   'ngi' => \$ngi,
 	   'force!' => \$force,
 	   'debug' => \$debug,
 	   'j=i' => \$threads,
@@ -624,7 +624,7 @@ EOF
 
 }
 
-if($uploadForNGIanalysis) {
+if($ngi) {
 unless(-e "$rfPath/Demultiplexing") {
     print $scriptFh <<EOF;
 # Create Demultiplexing softlink
