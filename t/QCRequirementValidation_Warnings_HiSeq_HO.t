@@ -17,10 +17,9 @@ require_ok( 'Molmed::Sisyphus::QCRequirementValidation' );
 require_ok( 'Molmed::Sisyphus::Common' );
 
 # Set up a temporary runfolder for testing
-my $testFolder = $FindBin::Bin . '/miseq_qc';
+my $testFolder = $FindBin::Bin . '/hiseq_ho_qc';
 
-my $qcFile = $FindBin::Bin . '/qc_files/sisyphus_override_pooling_requirement_qc.xml';
-my $qcFileOrg  = $FindBin::Bin . '/../sisyphus_qc.xml';
+my $qcFile = $FindBin::Bin . '/qc_files/sisyphus_requirement_warning_qc.xml';
 
 system("mkdir -p /tmp/sisyphus/$$/") == 0
   or die "Failed to create temporary dir /tmp/sisyphus/$$/ $!";
@@ -30,11 +29,7 @@ system("cp -a $testFolder /tmp/sisyphus/$$") == 0
   or die "Failed to copy testdata to /tmp/sisyphus/$$/ $!";
 $testFolder = "/tmp/sisyphus/$$/" . basename($testFolder);
 system("cp $qcFile $testFolder/") == 0
-  or die "Failed to copy sisyphus_override_pooling_requirement_qc.xml to $testFolder/";
-system("cp $qcFileOrg $testFolder/") == 0
   or die "Failed to copy sisyphus_qc.xml to $testFolder/";
-
-
 
 
 #Create objects used for MiSeq QC validation
@@ -46,15 +41,20 @@ $sis->runParameters();
 my $qc = Molmed::Sisyphus::QCRequirementValidation->new();
 isa_ok($qc, 'Molmed::Sisyphus::QCRequirementValidation', "New qcValidation object created");
 ##Loading QC requirement
-$qc->loadQCRequirement("$testFolder/sisyphus_qc.xml");
-my ($qcResult,$warnings) = $qc->validateSequenceRun($sis,"$testFolder/quickReport_override_not_enough_data_for_sample.txt");
-ok($qcResult->{'1'}->{'1'}->{'sampleFraction'}->{'a1r2-4w'}->{'res'} eq "4.975", "Not enough data for sample");
-ok($warnings->{'1'}->{'1'}->{'sampleFraction'}->{'a1r2-4w'}->{'res'} eq "4.975", "Not enough data for sample");
-$qc->loadQCRequirement("$testFolder/sisyphus_override_pooling_requirement_qc.xml");
-($qcResult,$warnings) = $qc->validateSequenceRun($sis,"$testFolder/quickReport_override_not_enough_data_for_sample.txt");
-ok(!defined($qcResult), "Override pooling requirement");
-ok(!defined($warnings), "Override pooling requirement");
+$qc->loadQCRequirement("$testFolder/sisyphus_requirement_warning_qc.xml");
 
+#ok(!defined($qc->validateSequenceRun($sis,"$testFolder/quickReport.txt")), "QC returned ok");
+my ($result, $warning) = $qc->validateSequenceRun($sis,"$testFolder/quickReport_warning.txt");
+ok(!defined($result->{'5'}->{'1'}->{'numberOfCluster'}->{'res'}), "Pass:  Enough clusters");
+ok($warning->{'5'}->{'1'}->{'numberOfCluster'}->{'res'} eq 139 , "Warning: Not enough clusters");
+ok(!defined($result->{'6'}->{'1'}->{'unidentified'}->{'res'}), "Pass: Not to many undefined");
+ok($warning->{'6'}->{'1'}->{'unidentified'}->{'res'} eq "7.7", "Warning: To many undefined");
+ok(!defined($result->{'4'}->{'2'}->{'errorRate'}->{'res'}), "To high error rate");
+ok($warning->{'4'}->{'2'}->{'errorRate'}->{'res'} eq "2.02", "To high error rate");
+ok(!defined($result->{'8'}->{'2'}->{'sampleFraction'}->{'AID_H_JM_SpA_CO105_tag76'}->{'res'}), "Pass: Turn of pooling requirement");
+ok($warning->{'8'}->{'2'}->{'sampleFraction'}->{'AID_H_JM_SpA_CO105_tag76'}->{'res'} eq "8.717", "Warning: Not enough data for sample");
+ok(!defined($result->{'5'}->{'2'}->{'q30'}->{'res'}), "To low Q30 yield");
+ok($warning->{'5'}->{'2'}->{'q30'}->{'res'} eq "10.99", "To low Q30 yield");
 
 done_testing();
 END{

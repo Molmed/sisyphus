@@ -86,15 +86,19 @@
 			</lane1>
 			<lane2>
 				<unidentified>2.9</unidentified>
-				<l101>
-					<q30>10</q30>
-				</l101>
+				<lengths>
+					<l101>
+						<q30>10</q30>
+					</l101>
+				</lengths>
 			</lane2>
 			<lane3>
-				<l101>
-					<q30>21.3</q30>
-					<errorRate>2.1</errorRate>
-				</l101>
+				<lengths>
+					<l101>
+						<q30>21.3</q30>
+						<errorRate>2.1</errorRate>
+					</l101>
+				</lengths>
 			</lane3>
 			<lane4>
 				<unidentified>7.5</unidentified>
@@ -104,9 +108,11 @@
 				<unidentified>8.0</unidentified>
 			</lane5>
 			<lane6>
-				<l101>
-					<errorRate>0.31</errorRate>
-				</l101>
+				<lengths>
+					<l101>
+						<errorRate>0.31</errorRate>
+					</l101>
+				</lengths>
 			</lane6>
 			<lane7>
 				<overridePoolingRequirement>1</overridePoolingRequirement>
