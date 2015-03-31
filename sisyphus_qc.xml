@@ -68,10 +68,10 @@
                                 <numberOfCluster>300</numberOfCluster>
                                 <overridePoolingRequirement>0</overridePoolingRequirement>
                                 <lengths>
-                                        <l125>
+                                        <l151>
                                                 <q30>33.7</q30>
                                                 <errorRate>5.0</errorRate>
-                                        </l125>
+                                        </l151>
                                 </lengths>
                         </warning>
                 </platform>
