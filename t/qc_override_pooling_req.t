@@ -20,7 +20,7 @@ require_ok( 'Molmed::Sisyphus::Common' );
 my $testFolder = $FindBin::Bin . '/miseq_qc';
 
 my $qcFile = $FindBin::Bin . '/qc_files/sisyphus_override_pooling_requirement_qc.xml';
-my $qcFileOrg  = $FindBin::Bin . '/../sisyphus_qc.xml';
+my $qcFileOrg  = $FindBin::Bin . '/qc_files/sisyphus_meet_requirement_qc.xml';
 
 system("mkdir -p /tmp/sisyphus/$$/") == 0
   or die "Failed to create temporary dir /tmp/sisyphus/$$/ $!";
@@ -32,7 +32,7 @@ $testFolder = "/tmp/sisyphus/$$/" . basename($testFolder);
 system("cp $qcFile $testFolder/") == 0
   or die "Failed to copy sisyphus_override_pooling_requirement_qc.xml to $testFolder/";
 system("cp $qcFileOrg $testFolder/") == 0
-  or die "Failed to copy sisyphus_qc.xml to $testFolder/";
+  or die "Failed to copy sisyphus_meet_requirement_qc.xml to $testFolder/";
 
 
 
@@ -46,7 +46,7 @@ $sis->runParameters();
 my $qc = Molmed::Sisyphus::QCRequirementValidation->new();
 isa_ok($qc, 'Molmed::Sisyphus::QCRequirementValidation', "New qcValidation object created");
 ##Loading QC requirement
-$qc->loadQCRequirement("$testFolder/sisyphus_qc.xml");
+$qc->loadQCRequirement("$testFolder/sisyphus_meet_requirement_qc.xml");
 my ($qcResult,$warnings) = $qc->validateSequenceRun($sis,"$testFolder/quickReport_override_not_enough_data_for_sample.txt");
 ok($qcResult->{'1'}->{'1'}->{'sampleFraction'}->{'a1r2-4w'}->{'res'} eq "4.975", "Not enough data for sample");
 ok($warnings->{'1'}->{'1'}->{'sampleFraction'}->{'a1r2-4w'}->{'res'} eq "4.975", "Not enough data for sample");

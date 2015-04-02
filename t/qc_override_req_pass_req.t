@@ -21,7 +21,7 @@ my $testFolder = $FindBin::Bin . '/hiseq_ho_qc';
 
 my $qcFilePass = $FindBin::Bin . '/qc_files/sisyphus_override_requirement_pass_qc.xml';
 my $qcFileWarning = $FindBin::Bin . '/qc_files/sisyphus_override_requirement_warning_qc.xml';
-my $qcFileOrg  = $FindBin::Bin . '/../sisyphus_qc.xml';
+my $qcFileOrg  = $FindBin::Bin . '/qc_files/sisyphus_meet_requirement_qc.xml';
 
 system("mkdir -p /tmp/sisyphus/$$/") == 0
   or die "Failed to create temporary dir /tmp/sisyphus/$$/ $!";
@@ -35,7 +35,7 @@ system("cp $qcFilePass $testFolder/") == 0
 system("cp $qcFileWarning $testFolder/") == 0
   or die "Failed to copy sisyphus_override_requirement_warning_qc.xml to $testFolder/";
 system("cp $qcFileOrg $testFolder/") == 0
-  or die "Failed to copy sisyphus_qc.xml to $testFolder/";
+  or die "Failed to copy sisyphus_meet_requirement_qc.xml to $testFolder/";
 
 
 
@@ -49,7 +49,7 @@ $sis->runParameters();
 my $qc = Molmed::Sisyphus::QCRequirementValidation->new();
 isa_ok($qc, 'Molmed::Sisyphus::QCRequirementValidation', "New qcValidation object created");
 ##Loading QC requirement
-$qc->loadQCRequirement("$testFolder/sisyphus_qc.xml");
+$qc->loadQCRequirement("$testFolder/sisyphus_meet_requirement_qc.xml");
 my ($qcResult, $warning) = $qc->validateSequenceRun($sis,"$testFolder/quickReport_override_qc_req.txt");
 
 ok($qcResult->{'1'}->{'1'}->{'numberOfCluster'}->{'res'} eq "139", "To few number of clusters");
