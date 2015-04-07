@@ -51,6 +51,9 @@ NGI_REMOTE_PATH: /data/a2014205/achive
 # The project that should have access to the data.
 NGI_PROJECT: a2014205
 
+# Change to 1 to process with NGI-pipeline
+NGI_PROCESSING: 0 
+
 # The host on which to archive the runfolder
 ARCHIVE_HOST: milou-b.uppmax.uu.se
 

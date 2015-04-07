@@ -65,10 +65,6 @@ Will not upload any data to Uppmax or start any jobs on Uppmax
 
 =item -noSeqStatSync
 
-Will not sync Seq-Summaries data
-
-=item -ngi
-
 Sync data to ngi-pipeline host
 
 =item -debug
@@ -128,7 +124,6 @@ GetOptions('help|?'=>\$help,
 	   'ignoreQCResult!' => \$ignoreQCResult,
 	   'noUppmaxProcessing!' => \$noUppmaxProcessing,
 	   'noSeqStatSync!' => \$noSeqStatSync,
-	   'ngi' => \$ngi,
 	   'force!' => \$force,
 	   'debug' => \$debug,
 	   'j=i' => \$threads,
@@ -236,6 +231,9 @@ if(defined $config->{UPPNEX_PROJECT}){
 }
 if(defined $config->{ANALYSIS_PATH}){
     $anPath = abs_path($rfPath . '/' . $config->{ANALYSIS_PATH});
+}
+if(defined($config->{NGI_PROCESSING})) {
+    $ngi = $config->{NGI_PROCESSING};
 }
 
 # Strip trailing slashes from paths
