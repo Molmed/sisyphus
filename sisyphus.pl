@@ -65,7 +65,7 @@ Will not upload any data to Uppmax or start any jobs on Uppmax
 
 =item -noSeqStatSync
 
-Will not sync Seq-Summaries data
+Sync data to ngi-pipeline host
 
 =item -debug
 
@@ -107,6 +107,7 @@ my $wait = 1;
 my $ignoreQCResult = 0;
 my $noUppmaxProcessing = 0;
 my $noSeqStatSync = 0;
+my $ngi = 0;
 my $force = 0;
 our $debug = 0;
 my $threads = `cat /proc/cpuinfo |grep "^processor"|wc -l`;
@@ -150,9 +151,12 @@ my $rfRoot = dirname($rfPath);
 # Set defaults
 my $rHost = "milou-b.uppmax.uu.se";
 my $uProj = "a2009002";
+my $ngiProj = "a2014205";
 my $rPath = "/proj/$uProj/private/nobackup/runfolders";
+my $ngiRemPath = "/proj/$ngiProj/archive";
 my $oPath = "/proj/$uProj/private/nobackup/OUTBOX";
 my $aHost = "milou-b.uppmax.uu.se";
+my $ngiRemHost = "nestor.uppmax.uu.se";
 my $aPath = "/proj/$uProj/private/";
 my $sHost = "localhost";
 my $sPath = dirname($rfPath) . '/summaries';
@@ -198,8 +202,14 @@ if(defined $config->{PERL5LIB}){
 if(defined $config->{REMOTE_HOST}){
     $rHost = $config->{REMOTE_HOST};
 }
+if(defined $config->{NGI_HOST}){
+    $ngiRemHost = $config->{NGI_HOST};
+}
 if(defined $config->{REMOTE_PATH}){
     $rPath = $config->{REMOTE_PATH};
+}
+if(defined $config->{NGI_REMOTE_PATH}){
+    $ngiRemPath = $config->{NGI_REMOTE_PATH};
 }
 if(defined $config->{OUTBOX_PATH}){
     $oPath = $config->{OUTBOX_PATH};
@@ -222,9 +232,13 @@ if(defined $config->{UPPNEX_PROJECT}){
 if(defined $config->{ANALYSIS_PATH}){
     $anPath = abs_path($rfPath . '/' . $config->{ANALYSIS_PATH});
 }
+if(defined($config->{NGI_PROCESSING})) {
+    $ngi = $config->{NGI_PROCESSING};
+}
 
 # Strip trailing slashes from paths
 $rPath =~ s:/*$::;
+$ngiRemPath =~ s:/*$::;
 $oPath =~ s:/*$::;
 $aPath =~ s:/*$::;
 $sPath =~ s:/*$::;
@@ -234,6 +248,7 @@ if($miseq){
 
 # Set combined paths
 my $targetPath = "$rHost:$rPath";
+my $ngiTargetPath = "$ngiRemHost:$ngiRemPath";
 my $summaryPath = "$sHost:$sPath";
 my $archivePath = "$aHost:$aPath";
 my $rBin = "$rPath/$rfName/Sisyphus";
@@ -385,6 +400,7 @@ check_errs()
   fi
 }
 
+main() {
 # Get Sisyphus version
 echo -n "Sisyphus version: "
 if [ -e "$FindBin::Bin/.git" ]; then
@@ -545,50 +561,8 @@ EOF
 
 # If uploading a MiSeq Analysis folder, tarball it and move it into the normal runfolder
 if ($miseq) {
-	print $scriptFh <<EOF;
-
-if [ ! -e "$rfPath/MD5" ]; then
-    mkdir -m 2770 $rfPath/MD5
-    check_errs \$? "Failed to mkdir $rfPath/MD5"
-fi
-
-cd $anPath
-check_errs \$? "Failed to cd to $anPath"
-
-if [ -e "$rfName" ]; then
-
-  echo -n "Checksumming files from $analysisPath"
-
-  # List the contents of the MiSeq analysis folder, and calculate MD5 checksums
-  find '$rfName' -type f | $FindBin::Bin/md5sum.pl $rfName > $rfPath/MD5/checksums.miseqrunfolder.md5
-  check_errs \$? "FAILED"
-  
-  echo OK
-
-  # Tarball the entire MiSeq analysis folder and move it under the runfolder
-  echo -n "Tarballing MiSeq analysis folder '$analysisPath'"
-  $FindBin::Bin/gzipFolder.pl '$rfName' '$rfPath/MD5/checksums.miseqrunfolder.md5'
-  
-  check_errs \$? "FAILED"
-  
-  echo OK
-  
-  echo -n "Move MiSeq analysis tarball to '$rfPath'"
-  mv "$rfName.tar.gz" "$rfPath/MiSeq_Runfolder.tar.gz"
-  check_errs \$? "FAILED"
-  
-  echo OK
-
-# If the analysis runfolder does not exist but the tarball does, it's ok, we are just re-running the script
-elif [ -e "$rfPath/MiSeq_Runfolder.tar.gz" ]; then
-  echo -n "MiSeq analysis folder is missing, but the tarball exists. Everything is OK!"
-  
-# Else, the folders and arguments need to be verified
-else
-  check_errs 1 "Was expecting a MiSeq analysis runfolder: '$analysisPath', but did not find one"
-  
-fi
-  
+    print $scriptFh <<EOF;
+processMiSeqAnalysisFolder "$rfPath" "$rfName" "$anPath" "$analysisPath";
 EOF
 
 }
@@ -615,150 +589,515 @@ EOF
 unless($noUppmaxProcessing) {
 print $scriptFh <<EOF;
 
+#Transfer data to remote host
+transferFilesToRemoteHost "$rfRoot" "$rfName" "rsync.log" "rsync-real.log" "$targetPath" "hiseq.rsync"
 
-# Transfer files to UPPMAX
-cd $rfRoot
-check_errs \$? "Failed to cd to $rfRoot"
+#Calculate MD5 sum for transferred files
+createMD5SumFromLogFile "$rfName" "$rfPath" "$rfRoot" "rsync.log" "checksums.md5"
 
-# Make a list of all the files that will be transferred,
-# without actually doing it, for use by the checksumming
-rsync -vrktp --dry-run --chmod=Dg+sx,ug+w,o-rwx --prune-empty-dirs --include-from '$FindBin::Bin/hiseq.rsync' '$rfName' '/$rnd' > '$rfName/rsync.log'
+#Copy calculated MD5sum to remote host
+copyFolderToRemoteTarget "$targetPath" "$rfPath/MD5" "$rfName"
 
-# Now do the actual transfer, loop until successful
-rm -f $rfName/rsync-real.log
-RSYNC_OK=1
-SLEEP=300
-until [ \$RSYNC_OK = 0 ]; do
-    echo -n "rsync $rfPath $targetPath  "
-    rsync -vrktp --chmod=Dg+sx,ug+w,o-rwx --prune-empty-dirs --include-from '$FindBin::Bin/hiseq.rsync' '$rfName' '$targetPath' >> '$rfName/rsync-real.log'
-    RSYNC_OK=\$?
-    if [ \$RSYNC_OK -gt 0 ]; then
-       echo "FAILED will retry in \$SLEEP seconds"
-       sleep \$SLEEP
-    fi
-done
-check_errs \$RSYNC_OK "FAILED"
-echo OK
+#Set permission on remote host
+setRemotePermission "$rHost" "$rPath" "$rfName"
 
-# Calculate md5 checksums of the transferred files
-cd $rfRoot
-check_errs \$? "Failed to cd to $rfRoot"
-if [ ! -e "$rfPath/MD5" ]; then
-    mkdir -m 2770 $rfPath/MD5
-    check_errs \$? "Failed to mkdir $rfPath/MD5"
-fi
-echo -n "Checksumming files from $rfPath"
-cat $rfPath/rsync.log | $FindBin::Bin/md5sum.pl $rfName > $rfPath/MD5/checksums.md5
-check_errs \$? "FAILED"
-echo OK
-
-# And copy them to the target
-RSYNC_OK=1
-SLEEP=300
-until [ \$RSYNC_OK = 0 ]; do
-    echo -n "Copy checksums to $targetPath/$rfName/  "
-    rsync -vrltp --chmod=Dg+sx,ug+w,o-rwx $rfPath/MD5 $targetPath/$rfName/
-    RSYNC_OK=\$?
-    if [ \$RSYNC_OK -gt 0 ]; then
-       echo "FAILED will retry in \$SLEEP seconds"
-       sleep \$SLEEP
-    fi
-done
-check_errs \$RSYNC_OK "FAILED"
-echo OK
-
-echo "Setting permissions on remote copy"
-PERM_OK=1
-SLEEP=300
-until [ \$PERM_OK = 0 ]; do
-    echo -n "ssh $rHost chgrp -R --reference '$rPath' '$rPath/$rfName'; find '$rPath/$rfName' -type d -exec chmod 2770 {} \\; ";
-    ssh $rHost "chgrp -R --reference '$rPath' '$rPath/$rfName'; find '$rPath/$rfName' -type d -exec chmod 2770 {} \\;"
-    PERM_OK=\$?
-    if [ \$PERM_OK -gt 0 ]; then
-       echo "FAILED will retry in \$SLEEP seconds"
-       sleep \$SLEEP
-    fi
-done
-check_errs \$PERM_OK "FAILED"
-echo OK
 EOF
 }
 
 unless($noSeqStatSync) {
 print $scriptFh <<EOF;
-# Extract the information to put in Seq-Summaries
-cd $rfRoot
-check_errs \$? "Failed to cd to $rfRoot"
-RSYNC_OK=1
-SLEEP=300
-until [ \$RSYNC_OK = 0 ]; do
-    echo -n "Extracting summary data  "
-    rsync -vrktp --chmod=Dg+sx,ug+w,o-rwx --prune-empty-dirs --include-from  '$FindBin::Bin/summary.rsync' '$rfName' '$summaryPath' > '$rfPath/rsync.summary.log'
-    RSYNC_OK=\$?
-    if [ \$RSYNC_OK -gt 0 ]; then
-       echo "FAILED will retry in \$SLEEP seconds"
-       sleep \$SLEEP
-    fi
-done
-check_errs \$RSYNC_OK "FAILED"
-echo OK
+
+rsyncSeqSummaries "$rfRoot" "$rfName" "$summaryPath" "rsync.summary.log" "summary.rsync"
 
 EOF
+
 }
 unless($noUppmaxProcessing) {
 # The rest of the processing is done at UPPMAX
 print $scriptFh <<EOF;
-cd $rfRoot
-check_errs \$? "Failed to cd to $rfRoot"
-
-# Only start calculating the fastq-stats and leave the report and extraction part
-# to manual start after inspection
-START_OK=1
-SLEEP=300
-until [ \$START_OK = 0 ]; do
-    echo -n "Starting processing at UPPMAX "
-    ssh $rHost "cd $rPath/$rfName; ./Sisyphus/aeacus-stats.pl -runfolder $rPath/$rfName $debugFlag";
-    START_OK=\$?
-    if [ \$START_OK -gt 0 ]; then
-       echo "FAILED will retry in \$SLEEP seconds"
-       sleep \$SLEEP
-    fi
-done
-check_errs \$START_OK "FAILED"
-echo OK
-
-
-
-
-check_errs $? "FAILED to start aeacus-stats.pl in $rPath/$rfName at $rHost";
+#Start cluster jobs on remote host
+startClusterJobs "$rfRoot" "$rHost" "$rPath" "$rfName" "$debugFlag";
 
 EOF
 
-print $scriptFh <<EOF;
-cd $rfRoot
-check_errs \$? "Failed to cd to $rfRoot"
+}
 
-# Start extracting projects and archive data
-# to manual start after inspection
-START_OK=1
-SLEEP=300
-sleep 10
-until [ \$START_OK = 0 ]; do
-    echo -n "Starting extracting and archiving at UPPMAX "
-    ssh $rHost "cd $rPath/$rfName; ./Sisyphus/aeacus-reports.pl -runfolder $rPath/$rfName $debugFlag";
-    START_OK=\$?
-    if [ \$START_OK -gt 0 ]; then
-       echo "FAILED will retry in \$SLEEP seconds"
-       sleep \$SLEEP
-    fi
-done
-check_errs \$START_OK "FAILED"
-echo OK
+if($ngi) {
+unless(-e "$rfPath/Demultiplexing") {
+    print $scriptFh <<EOF;
+# Create Demultiplexing softlink
+cd $rfPath;
+check_errs \$? "Failed to cd to $rfPath"
 
-check_errs $? "FAILED to start aeacus-reports.pl in $rPath/$rfName at $rHost";
 
+ln -s Unaligned Demultiplexing;
 EOF
 }
+
+print $scriptFh <<EOF;
+#Transfer data to remote host
+transferFilesToRemoteHost "$rfRoot" "$rfName" "rsync.ngi.log" "rsync-real.ngi.log" "$ngiTargetPath" "ngi.rsync"
+
+#Calculate MD5 sum for transferred files
+createMD5SumFromLogFile "$rfName" "$rfPath" "$rfRoot" "rsync.ngi.log" "checksums.ngi.md5"
+
+#Copy calculated MD5sum to remote host
+copyFolderToRemoteTarget "$ngiTargetPath" "$rfPath/MD5/checksums.ngi.md5" "$rfName"
+
+#Set permission on remote host
+setRemotePermission "$ngiRemHost" "$ngiRemPath" "$rfName"
+}
+EOF
+}
+
+print $scriptFh <<EOF;
+
+########################################################################
+#           Helper functions
+########################################################################
+
+processMiSeqAnalysisFolder() {
+    runfolderPath="";
+    runfolderName="";
+    miseqAnPath="";
+    miseqAnalysisPath="";
+    if [ -z "\$1" ]
+    then
+        echo "-runfolder path #1 is zero length or empty."
+        exit 1;
+    else
+        runfolderPath=\$1;
+    fi
+    if [ -z "\$2" ]
+    then
+        echo "-runfolder name #2 is zero length or empty."
+        exit 1;
+    else
+        runfolderName=\$2;
+    fi
+    if [ -z "\$3" ]
+    then
+        echo "-miseqAnPath #3 is zero length or empty."
+        exit 1;
+    else
+        miseqAnPath=\$3;
+    fi
+    if [ -z "\$4" ]
+    then
+        echo "-miseqAnalysisPath #4 is zero length or empty."
+        exit 1;
+    else
+        miseqAnalysisPath=\$4;
+    fi
+
+    if [ ! -e "\$runfolderPath/MD5" ]; then
+        mkdir -m 2770 \$runfolderPath/MD5
+        check_errs \$? "Failed to mkdir \$runfolderPath/MD5"
+    fi
+
+    cd \$miseqAnPath
+    check_errs \$? "Failed to cd to \$miseqAnPath"
+
+    if [ -e "\$runfolderName" ]; then
+
+      echo -n "Checksumming files from \$miseqAnalysisPath"
+
+    # List the contents of the MiSeq analysis folder, and calculate MD5 checksums
+    find '\$runfolderName' -type f | $FindBin::Bin/md5sum.pl \$runfolderName > \$runfolderPath/MD5/checksums.miseqrunfolder.md5
+    check_errs \$? "FAILED"
+  
+    echo OK
+
+    # Tarball the entire MiSeq analysis folder and move it under the runfolder
+    echo -n "Tarballing MiSeq analysis folder '\$miseqAnalysisPath'"
+    $FindBin::Bin/gzipFolder.pl '\$runfolderName' '\$runfolderPath/MD5/checksums.miseqrunfolder.md5'
+  
+    check_errs \$? "FAILED"
+  
+    echo OK
+  
+    echo -n "Move MiSeq analysis tarball to '\$runfolderPath'"
+    mv "\$runfolderName.tar.gz" "\$runfolderPath/MiSeq_Runfolder.tar.gz"
+    check_errs \$? "FAILED"
+  
+    echo OK
+
+    # If the analysis runfolder does not exist but the tarball does, it's ok, we are just re-running the script
+    elif [ -e "\$runfolderPath/MiSeq_Runfolder.tar.gz" ]; then
+    echo -n "MiSeq analysis folder is missing, but the tarball exists. Everything is OK!"
+  
+    # Else, the folders and arguments need to be verified
+    else
+        check_errs 1 "Was expecting a MiSeq analysis runfolder: '\$miseqAnalysisPath', but did not find one"
+  
+    fi
+}
+
+startClusterJobs() {
+    runfolderRoot="";
+    remoteHost="";
+    remotePath="";
+    runfolderName="";
+    debugFlag="";
+    if [ -z "\$1" ]
+    then
+        echo "-runfolder root #1 is zero length or empty."
+        exit 1;
+    else
+        runfolderRoot=\$1;
+    fi
+    if [ -z "\$2" ]
+    then
+        echo "-remote host #2 is zero length or empty."
+        exit 1;
+    else
+        remoteHost=\$2;
+    fi
+    if [ -z "\$3" ]
+    then
+        echo "-remote path #3 is zero length or empty."
+        exit 1;
+    else
+        remotePath=\$3;
+    fi
+    if [ -z "\$4" ]
+    then
+        echo "-runfolder name #4 is zero length or empty."
+        exit 1;
+    else
+        runfolderName=\$4;
+    fi
+    if ! [ -z "\$5" ]
+    then
+        debugFlag=\$5;
+    fi
+    cd \$runfolderRoot
+    check_errs \$? "Failed to cd to \$runfolderRoot"
+
+    # Only start calculating the fastq-stats and leave the report and extraction part
+    # to manual start after inspection
+    START_OK=1
+    SLEEP=300
+    until [ \$START_OK = 0 ]; do
+        echo -n "Starting processing at UPPMAX "
+        ssh \$remoteHost "cd \$remotePath/\$runfolderName; ./Sisyphus/aeacus-stats.pl -runfolder \$remotePath/\$runfolderName \$debugFlag";
+        START_OK=\$?
+        if [ \$START_OK -gt 0 ]; then
+           echo "FAILED will retry in \$SLEEP seconds"
+           sleep \$SLEEP
+        fi
+    done
+    check_errs \$START_OK "FAILED"
+    echo OK
+
+    check_errs $? "FAILED to start aeacus-stats.pl in \$remotePath/\$runfolderName at \$remoteHost";
+
+    cd \$runfolderRoot
+    check_errs \$? "Failed to cd to \$runfolderRoot"
+
+    # Start extracting projects and archive data
+    # to manual start after inspection
+    START_OK=1
+    SLEEP=300
+    sleep 10
+    until [ \$START_OK = 0 ]; do
+        echo -n "Starting extracting and archiving at UPPMAX "
+        ssh \$remoteHost "cd \$remotePath/\$runfolderName; ./Sisyphus/aeacus-reports.pl -runfolder \$remotePath/\$runfolderName \$debugFlag";
+        START_OK=\$?
+        if [ \$START_OK -gt 0 ]; then
+           echo "FAILED will retry in \$SLEEP seconds"
+           sleep \$SLEEP
+        fi
+    done
+    check_errs \$START_OK "FAILED"
+    echo OK
+
+    check_errs \$? "FAILED to start aeacus-reports.pl in \$remotePath/\$runfolderName at \$remoteHost";
+
+}
+
+
+rsyncSeqSummaries () {
+    runfolderRoot="":
+    runfolderName="";
+    summaryPath="";
+    rsyncFileLogName="";
+    rsyncFilterFile="";
+    if [ -z "\$1" ]
+    then
+        echo "-runfolder root #1 is zero length or empty."
+        exit 1;
+    else
+        runfolderRoot=\$1;
+    fi
+    if [ -z "\$2" ]
+    then
+        echo "-runfolder name #2 is zero length or empty."
+        exit 1;
+    else
+        runfolderName=\$2;
+    fi
+    if [ -z "\$3" ]
+    then
+        echo "-seq summary path #3 is zero length or empty, should be host:path."
+        exit 1;
+    else
+        summaryPath=\$3;
+    fi
+    if [ -z "\$4" ]
+    then
+        echo "-rsync file log name #4 is zero length or empty."
+        exit 1;
+    else
+        rsyncFileLogName=\$4;
+    fi
+    if [ -z "\$5" ]
+    then
+        echo "-rsync filter file #5 is zero length or empty."
+        exit 1;
+    else
+        rsyncFilterFile=\$5;
+    fi
+
+    runfolderPath="\$runfolderRoot/\$runfolderName";
+
+    # Extract the information to put in Seq-Summaries
+    cd \$runfolderRoot
+    check_errs \$? "Failed to cd to \$runfolderRoot"
+    RSYNC_OK=1
+    SLEEP=300
+    until [ \$RSYNC_OK = 0 ]; do
+        echo -n "Extracting summary data  "
+        rsync -vrktp --chmod=Dg+sx,ug+w,o-rwx --prune-empty-dirs --include-from  '$FindBin::Bin/\$rsyncFilterFile' '\$runfolderName' '\$summaryPath' > '\$runfolderPath/\$rsyncFileLogName'
+        RSYNC_OK=\$?
+        if [ \$RSYNC_OK -gt 0 ]; then
+           echo "FAILED will retry in \$SLEEP seconds"
+           sleep \$SLEEP
+        fi
+    done
+    check_errs \$RSYNC_OK "FAILED"
+    echo OK
+}
+
+transferFilesToRemoteHost () {
+    runfolderRoot="";
+    runfolderName="";
+    syncLogNameDryRun="";
+    syncLogNameRealRun="";
+    targetPath="";
+    rsyncFilterFile="";
+    if [ -z "\$1" ]
+    then
+        echo "-runfolder root #1 is zero length or empty."
+        exit 1;
+    else
+        runfolderRoot=\$1;
+    fi
+    if [ -z "\$2" ]
+    then
+        echo "-runfolder name #2 is zero length or empty."
+        exit 1;
+    else
+        runfolderName=\$2;
+    fi
+    if [ -z "\$3" ]
+    then
+        echo "-sync log name (dry run) #3 is zero length or empty."
+        exit 1;
+    else
+        syncLogNameDryRun=\$3;
+    fi
+    if [ -z "\$4" ]
+    then
+        echo "-sync log name (dry run) #4 is zero length or empty."
+        exit 1;
+    else
+        syncLogNameRealRun=\$4;
+    fi
+    if [ -z "\$5" ]
+    then
+        echo "-target path #5 is zero length or empty, should be host:path"
+        exit 1;
+    else
+        targetPath=\$5;
+    fi
+    if [ -z "\$6" ]
+    then
+        echo "-rsync filter file #6 is zero length or empty, should be host:path"
+        exit 1;
+    else
+        rsyncFilterFile=\$6;
+    fi
+    
+    runfolderPath="\$runfolderRoot/\$runfolderName"
+    # Transfer files to UPPMAX
+    cd \$runfolderRoot;
+    check_errs \$? "Failed to cd to \$runfolderRoot"
+
+    # Make a list of all the files that will be transferred,
+    # without actually doing it, for use by the checksumming
+    rsync -vrktp --dry-run --chmod=Dg+sx,ug+w,o-rwx --prune-empty-dirs --include-from "$FindBin::Bin/\$rsyncFilterFile" "\$runfolderName" "/$rnd" > "\$runfolderName/\$syncLogNameDryRun"
+
+    # Now do the actual transfer, loop until successful
+    rm -f \$runfolderName/rsync-real.ngi.log
+    RSYNC_OK=1
+    SLEEP=300
+    until [ \$RSYNC_OK = 0 ]; do
+        echo -n "rsync \$runfolderPath \$targetPath  "
+        rsync -vrktp --chmod=Dg+sx,ug+w,o-rwx --prune-empty-dirs --include-from "$FindBin::Bin/\$rsyncFilterFile" "\$runfolderName" "\$targetPath" >> "\$runfolderName/\$syncLogNameRealRun"
+        RSYNC_OK=\$?
+        if [ \$RSYNC_OK -gt 0 ]; then
+           echo "FAILED will retry in \$SLEEP seconds"
+           sleep \$SLEEP
+        fi
+    done
+    check_errs \$RSYNC_OK "FAILED"
+    echo OK
+}
+
+createMD5SumFromLogFile () {
+    runfolderName="";
+    runfolderPath="";
+    runfolderRoot="";
+    logFile="";
+    outputMD5SumFileName="";
+    if [ -z "\$1" ]
+    then
+        echo "-runfolder name #1 is zero length or empty."
+        exit 1;
+    else
+        runfolderName=\$1;
+    fi
+    if [ -z "\$2" ]
+    then
+        echo "-runfolder path #2 is zero length or empty."
+        exit 1;
+    else
+        runfolderPath=\$2;
+    fi
+    if [ -z "\$3" ]
+    then
+        echo "-runfolder root path #3 is zero length or empty."
+        exit 1;
+    else
+        runfolderRoot=\$3;
+    fi
+    if [ -z "\$4" ]
+    then
+        echo "-log file path #4 is zero length or empty."
+        exit 1;
+    else
+        logFile=\$4;
+    fi
+    if [ -z "\$5" ]
+    then
+        echo "-output name of md5sum result #5 is zero length or empty."
+        exit 1;
+    else
+        outputMD5SumFileName=\$5;
+    fi
+    # Calculate md5 checksums of the transferred files
+    cd \$runfolderRoot
+    check_errs \$? "Failed to cd to \$runfolderRoot"
+
+    if [ ! -e "\$runfolderPath/MD5" ]; then
+        mkdir -m 2770 \$runfolderPath/MD5
+        check_errs \$? "Failed to mkdir \$runfolderPath/MD5"
+    fi
+    echo -n "Checksumming files from \$runfolderPath"
+    cat \$runfolderPath/\$logFile | $FindBin::Bin/md5sum.pl \$runfolderName > \$runfolderPath/MD5/\$outputMD5SumFileName
+    check_errs \$? "FAILED"
+    echo OK
+}
+
+copyFolderToRemoteTarget () {
+    targetPath="";
+    runfolderPath="";
+    runfolderName="";
+    if [ -z "\$1" ]
+    then
+        echo "-target path #1 is zero length or empty, should be host:path"
+        exit 1;
+    else
+        targetPath=\$1;
+    fi
+    if [ -z "\$2" ]
+    then
+        echo "-path to copy #2 is zero length or empty."
+        exit 1;
+    else
+        pathToCopy=\$2;
+    fi
+    if [ -z "\$3" ]
+    then
+        echo "-runfolder name #3 is zero length or empty."
+        exit 1;
+    else
+        runfolderName=\$3;
+    fi
+
+    # And copy them to the target
+    RSYNC_OK=1
+    SLEEP=300
+    until [ \$RSYNC_OK = 0 ]; do
+        echo -n "Copy checksums to \$targetPath/\$runfolderName/  "
+        rsync -vrltp --chmod=Dg+sx,ug+w,o-rwx \$pathToCopy \$targetPath/\$runfolderName/
+        RSYNC_OK=\$?
+        if [ \$RSYNC_OK -gt 0 ]; then
+           echo "FAILED will retry in \$SLEEP seconds"
+           sleep \$SLEEP
+        fi
+    done
+
+    check_errs \$RSYNC_OK "FAILED"
+    echo OK
+}
+
+setRemotePermission () {
+   remoteHost="";
+   remotePath="";
+   runfolderName="";
+   if [ -z "\$1" ]
+   then
+     echo "-remote host #1 is zero length or empty."
+     exit 1;
+   else
+      remoteHost=\$1;
+   fi
+   if [ -z "\$2" ]
+   then
+     echo "-remote path #2 is zero length or empty."
+     exit 1;
+   else
+      remotePath=\$2;
+   fi
+   if [ -z "\$3" ]
+   then
+     echo "-runfolder name path #3 is zero length or empty."
+     exit 1;
+   else
+      runfolderName=\$3;
+   fi
+
+    echo "Setting permissions on remote copy"
+    PERM_OK=1
+    SLEEP=300
+    until [ \$PERM_OK = 0 ]; do
+        echo -n "ssh \$remoteHost chgrp -R --reference \$remotePath \$remotePath/\$runfolderName; find \$remotePath/\$runfolderName -type d -exec chmod 2	770 {} \\; ";
+        ssh \$remoteHost "chgrp -R --reference \$remotePath \$remotePath/\$runfolderName; find \$remotePath/\$runfolderName -type d -exec chmod 2770 {} \\;"
+        PERM_OK=\$?
+        if [ \$PERM_OK -gt 0 ]; then
+           echo "FAILED will retry in \$SLEEP seconds"
+           sleep \$SLEEP
+        fi
+    done
+    check_errs \$PERM_OK "FAILED"
+    echo OK
+}
+
+#Run main function
+main "$@"
+EOF
 
 close $scriptFh;
 

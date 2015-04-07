@@ -2,7 +2,7 @@
 # Empty dirs can be excluded with --prune-empty-dirs
 #
 # cd <runfolder>
-# rsync -av --prune-empty-dirs --include-from hiseq.rsync $PWD/ biologin:~/incoming/runfolders/$runfolder > $PWD/rsync.log
+# rsync -avL --prune-empty-dirs --include-from hiseq.rsync $PWD/ biologin:~/incoming/runfolders/$runfolder > $PWD/rsync.log
 #
 
 + */
@@ -15,7 +15,8 @@
 
 # Include full tree of some subdirs
 # This works if rsync is called with src dest, but not src/ dest
-+ /*/Sisyphus/***
 + /*/Demultiplexing/***
++ /*/InterOp/***
++ /*/Sisyphus/***
 
 - *

@@ -42,14 +42,17 @@ PERL5LIB:
 # The directory on REMOTE_HOST to put the data for delivery in
 OUTBOX_PATH: DEFAULT
 
-# The host path to nestor where HiSeqX data should be delivered.
-NESTOR_HOST: nestor.uppmax.uu.se
+# The host path to where data that should be processed with NGI-pipeline will be delivered.
+NGI_HOST: nestor.uppmax.uu.se
 
-# The host path to nestor where HiSeqX data should be delivered.
-HISEQX_DATA_LOCATION_ON_NESTOR: /data/a2014205/achive
+# The host path where NGI-pipeline data should be delivered.
+NGI_REMOTE_PATH: /data/a2014205/achive
 
 # The project that should have access to the data.
-NESTOR_GROUP: a2014205
+NGI_PROJECT: a2014205
+
+# Change to 1 to process with NGI-pipeline
+NGI_PROCESSING: 0 
 
 # The host on which to archive the runfolder
 ARCHIVE_HOST: milou-b.uppmax.uu.se
