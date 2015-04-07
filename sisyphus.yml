@@ -29,7 +29,7 @@ MISMATCH:
 REMOTE_HOST: milou-b.uppmax.uu.se
 
 # The directory on REMOTE_HOST to put the runfolder in
-REMOTE_PATH: /gulo/proj_nobackup/a2009002/private/runfolders
+REMOTE_PATH: /proj/a2009002/private/nobackup/runfolders
 
 # Array with extra perl library paths
 # This is where non system default libraries which are not
