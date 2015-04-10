@@ -13,10 +13,18 @@
 				<numberOfCluster>140</numberOfCluster>
 				<overridePoolingRequirement>0</overridePoolingRequirement>
 				<lengths>
+					<l100>
+						<q30>11</q30>
+						<errorRate>2.0</errorRate>
+					</l100>
 					<l101>
 						<q30>11</q30>
 						<errorRate>2.0</errorRate>
 					</l101>
+					<l50>
+						<q30>5.6</q30>
+						<errorRate>1.0</errorRate>
+					</l50>
 					<l51>
 						<q30>5.6</q30>
 						<errorRate>1.0</errorRate>
@@ -41,18 +49,30 @@
 						<q30>18</q30>
 						<errorRate>2.0</errorRate>
 					</l125>
-   					 <l126>
+   					<l126>
                                                 <q30>18</q30>
                                                 <errorRate>2.0</errorRate>
                                         </l126>
 					<l100>
 						<q30>14</q30>
 						<errorRate>2.0</errorRate>
-					</l100>
+					</l100>	
+					<l101>
+						<q30>14</q30>
+						<errorRate>2.0</errorRate>
+					</l101>
 					<l50>
 						<q30>7.0</q30>
 						<errorRate>1.0</errorRate>
 					</l50>
+					<l51>
+						<q30>7.0</q30>
+						<errorRate>1.5</errorRate>
+					</l51>
+					<l62>
+						<q30>7.0</q30>
+						<errorRate>1.5</errorRate>
+					</l62>
 				</lengths>
 			</warning>
 		</platform>
@@ -84,10 +104,42 @@
 			<lengths>
 			</lengths>
 			<warning>
-				<unidentified>5.0</unidentified>
+				<unidentified>10.0</unidentified>
 				<numberOfCluster>110</numberOfCluster>
 				<overridePoolingRequirement>0</overridePoolingRequirement>
-				<lengths>
+				<lengths>	
+					<l151>
+						<q30>12.3</q30>
+						<errorRate>2.0</errorRate>
+					</l151>
+					<l101>
+						<q30>8.8</q30>
+						<errorRate>2.0</errorRate>
+					</l101>
+				</lengths>
+			</warning>
+		</platform>
+		<platform>
+			<controlSoftware>HiSeq Control Software</controlSoftware>
+			<version>HiSeq Rapid Flow Cell v2</version>
+			<mode>RapidRun</mode>
+			<unidentified>20.0</unidentified>
+			<overridePoolingRequirement>0</overridePoolingRequirement>
+			<lengths>
+			</lengths>
+			<warning>
+				<unidentified>10.0</unidentified>
+				<numberOfCluster>110</numberOfCluster>
+				<overridePoolingRequirement>0</overridePoolingRequirement>
+				<lengths>	
+					<l251>
+						<q30>18.7</q30>
+						<errorRate>5.0</errorRate>
+					</l251>
+					<l250>
+						<q30>18.7</q30>
+						<errorRate>5.0</errorRate>
+					</l250>
 					<l151>
 						<q30>12.3</q30>
 						<errorRate>2.0</errorRate>
@@ -107,17 +159,17 @@
 			<lengths>
 			</lengths>
 			<warning>
-				<unidentified>5.0</unidentified>
+				<unidentified>10.0</unidentified>
 				<numberOfCluster>10</numberOfCluster>
 				<overridePoolingRequirement>0</overridePoolingRequirement>
 				<lengths>
 					<l251>
 						<q30>1.8</q30>
-						<errorRate>2.0</errorRate>
+						<errorRate>5.0</errorRate>
 					</l251>
 					<l151>
 						<q30>1.1</q30>
-						<errorRate>1.5</errorRate>
+						<errorRate>2.0</errorRate>
 					</l151>
 					<l26>
 						<q30>0.2</q30>
@@ -134,13 +186,13 @@
 			<lengths>
 			</lengths>
 			<warning>
-				<unidentified>5.0</unidentified>
+				<unidentified>10.0</unidentified>
 				<numberOfCluster>18</numberOfCluster>
 				<overridePoolingRequirement>0</overridePoolingRequirement>
 				<lengths>
 					<l301>
 						<q30>3.7</q30>
-						<errorRate>2.5</errorRate>
+						<errorRate>5.0</errorRate>
 					</l301>
 					<l75>
 						<q30>1.1</q30>

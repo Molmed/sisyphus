@@ -1361,30 +1361,22 @@ sub readSampleSheet{
                     my @r = split /,/, $dataRow;
                     $r[$columnMap->{'index'}] = 'unknown' if($r[$columnMap->{'index'}] !~ m/^[ACGT-]+$/); # Use 'unknown' for unspecified index tags
                     unless($r[6] =~ m/^y/i){ # Skip the controls
-                    # Use project + lane + index tag    as keys
-                    if(defined($sampleCounter->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'Sample_Name'}]})) {
-                        #Calculate sample number
-                        if(!defined($sampleCounter->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'Sample_ID'}]})) {
-                            $sampleCounter->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'Sample_Name'}]}->{'counter'} =
-                                $sampleCounter->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'Sample_Name'}]}->{'counter'} + 1;
-                            $sampleCounter->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'Sample_ID'}]} =
-                                $sampleCounter->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'Sample_Name'}]}->{'counter'};
-                            } else {
-                                die "Unhandled case!!!\n";
-                            }
-                        } else {
-			    #Sample name haven't been seen before
-                            $sampleCounter->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'Sample_Name'}]}->{'counter'} = $r[$columnMap->{'index'}] eq 'unknown' ? 0 : 1;
-                            $sampleCounter->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'Sample_ID'}]} = $r[$columnMap->{'index'}] eq 'unknown' ? 0 : 1;
+                        
+			if(defined($sampleCounter->{$r[$columnMap->{'Lane'}]})){
+                                $sampleCounter->{$r[$columnMap->{'Lane'}]}++;
                         }
-                        #Save information in hash
+                        else{
+                                 $sampleCounter->{$r[$columnMap->{'Lane'}]} = 1;
+                        }
+
+			#Save information in hash
                         $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'index'}]} =
                             {'SampleID'=>$r[$columnMap->{'Sample_ID'}],
                              'SampleName'=>$r[$columnMap->{'Sample_Name'}],
                              'Index'=>$r[$columnMap->{'index'}],
                              'Description'=>$r[$columnMap->{'Description'}],
                              'SampleWell'=>$r[$columnMap->{'Sample_Well'}],
-                             'SampleNumber'=>$sampleCounter->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'Sample_ID'}]},
+                             'SampleNumber'=>$sampleCounter->{$r[$columnMap->{'Lane'}]},
                              'SamplePlate'=>$r[$columnMap->{'Sample_Plate'}],
                              'Lane'=>$r[$columnMap->{'Lane'}],
                              'SampleProject'=>$r[$columnMap->{'Sample_Project'}],
