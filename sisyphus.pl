@@ -652,7 +652,7 @@ EOF
 
 print $scriptFh <<EOF;
 
-} # End brack for main function
+} # End bracket for main function
 
 ########################################################################
 #           Helper functions
