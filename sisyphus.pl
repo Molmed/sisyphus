@@ -646,11 +646,13 @@ copyFolderToRemoteTarget "$ngiTargetPath" "$rfPath/MD5/checksums.ngi.md5" "$rfNa
 
 #Set permission on remote host
 setRemotePermission "$ngiRemHost" "$ngiRemPath" "$rfName"
-}
+
 EOF
 }
 
 print $scriptFh <<EOF;
+
+} # End bracket for main function
 
 ########################################################################
 #           Helper functions
