@@ -46,7 +46,7 @@ OUTBOX_PATH: DEFAULT
 NGI_HOST: nestor.uppmax.uu.se
 
 # The host path where NGI-pipeline data should be delivered.
-NGI_REMOTE_PATH: /data/a2014205/achive
+NGI_REMOTE_PATH: /proj/a2014205/archive/
 
 # The project that should have access to the data.
 NGI_PROJECT: a2014205
