@@ -152,7 +152,7 @@ sub validateSequenceRun {
 				if($_->{'controlSoftware'} eq $sisyphus->getApplicationName() && 
 				   $_->{'version'} eq $sisyphus->getReagentKitVersion()) {
 					#For HiSeq the runMode should be checked
-					if(($_->{'controlSoftware'} =~ /^MiSeq/ ) || ($_->{'controlSoftware'} =~ /^HiSeq/ && 
+					if(($_->{'controlSoftware'} =~ /^MiSeq|^HiSeq X/ ) || ($_->{'controlSoftware'} =~ /^HiSeq/ && 
 					    $_->{'mode'} eq  $sisyphus->getRunMode())) {
 						$qcRequirementsFound = 1;
 						if($self->{VERBOSE}) {

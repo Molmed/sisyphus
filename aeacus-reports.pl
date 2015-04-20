@@ -216,7 +216,7 @@ my $repJob =
                                            QOS=>$uQos,            # High priority
                                            PARTITION=>'core',     # core or node (or devel));
                                            MAIL_USER=>$email,
-                                           MAIL_TYPE=>'END'
+                                           MAIL_TYPE=>'FAIL'
                                           );
 foreach my $job (values %projJobs){
     $repJob->addDep($job);
