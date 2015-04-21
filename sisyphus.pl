@@ -870,7 +870,7 @@ rsyncSeqSummaries () {
     SLEEP=300
     until [ \$RSYNC_OK = 0 ]; do
         echo -n "Extracting summary data  "
-        rsync -vrktp --chmod=Dg+sx,ug+w,o-rwx --prune-empty-dirs --include-from  '$FindBin::Bin/\$rsyncFilterFile' '\$runfolderName' '\$summaryPath' > '\$runfolderPath/\$rsyncFileLogName'
+        rsync -vrktp --chmod=Dg+sx,ug+w,o-rwx --prune-empty-dirs --include-from  "$FindBin::Bin/\$rsyncFilterFile" "\$runfolderName" "\$summaryPath" > "\$runfolderPath/\$rsyncFileLogName"
         RSYNC_OK=\$?
         if [ \$RSYNC_OK -gt 0 ]; then
            echo "FAILED will retry in \$SLEEP seconds"
