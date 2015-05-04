@@ -45,6 +45,9 @@ OUTBOX_PATH: DEFAULT
 # The host path to where data that should be processed with NGI-pipeline will be delivered.
 NGI_HOST: nestor.uppmax.uu.se
 
+# The port on which the ngi pipeline will respond on the remote host.
+NGI_PORT: 6666
+
 # The host path where NGI-pipeline data should be delivered.
 NGI_REMOTE_PATH: /proj/a2014205/archive/
 
