@@ -13,3 +13,5 @@ before_install:
   - echo 'our $VERSION="'`perl ./version.pl`'"' |tee VERSION
   - find . > MANIFEST
 
+before_script:
+  - find . -name "*.pl" | xargs -n1 perl -cw
