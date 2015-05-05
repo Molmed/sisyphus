@@ -651,15 +651,10 @@ copyFolderToRemoteTarget "$ngiTargetPath" "$rfPath/MD5/checksums.ngi.md5" "$rfNa
 #Set permission on remote host
 setRemotePermission "$ngiRemHost" "$ngiRemPath" "$rfName"
 
-EOF
-}
+startNGIPipeline "$ngiRemHost" "$ngiRemPort" "$rfName"
+check_errs \$? "Failed to start ngi analysis"
 
-#If this is a ngi flowcell - start the analysis
-if($ngi) {
-    print $scriptFh <<EOF;
-    startNGIPipeline "$ngiRemHost" "$ngiRemPort" "$rfName"
-    check_errs \$? "Failed to start ngi analysis"
-    EOF
+EOF
 }
 
 print $scriptFh <<EOF;
