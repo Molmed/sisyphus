@@ -1141,7 +1141,7 @@ startNGIPipeline () {
        runfolderName=\$3;
     fi
     
-    ssh \$remoteHost "curl \$remoteHost:\$remotePort/flowcell_analysis/runfolderName"
+    ssh \$remoteHost "curl localhost:\$remotePort/flowcell_analysis/runfolderName"
 
 }
 
