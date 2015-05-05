@@ -6,11 +6,13 @@ before_install:
   - sudo apt-get update -qq
   - sudo apt-get install -y dos2unix
   - sudo apt-get install -y libxml-libxslt-perl
+  - sudo apt-get install -y libgdbm
   - "cpanm --quiet --notest PerlIO::gzip"
   - "cpanm --quiet --notest Digest::MD5"
   - "cpanm --quiet --notest XML::Simple"
   - "cpanm --quiet --notest Archive::Zip"
   - "cpanm --quiet --notest PDL"
+  - "cpanm --quite --notest XML::LibXSLT"
   - echo 'our $VERSION="'`perl ./version.pl`'"' |tee VERSION
   - find . > MANIFEST
 
