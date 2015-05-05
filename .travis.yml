@@ -3,14 +3,14 @@ perl:
   - "5.10"
 
 before_install: 
-  - "cpanm --quiet --notest Digest::MD5"
-  - "cpanm --quiet --notest PerlIO::gzip"
-  - "cpanm --quiet --notest XML::Simple"
-  - "cpanm --quiet --notest Archive::Zip"
-  - "cpanm --quiet --notest PDL"
   - sudo apt-get update -qq
   - sudo apt-get install -y dos2unix
   - sudo apt-get install -y libxml-libxslt-perl
+  - "cpanm --quiet --notest PerlIO::gzip"
+  - "cpanm --quiet --notest Digest::MD5"
+  - "cpanm --quiet --notest XML::Simple"
+  - "cpanm --quiet --notest Archive::Zip"
+  - "cpanm --quiet --notest PDL"
   - echo 'our $VERSION="'`perl ./version.pl`'"' |tee VERSION
   - find . > MANIFEST
 
