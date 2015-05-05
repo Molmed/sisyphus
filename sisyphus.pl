@@ -157,6 +157,7 @@ my $ngiRemPath = "/proj/$ngiProj/archive";
 my $oPath = "/proj/$uProj/private/nobackup/OUTBOX";
 my $aHost = "milou-b.uppmax.uu.se";
 my $ngiRemHost = "nestor.uppmax.uu.se";
+my $ngiRemPort = "6666";
 my $aPath = "/proj/$uProj/private/";
 my $sHost = "localhost";
 my $sPath = dirname($rfPath) . '/summaries';
@@ -204,6 +205,9 @@ if(defined $config->{REMOTE_HOST}){
 }
 if(defined $config->{NGI_HOST}){
     $ngiRemHost = $config->{NGI_HOST};
+}
+if(defined $config->{NGI_PORT}){
+    $ngiRemPort = $config->{NGI_PORT};
 }
 if(defined $config->{REMOTE_PATH}){
     $rPath = $config->{REMOTE_PATH};
@@ -646,6 +650,9 @@ copyFolderToRemoteTarget "$ngiTargetPath" "$rfPath/MD5/checksums.ngi.md5" "$rfNa
 
 #Set permission on remote host
 setRemotePermission "$ngiRemHost" "$ngiRemPath" "$rfName"
+
+startNGIPipeline "$ngiRemHost" "$ngiRemPort" "$rfName"
+check_errs \$? "Failed to start ngi analysis"
 
 EOF
 }
@@ -1095,6 +1102,42 @@ setRemotePermission () {
     done
     check_errs \$PERM_OK "FAILED"
     echo OK
+}
+
+# Start up the analysis in the ngi pipeline for 
+# this flowcell
+startNGIPipeline () {
+
+    remoteHost="";
+    remotePort="";
+    runfolderName="";
+
+    if [ -z "\$1" ]
+    then
+      echo "-remote host #1 is zero length or empty."
+      exit 1;
+    else
+       remoteHost=\$1;
+    fi
+
+    if [ -z "\$2" ]
+    then
+      echo "-remote port #2 is zero length or empty."
+      exit 1;
+    else
+       remotePort=\$2;
+    fi
+    
+    if [ -z "\$3" ]
+    then
+      echo "-runfolder name path #3 is zero length or empty."
+      exit 1;
+    else
+       runfolderName=\$3;
+    fi
+    
+    ssh \$remoteHost "curl --fail --silent --show-error http://localhost:\$remotePort/flowcell_analysis/\$runfolderName"
+
 }
 
 #Run main function

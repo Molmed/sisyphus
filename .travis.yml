@@ -3,13 +3,18 @@ perl:
   - "5.10"
 
 before_install: 
-  - "cpanm --quiet --notest Digest::MD5"
+  - sudo apt-get update -qq
+  - sudo apt-get install -y dos2unix
+  - sudo apt-get install -y libxml-libxslt-perl
+  - sudo apt-get install -y libgdbm3  
   - "cpanm --quiet --notest PerlIO::gzip"
+  - "cpanm --quiet --notest Digest::MD5"
   - "cpanm --quiet --notest XML::Simple"
   - "cpanm --quiet --notest Archive::Zip"
   - "cpanm --quiet --notest PDL"
-  - sudo apt-get update -qq
-  - sudo apt-get install -y dos2unix
+  - "cpanm --quite --notest XML::LibXSLT"
   - echo 'our $VERSION="'`perl ./version.pl`'"' |tee VERSION
   - find . > MANIFEST
 
+before_script:
+  - find . -name "*.pl" | xargs -n1 perl -cw
