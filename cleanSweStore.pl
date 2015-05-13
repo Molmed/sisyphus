@@ -147,7 +147,7 @@ foreach my $runfolder (keys %{$dataToClean}) { # Process each runfolder
 	} elsif($numFoundProjects > $numRemoveProjects) { # Remove subset of projects found on SweStore 
 		if($execute) { #Perform deletion
 			foreach my $key (keys %{$dataToClean->{$runfolder}}) {
-				qx(irm -f $swestorePath/20$year-$month/$runfolder/Projects/$key);
+				qx(irm -rf $swestorePath/20$year-$month/$runfolder/Projects/$key);
 				print REMOVED "$swestorePath/20$year-$month/$runfolder/Projects/$key\n";
 				delete $foundProjects{$key};
 			}
@@ -159,7 +159,7 @@ foreach my $runfolder (keys %{$dataToClean}) { # Process each runfolder
 	} else { # Same number of folders in file as on SweStore, remove entire runfolder
 		print "Removing runfolder $runfolder!\n";
 		if($execute) { #Perform deletion
-			qx(irm -f $swestorePath/20$year-$month/$runfolder);
+			qx(irm -rf $swestorePath/20$year-$month/$runfolder);
 			print REMOVED "$swestorePath/20$year-$month/$runfolder\n";
 		}
 	}
