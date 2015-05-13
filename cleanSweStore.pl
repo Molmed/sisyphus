@@ -15,7 +15,7 @@ cleanSweStore.pl - clean swestore from old projects
 =head1 SYNOPSIS
 
  cleanSweStore.pl -help|-man
- cleanSweStore.pl -projects <file with list of projects> [-execute]
+ cleanSweStore.pl -projectFile <file with a list of projects> [-execute]
 
 =head1 OPTIONS
 
@@ -29,11 +29,12 @@ prints out a brief help text.
 
 Opens the manpage.
 
-=item -runfolder
+=item -projectFile
 
 Path to a file containing all projects that should be removed from SweStore.
-
-Format, runfolder and projectID seperated by tab: runfoldername1	projectId1
+The file should contain two columns per row where the first column is the
+runfoldername and the second column is the projecID. One row per project must 
+be created if a runfolder contain multiple projects that should be removed.
 
 =item -execute
 
@@ -46,7 +47,7 @@ of the projects.
 
 =cut
 
-my ($project, $debug, $execute);
+my ($inputProjectFile, $debug, $execute);
 
 my $swestorePath = "/ssUppnexZone/proj/a2009002";
 
@@ -62,14 +63,14 @@ my ($help,$man) = (0,0);
 
 GetOptions('help|?'=>\$help,
 	   'man'=>\$man,
-	   'projects=s' => \$project, 
+	   'projectFile=s' => \$inputProjectFile, 
 	   'execute!' => \$execute,
     	   'debug' => \$debug,
       	    ) or pod2usage(-verbose => 0);
 
 pod2usage(-verbose => 1)  if ($help);
 pod2usage(-verbose => 2)  if ($man);
-unless (defined($project)) {
+unless (defined($inputProjectFile)) {
 	print "You must provide a list of projects to clean, format: runfoldername\tprojectid\n";
 	pod2usage(-verbose => 1);
 	exit;
@@ -89,7 +90,7 @@ unless (defined($project)) {
 #	}#
 # }
 #
-open PROJECTS, $project or die "Couldn't open project file: $project!";
+open PROJECTS, $inputProjectFile or die "Couldn't open project file: $inputProjectFile!";
 my $dataToClean;
 while(<PROJECTS>){
 	if(!/^#/) {
@@ -100,18 +101,28 @@ while(<PROJECTS>){
 	}
 }
 close(PROJECTS);
-
 my $timestamp = time;
 
-open REMOVED, "> removedFromSweStore.$timestamp.log" or die "Couldn't open output file: removedFromSweStore.$timestamp.log!\n";
-open SAVED, "> leftOnSweStore.$timestamp.log" or die "Couldn't open output file: leftOnSweStore.$timestamp.log!\n";
+my ($REMOVED, $NOTREMOVED,$LEFTONSWESTORE);
+
+#do not want to load, no idea why
+#qx(module load irods);
 
 print "Cleaning swestore!\n";
+
+if($execute) {
+	open $REMOVED, "> removedFromSweStore.$timestamp.log" or die "Couldn't open output file: removedFromSweStore.$timestamp.log!\n";
+	open $NOTREMOVED, "> notRemovedFromSweStore.$timestamp.log" or die "Couldn't open output file: notRemovedFromSweStore.$timestamp.log!\n";
+	open $LEFTONSWESTORE, "> notRemovedFromSweStore.$timestamp.log" or die "Couldn't open output file: leftOnSweStore.$timestamp.log!\n";
+}
+
+my $counterRemoved = 0;
+my $counterNotRemoved = 0;
 #
 # Remove the provided projects from SweStore
 #
 foreach my $runfolder (keys %{$dataToClean}) { # Process each runfolder 
-	my ($year,$month,$day) = ($runfolder =~ m/^(\d{2})(\d{2})(\d{2})_[A-Z0-9]+_[0-9]+_[A-Z0-9]/);
+	my ($year,$month,$day) = ($runfolder =~ m/^(\d{2})(\d{2})(\d{2})_[A-Z0-9-]+_[0-9]+_[A-Z0-9-]+/);
 	# Find each  stored project at SweStore, for the specified runfolder
 	my $projects = qx(ils $swestorePath/20$year-$month/$runfolder/Projects/);
 	#Result from ils
@@ -125,10 +136,12 @@ foreach my $runfolder (keys %{$dataToClean}) { # Process each runfolder
 	my %foundProjects;
 	# Only extract information from lines containing "C-"
 	foreach (@projectPath) {
-		if(/^[ ]*C-/) {
-			my ($project) = ($_ =~ m/.*\/(.*)$/);
-			$project =~ s/\s+//;
-			$foundProjects{$project} = 1;
+		if(/^\s*C-/) {
+			my ($project) = ($_ =~ m/.*\/(([A-Z]{2}-?[0-9]{2,4}))$/);
+			if($project) {
+				$project =~ s/\s+//;
+				$foundProjects{$project} = 1;
+			}
 		}
 	}
 	# Calculate number of projects found
@@ -137,33 +150,36 @@ foreach my $runfolder (keys %{$dataToClean}) { # Process each runfolder
 	my $numRemoveProjects = (keys %{$dataToClean->{$runfolder}});
 	#Make sure that the provided projects exist on SweStore, if not terminate the script.
 	foreach my $key (keys %{$dataToClean->{$runfolder}}) {
-		if(!exists($foundProjects{$key})) {
-			die "Couldn't find project $key on swestore: /ssUppnexZone/proj/a2009002/20" . $year . '-' . $month . '/' . $runfolder . "/Project\n";
-		}
-	}
-	
-	if($numFoundProjects < $numRemoveProjects) { #Cannot remove more projects than found on SweStore
-		die "You can't remove more projects than what exists, found $numFoundProjects, removing $numRemoveProjects!\n";
-	} elsif($numFoundProjects > $numRemoveProjects) { # Remove subset of projects found on SweStore 
-		if($execute) { #Perform deletion
-			foreach my $key (keys %{$dataToClean->{$runfolder}}) {
+		if(exists($foundProjects{$key})) {
+			#die "Couldn't find project $key on swestore: /ssUppnexZone/proj/a2009002/20" . $year . '-' . $month . '/' . $runfolder . "/Project\n";
+			print("Removing project $key from $runfolder\n");
+			if($execute) { #Perform deletion
 				qx(irm -rf $swestorePath/20$year-$month/$runfolder/Projects/$key);
-				print REMOVED "$swestorePath/20$year-$month/$runfolder/Projects/$key\n";
+				print $REMOVED "$swestorePath/20$year-$month/$runfolder/Projects/$key\n";
 				delete $foundProjects{$key};
 			}
-			foreach my $key (keys %foundProjects) {
-				print SAVED "$swestorePath/20$year-$month/$runfolder/Projects/$key\n";
-			}
-		}
-		print("Removing a subset of the projects from $runfolder\n");
-	} else { # Same number of folders in file as on SweStore, remove entire runfolder
-		print "Removing runfolder $runfolder!\n";
-		if($execute) { #Perform deletion
-			qx(irm -rf $swestorePath/20$year-$month/$runfolder);
-			print REMOVED "$swestorePath/20$year-$month/$runfolder\n";
+			$counterRemoved++;
+			delete $dataToClean->{$key};
+		} else {
+			print("Couldn't find project $key for $runfolder\n");
+			$counterNotRemoved++;
+			if($execute) { #Perform deletion
+                                print $NOTREMOVED "$runfolder\t$key\n";
+                        }
 		}
 	}
-	
+	foreach my $key (keys %foundProjects) {
+		if($execute) { #Perform deletion
+			print $LEFTONSWESTORE "$runfolder\t$key\n";
+		}
+	}
+
+					
 }
-close(SAVED);
-close(REMOVED)
+if($execute) {
+	close($NOTREMOVED);
+	close($REMOVED);
+	close($LEFTONSWESTORE);
+}
+
+print "Cleaning completed:\n\t$counterRemoved projects removed\n\t$counterNotRemoved couldn't be removed\n";
