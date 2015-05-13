@@ -113,7 +113,7 @@ print "Cleaning swestore!\n";
 if($execute) {
 	open $REMOVED, "> removedFromSweStore.$timestamp.log" or die "Couldn't open output file: removedFromSweStore.$timestamp.log!\n";
 	open $NOTREMOVED, "> notRemovedFromSweStore.$timestamp.log" or die "Couldn't open output file: notRemovedFromSweStore.$timestamp.log!\n";
-	open $LEFTONSWESTORE, "> notRemovedFromSweStore.$timestamp.log" or die "Couldn't open output file: leftOnSweStore.$timestamp.log!\n";
+	open $LEFTONSWESTORE, "> leftOnSweStore.$timestamp.log" or die "Couldn't open output file: leftOnSweStore.$timestamp.log!\n";
 }
 
 my $counterRemoved = 0;
