@@ -137,21 +137,16 @@ foreach my $runfolder (keys %{$dataToClean}) { # Process each runfolder
 	# Only extract information from lines containing "C-"
 	foreach (@projectPath) {
 		if(/^\s*C-/) {
-			my ($project) = ($_ =~ m/.*\/(([A-Z]{2}-?[0-9]{2,4}))$/);
+			my ($project) = ($_ =~ m/.*\/([A-Z]{2}-?[0-9]{2,4})$/);
 			if($project) {
 				$project =~ s/\s+//;
 				$foundProjects{$project} = 1;
 			}
 		}
 	}
-	# Calculate number of projects found
-	my $numFoundProjects = (keys %foundProjects);
-	# Calculate number of projects that have been provided
-	my $numRemoveProjects = (keys %{$dataToClean->{$runfolder}});
-	#Make sure that the provided projects exist on SweStore, if not terminate the script.
+	#Remove projects from SweStore
 	foreach my $key (keys %{$dataToClean->{$runfolder}}) {
 		if(exists($foundProjects{$key})) {
-			#die "Couldn't find project $key on swestore: /ssUppnexZone/proj/a2009002/20" . $year . '-' . $month . '/' . $runfolder . "/Project\n";
 			print("Removing project $key from $runfolder\n");
 			if($execute) { #Perform deletion
 				qx(irm -rf $swestorePath/20$year-$month/$runfolder/Projects/$key);
