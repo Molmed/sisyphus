@@ -149,8 +149,8 @@ foreach my $runfolder (keys %{$dataToClean}) { # Process each runfolder
 		if(exists($foundProjects{$key})) {
 			print("Removing project $key from $runfolder\n");
 			if($execute) { #Perform deletion
-				qx(irm -rf $swestorePath/20$year-$month/$runfolder/Projects/$key);
-				print $REMOVED "$swestorePath/20$year-$month/$runfolder/Projects/$key\n";
+				qx(irm -rf $swestorePath/20$year-$month/$runfolder/Projects/$key/$runfolder);
+				print $REMOVED "$swestorePath/20$year-$month/$runfolder/Projects/$key/$runfolder\n";
 				delete $foundProjects{$key};
 			}
 			$counterRemoved++;
