@@ -103,7 +103,7 @@ while(<PROJECTS>){
 close(PROJECTS);
 my $timestamp = time;
 
-my ($REMOVED, $NOTREMOVED,$LEFTONSWESTORE);
+my ($REMOVED, $NOTREMOVED,$LEFTONSWESTORE,$NOTFOUND);
 
 #do not want to load, no idea why
 #qx(module load irods);
@@ -114,6 +114,14 @@ if($execute) {
 	open $REMOVED, "> removedFromSweStore.$timestamp.log" or die "Couldn't open output file: removedFromSweStore.$timestamp.log!\n";
 	open $NOTREMOVED, "> notRemovedFromSweStore.$timestamp.log" or die "Couldn't open output file: notRemovedFromSweStore.$timestamp.log!\n";
 	open $LEFTONSWESTORE, "> leftOnSweStore.$timestamp.log" or die "Couldn't open output file: leftOnSweStore.$timestamp.log!\n";
+	open $NOTFOUND, "> notFoundOnSweStore.$timestamp.log" or die "Couldn't open output file: notFoundOnSweStore.$timestamp.log!\n";
+
+} else {
+	open $REMOVED, "> dryRun.removedFromSweStore.$timestamp.log" or die "Couldn't open output file: dryRun.removedFromSweStore.$timestamp.log!\n";
+        open $NOTREMOVED, "> dryRun.notRemovedFromSweStore.$timestamp.log" or die "Couldn't open output file: dryRun.notRemovedFromSweStore.$timestamp.log!\n";
+        open $LEFTONSWESTORE, "> dryRun.leftOnSweStore.$timestamp.log" or die "Couldn't open output file: dryRun.leftOnSweStore.$timestamp.log!\n";
+        open $NOTFOUND, "> dryRun.notFoundOnSweStore.$timestamp.log" or die "Couldn't open output file: dryRun.notFoundOnSweStore.$timestamp.log!\n";
+
 }
 
 my $counterRemoved = 0;
@@ -150,31 +158,33 @@ foreach my $runfolder (keys %{$dataToClean}) { # Process each runfolder
 			print("Removing project $key from $runfolder\n");
 			if($execute) { #Perform deletion
 				qx(irm -rf $swestorePath/20$year-$month/$runfolder/Projects/$key/$runfolder);
-				print $REMOVED "$swestorePath/20$year-$month/$runfolder/Projects/$key/$runfolder\n";
-				delete $foundProjects{$key};
 			}
+			print $REMOVED "$swestorePath/20$year-$month/$runfolder/Projects/$key/$runfolder\n";
+                        delete $foundProjects{$key};
 			$counterRemoved++;
-			delete $dataToClean->{$key};
+			delete $dataToClean->{$runfolder}->{$key};
 		} else {
 			print("Couldn't find project $key for $runfolder\n");
 			$counterNotRemoved++;
-			if($execute) { #Perform deletion
-                                print $NOTREMOVED "$runfolder\t$key\n";
-                        }
+                        print $NOTREMOVED "$runfolder\t$key\n";
 		}
 	}
 	foreach my $key (keys %foundProjects) {
-		if($execute) { #Perform deletion
-			print $LEFTONSWESTORE "$runfolder\t$key\n";
-		}
+		print $LEFTONSWESTORE "$runfolder\t$key\n";		
 	}
 
 					
 }
-if($execute) {
-	close($NOTREMOVED);
-	close($REMOVED);
-	close($LEFTONSWESTORE);
+
+foreach my $runfolder (keys %{$dataToClean}) {
+	foreach my $key (keys %{$dataToClean->{$runfolder}}) {
+		print $NOTFOUND  "$runfolder\t$key\n";
+	}
 }
+
+close($NOTREMOVED);
+close($REMOVED);
+close($LEFTONSWESTORE);
+close($NOTFOUND);
 
 print "Cleaning completed:\n\t$counterRemoved projects removed\n\t$counterNotRemoved couldn't be removed\n";
