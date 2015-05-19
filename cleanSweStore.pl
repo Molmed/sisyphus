@@ -114,13 +114,11 @@ if($execute) {
 	open $REMOVED, "> removedFromSweStore.$timestamp.log" or die "Couldn't open output file: removedFromSweStore.$timestamp.log!\n";
 	open $NOTREMOVED, "> notRemovedFromSweStore.$timestamp.log" or die "Couldn't open output file: notRemovedFromSweStore.$timestamp.log!\n";
 	open $LEFTONSWESTORE, "> leftOnSweStore.$timestamp.log" or die "Couldn't open output file: leftOnSweStore.$timestamp.log!\n";
-	open $NOTFOUND, "> notFoundOnSweStore.$timestamp.log" or die "Couldn't open output file: notFoundOnSweStore.$timestamp.log!\n";
 
 } else {
 	open $REMOVED, "> dryRun.removedFromSweStore.$timestamp.log" or die "Couldn't open output file: dryRun.removedFromSweStore.$timestamp.log!\n";
         open $NOTREMOVED, "> dryRun.notRemovedFromSweStore.$timestamp.log" or die "Couldn't open output file: dryRun.notRemovedFromSweStore.$timestamp.log!\n";
         open $LEFTONSWESTORE, "> dryRun.leftOnSweStore.$timestamp.log" or die "Couldn't open output file: dryRun.leftOnSweStore.$timestamp.log!\n";
-        open $NOTFOUND, "> dryRun.notFoundOnSweStore.$timestamp.log" or die "Couldn't open output file: dryRun.notFoundOnSweStore.$timestamp.log!\n";
 
 }
 
@@ -162,7 +160,6 @@ foreach my $runfolder (keys %{$dataToClean}) { # Process each runfolder
 			print $REMOVED "$swestorePath/20$year-$month/$runfolder/Projects/$key/$runfolder\n";
                         delete $foundProjects{$key};
 			$counterRemoved++;
-			delete $dataToClean->{$runfolder}->{$key};
 		} else {
 			print("Couldn't find project $key for $runfolder\n");
 			$counterNotRemoved++;
@@ -176,15 +173,9 @@ foreach my $runfolder (keys %{$dataToClean}) { # Process each runfolder
 					
 }
 
-foreach my $runfolder (keys %{$dataToClean}) {
-	foreach my $key (keys %{$dataToClean->{$runfolder}}) {
-		print $NOTFOUND  "$runfolder\t$key\n";
-	}
-}
 
 close($NOTREMOVED);
 close($REMOVED);
 close($LEFTONSWESTORE);
-close($NOTFOUND);
 
 print "Cleaning completed:\n\t$counterRemoved projects removed\n\t$counterNotRemoved couldn't be removed\n";
