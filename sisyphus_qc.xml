@@ -41,7 +41,7 @@
 			<lengths>
 			</lengths>
 			<warning>
-				<unidentified>5.0</unidentified>
+				<unidentified>10.0</unidentified>
 				<numberOfCluster>180</numberOfCluster>
 				<overridePoolingRequirement>0</overridePoolingRequirement>
 				<lengths>
@@ -50,9 +50,9 @@
 						<errorRate>2.0</errorRate>
 					</l125>
    					<l126>
-                                                <q30>18</q30>
-                                                <errorRate>2.0</errorRate>
-                                        </l126>
+                         <q30>18</q30>
+                        <errorRate>2.0</errorRate>
+                    </l126>
 					<l100>
 						<q30>14</q30>
 						<errorRate>2.0</errorRate>

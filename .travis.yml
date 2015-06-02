@@ -11,7 +11,7 @@ before_install:
   - "cpanm --quiet --notest Digest::MD5"
   - "cpanm --quiet --notest XML::Simple"
   - "cpanm --quiet --notest Archive::Zip"
-  - "cpanm --quiet --notest PDL"
+  - "cpanm --quiet --notest CHM/PDL-2.007.tar.gz"
   - "cpanm --quite --notest XML::LibXSLT"
   - echo 'our $VERSION="'`perl ./version.pl`'"' |tee VERSION
   - find . > MANIFEST
