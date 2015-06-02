@@ -45,6 +45,9 @@ OUTBOX_PATH: DEFAULT
 # The host path to where data that should be processed with NGI-pipeline will be delivered.
 NGI_HOST: nestor.uppmax.uu.se
 
+# The port on which the ngi pipeline will respond on the remote host.
+NGI_PORT: 6666
+
 # The host path where NGI-pipeline data should be delivered.
 NGI_REMOTE_PATH: /proj/a2014205/archive/
 
@@ -62,14 +65,14 @@ ARCHIVE_HOST: milou-b.uppmax.uu.se
 # Default to nobackup dir as this will only be used while
 # staging the data for transfer to Swestore
 # This way we can hardlink instead of copy fastq-files
-ARCHIVE_PATH: /gulo/proj_nobackup/a2009002/private/archive-tmp
+ARCHIVE_PATH: /proj/a2009002/private/nobackup/archive-tmp
 
 # The iRODS path to SweStore archive
 SWESTORE_PATH: /ssUppnexZone/proj/a2009002
 
 # Root dir of temporary directory to use
 # (eg when verifying the archive copies)
-TEMP_PATH: /gulo/proj_nobackup/a2009002/private/tmp
+TEMP_PATH: /proj/a2009002/private/nobackup/tmp
 
 # The host on which to put the summaries
 SUMMARY_HOST: mm-xlas002

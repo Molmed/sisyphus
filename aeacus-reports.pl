@@ -215,6 +215,7 @@ my $repJob =
                                            TIME=>"0-10:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
                                            QOS=>$uQos,            # High priority
                                            PARTITION=>'core',     # core or node (or devel));
+                                           CORES=>'2',
                                            MAIL_USER=>$email,
                                            MAIL_TYPE=>'FAIL'
                                           );
