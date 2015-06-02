@@ -137,7 +137,7 @@ foreach my $proj (keys %{$sampleSheet}){
             foreach my $read (keys %{$files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}}){
                 foreach my $pctLane (keys %{$files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}}){
 			my $stat = Molmed::Sisyphus::QStat->new(OFFSET=>$OFFSET, DEBUG=>$debug);
-                        $samples->{$machineType eq 'hiseqx' ? $info->{SampleName} : $info->{SampleID}}->{$lid}->{$info->{Index}} = 1;
+                        $samples->{$machineType eq 'hiseqx' ? $info->{SampleID} : $info->{SampleID}}->{$lid}->{$info->{Index}} = 1;
 			my $filehandle;
 
                         if($files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane} =~ /fastq.gz$/) {
