@@ -732,16 +732,17 @@ sub saveMd5{
     $file =~ s:^$rfPath/::;
     my $runfolder = basename($rfPath);
     
+    $self->mkpath("$rfPath/MD5",2770);
+    
+    print STDERR "Writing MD5 for '$file'\n" if($self->{DEBUG});
+ 
     if (my $lock = new File::NFSLock {
-        file      => $file,
+        file      => "$rfPath/MD5/sisyphus.md5",
         lock_type => LOCK_EX,
         blocking_timeout   => 10,      # 10 sec
         stale_lock_timeout => 30 * 60, # 30 min
         }) 
     {
-    
-    $self->mkpath("$rfPath/MD5",2770);
-    print STDERR "Writing MD5 for '$file'\n" if($self->{DEBUG});
     
     open(my $md5fh, ">>", "$rfPath/MD5/sisyphus.md5") or die "Failed to open $rfPath/MD5/sisyphus.md5:$!\n";
     print $md5fh "$sum  $runfolder/$file\n";
