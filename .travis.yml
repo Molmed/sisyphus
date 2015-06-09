@@ -13,6 +13,7 @@ before_install:
   - "cpanm --quiet --notest Archive::Zip"
   - "cpanm --quiet --notest CHM/PDL-2.007.tar.gz"
   - "cpanm --quite --notest XML::LibXSLT"
+  - "cpanm --quite --notest File::NFSLock"
   - echo 'our $VERSION="'`perl ./version.pl`'"' |tee VERSION
   - find . > MANIFEST
 

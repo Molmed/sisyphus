@@ -50,6 +50,16 @@ ok($sis->excludeLane(2), "Excluded lane 2");
 ok($sis->excludeLane(3), "Excluded lane 3");
 ok($sis->excludeLane(3), "Excluded lane 3");
 
+# Test if MD5 sum can be calculated
+my $md5 = $sis->getMd5("$testfolder1/sisyphus.yml", -noCache=>1);
+ok($md5 eq "ffe051d77d496c756e817f90ed5e905e", "MD5 sum was calculated");
+
+# Test if MD5 sum can be written to file
+$sis->saveMd5("$testfolder1/sisyphus.yml", $md5);
+open my $fh, '<', "$testfolder1/MD5/sisyphus.md5" or die "Could not open sisyphus.md5!\n";
+my $firstLine = <$fh>;
+ok($firstLine =~ $md5, "MD5 sum was written to file");
+close $fh;
 
 done_testing();
 
