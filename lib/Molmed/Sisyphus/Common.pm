@@ -746,8 +746,8 @@ sub saveMd5{
     
     open(my $md5fh, ">>", "$rfPath/MD5/sisyphus.md5") or die "Failed to open $rfPath/MD5/sisyphus.md5:$!\n";
     print $md5fh "$sum  $runfolder/$file\n";
-    $lock->unlock();
     close($md5fh);
+    $lock->unlock();
     
     }else{
      die "I couldn't lock the file [$File::NFSLock::errstr]";
