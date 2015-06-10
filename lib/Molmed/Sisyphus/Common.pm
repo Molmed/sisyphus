@@ -740,7 +740,7 @@ sub saveMd5{
         file      => "$rfPath/MD5/sisyphus.md5",
         lock_type => LOCK_EX,
         blocking_timeout   => 10,      # 10 sec
-        stale_lock_timeout => 30 * 60, # 30 min
+        stale_lock_timeout => 60, # 1 min
         }) 
     {
     

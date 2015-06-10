@@ -50,16 +50,50 @@ ok($sis->excludeLane(2), "Excluded lane 2");
 ok($sis->excludeLane(3), "Excluded lane 3");
 ok($sis->excludeLane(3), "Excluded lane 3");
 
-# Test if MD5 sum can be calculated
-my $md5 = $sis->getMd5("$testfolder1/sisyphus.yml", -noCache=>1);
-ok($md5 eq "ffe051d77d496c756e817f90ed5e905e", "MD5 sum was calculated");
+#
+# Test MD5 sum functions and file locking
+#
 
-# Test if MD5 sum can be written to file
-$sis->saveMd5("$testfolder1/sisyphus.yml", $md5);
+opendir(DH, "$testfolder1") or die "Couldn't open dir: $testfolder1";
+my @dirFiles = grep ! /^\./, readdir(DH); #ignore hidden files
+closedir(DH);
+
+my $md5;
+my @children;
+my $numberOfFiles = @dirFiles;
+$sis->mkpath("$testfolder1/MD5", 2770);
+
+foreach my $file (@dirFiles) {
+    my $pid = fork();
+    if ($pid) {
+        #parent
+        push @children, $pid;
+    }
+    elsif ($pid==0) {
+        #child
+        $md5 = $sis->getMd5("$testfolder1/$file", -noCache=>1);
+        $sis->saveMd5("$testfolder1/$file", $md5);
+        exit 0;
+    }
+    else {
+        die "Couldn't fork: $!\n";
+    }
+}
+
+foreach my $pid ( @children ) {
+    waitpid($pid, 0);
+}
+
 open my $fh, '<', "$testfolder1/MD5/sisyphus.md5" or die "Could not open sisyphus.md5!\n";
-my $firstLine = <$fh>;
-ok($firstLine =~ $md5, "MD5 sum was written to file");
+my $lineOK = 0;
+while (my $line = <$fh>){
+    if ($line =~ m/^[a-f0-9]{32}\h\h120224_SN866_0134_BC0H34ACXX\.*/g){
+        $lineOK++;    
+    }
+}
 close $fh;
+
+ok($lineOK == $numberOfFiles, "MD5 sums have been written in parallel");
 
 done_testing();
 
