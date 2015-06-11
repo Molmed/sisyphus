@@ -18,6 +18,7 @@ use File::Find;
 #use Hash::Util;
 use File::Path 'rmtree';
 use Fcntl qw(:flock SEEK_END :mode); # Import LOCK_*, mode and SEEK_END constants
+use File::NFSLock;
 
 our $AUTOLOAD;
 
@@ -730,14 +731,27 @@ sub saveMd5{
     my $absFile = $file;
     $file =~ s:^$rfPath/::;
     my $runfolder = basename($rfPath);
-
+    
     $self->mkpath("$rfPath/MD5",2770);
+    
     print STDERR "Writing MD5 for '$file'\n" if($self->{DEBUG});
+ 
+    if (my $lock = new File::NFSLock {
+        file      => "$rfPath/MD5/sisyphus.md5",
+        lock_type => LOCK_EX,
+        blocking_timeout   => 10,      # 10 sec
+        stale_lock_timeout => 60, # 1 min
+        }) 
+    {
+    
     open(my $md5fh, ">>", "$rfPath/MD5/sisyphus.md5") or die "Failed to open $rfPath/MD5/sisyphus.md5:$!\n";
-    flock($md5fh, LOCK_EX) || confess "Failed to lock $rfPath/MD5/sisyphus.md5:$!\n";
     print $md5fh "$sum  $runfolder/$file\n";
-    flock($md5fh, LOCK_UN);
     close($md5fh);
+    $lock->unlock();
+    
+    }else{
+     die "I couldn't lock the file [$File::NFSLock::errstr]";
+    }
 
     # Update the cache, if used, with the new(?) checksum for this file
     if(exists $self->{CHECKSUMS}){
