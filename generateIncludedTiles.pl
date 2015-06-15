@@ -78,7 +78,8 @@ unless(defined $rfPath && -e $rfPath){
 
 my $sisyphus = Molmed::Sisyphus::Common->new(PATH=>$rfPath, DEBUG=>$debug);
 
-# Identify tiles with too high error for exclusion
+# Spits which tiles to keep and which to exclude
+# based on the errors rates.
 my ($incTilesRef, $excTilesRef) = $sisyphus->getExcludedAndIncludedTiles();
 
 my @incTiles = @{$incTilesRef};
