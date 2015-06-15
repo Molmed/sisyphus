@@ -345,35 +345,10 @@ my $posFormat = $sisyphus->positionsFormat();
 my $machineType = $sisyphus->machineType();
 
 # Identify tiles with too high error for exclusion
-my $excludedTiles = $sisyphus->excludeTiles();
-my @incTiles;
-my @excTiles;
-foreach my $lane (1..$sisyphus->laneCount){
-    if(exists $excludedTiles->{$lane}){
-	my $flowcellLayot = $runInfo->{xml}->{Run}->{FlowcellLayout};
-	if(scalar(keys %{$excludedTiles->{$lane}}) == $runInfo->{tiles} + 2 ){ # There are two extra keys in the excludedTiles hash
-	    # Exclude the whole lane
-	    push @excTiles, "s_${lane}";
-	    # And also add it to lanes that should not be delivered
-	    $sisyphus->excludeLane($lane);
-	}else{
-	    for(my $surf=1; $surf<=$flowcellLayot->{SurfaceCount}; $surf++){
-		for(my $swath=1; $swath<=$flowcellLayot->{SwathCount}; $swath++){
-		    for(my $t=1; $t<=$flowcellLayot->{TileCount}; $t++){
-			my $tile = sprintf("$surf$swath%02d", $t);
-			if(exists $excludedTiles->{$lane}->{$tile}){
-			    push @excTiles, "s_${lane}_$tile";
-			}else{
-			    push @incTiles, "s_${lane}_$tile";
-			}
-		    }
-		}
-	    }
-	}
-    }else{
-	push @incTiles, "s_$lane";
-    }
-}
+my ($incTilesRef, $excTilesRef) = sisyphus->getExcludedAndIncludedTiles();
+
+my @incTiles = @{$incTilesRef};
+my @excTiles = @{$excTilesRef};
 
 my $includeTiles = join ',', @incTiles;
 my $ignore = '';
