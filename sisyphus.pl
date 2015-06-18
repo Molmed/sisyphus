@@ -345,7 +345,7 @@ my $posFormat = $sisyphus->positionsFormat();
 my $machineType = $sisyphus->machineType();
 
 # Identify tiles with too high error for exclusion
-my ($incTilesRef, $excTilesRef) = sisyphus->getExcludedAndIncludedTiles();
+my ($incTilesRef, $excTilesRef) = $sisyphus->getExcludedAndIncludedTiles();
 
 my @incTiles = @{$incTilesRef};
 my @excTiles = @{$excTilesRef};
