@@ -3182,6 +3182,62 @@ sub excludeTiles{
     return \%excluded;
 }
 
+
+
+
+=head2 getExcludedAndIncludedTiles()
+
+ Title   : getExcludedAndIncludedTiles()
+ Usage   : $sisyphus->getExcludedAndIncludedTiles()
+ Function: Parses information from Sisyphus::excludeTiles() to two arrays
+           and returns them. 
+ Example :
+ Returns : Two arrays, the first one contains the includeded tiles, the second the excluded tiles.
+ Args    : none
+
+=cut
+sub getExcludedAndIncludedTiles {
+
+
+    my $self = shift;
+    my $runInfo = $self->getRunInfo();
+
+    # Identify tiles with too high error for exclusion
+    my $excludedTiles = $self->excludeTiles();
+    my @incTiles;
+    my @excTiles;
+    foreach my $lane (1..$self->laneCount){
+        if(exists $excludedTiles->{$lane}){
+    	my $flowcellLayot = $runInfo->{xml}->{Run}->{FlowcellLayout};
+    	if(scalar(keys %{$excludedTiles->{$lane}}) == $runInfo->{tiles} + 2 ){ # There are two extra keys in the excludedTiles hash
+    	    # Exclude the whole lane
+    	    push @excTiles, "s_${lane}";
+    	    # And also add it to lanes that should not be delivered
+    	    $self->excludeLane($lane);
+    	}else{
+    	    for(my $surf=1; $surf<=$flowcellLayot->{SurfaceCount}; $surf++){
+    		for(my $swath=1; $swath<=$flowcellLayot->{SwathCount}; $swath++){
+    		    for(my $t=1; $t<=$flowcellLayot->{TileCount}; $t++){
+    			my $tile = sprintf("$surf$swath%02d", $t);
+    			if(exists $excludedTiles->{$lane}->{$tile}){
+    			    push @excTiles, "s_${lane}_$tile";
+    			}else{
+    			    push @incTiles, "s_${lane}_$tile";
+    			}
+    		    }
+    		}
+    	    }
+    	}
+        }else{
+    	push @incTiles, "s_$lane";
+        }
+    }
+
+    return (\@incTiles, \@excTiles);
+
+}
+
+
 =head2 excludedTiles()
 
  Title   : excludedTiles()
