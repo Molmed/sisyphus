@@ -221,6 +221,7 @@ unless($verifyOnly){
       MAIL_USER=>$email, 
       MAIL_TYPE=>'END', 
 	);
+    $job->addCommand("module load irods");
     $job->addCommand("$scriptCommand --verifyOnly -ipath '$iPath/$month'", "archive2swestore on $rfName FAILED");
     print STDERR "Submitting SwSt-$rfName starting at $sTime\t";
     $job->submit();
