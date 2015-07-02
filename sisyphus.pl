@@ -340,9 +340,10 @@ sleep 1800 if($wait);
 my $runInfo = $sisyphus->getRunInfo() || die "Failed to read RunInfo.xml from $rfPath\n";
 
 # This (or rather the object method) will need changing when we have an example of a dual-index run
-my $readMask = $sisyphus->createReadMask() || die "Failed to generate readMask";
+my $readMaskTemp = $sisyphus->createReadMask() || die "Failed to generate readMask";
 my $posFormat = $sisyphus->positionsFormat();
 my $machineType = $sisyphus->machineType();
+my @readMask = @{$readMaskTemp};
 
 # Identify tiles with too high error for exclusion
 my ($incTilesRef, $excTilesRef) = $sisyphus->getExcludedAndIncludedTiles();
@@ -408,7 +409,7 @@ if(exists $config->{MISMATCH}){
 }
 
 if ($machineType eq "hiseqx") {
-    $includeTiles =~ s/,/ --tiles /g;
+    #$includeTiles =~ s/,/ --tiles /g;
 
     if (-e "$fastqPath/Unaligned") {
         print STDERR "\n\nERROR: $fastqPath/Unaligned already exists\n\n";
@@ -416,6 +417,7 @@ if ($machineType eq "hiseqx") {
     } else {
         mkdir "$fastqPath/Unaligned";
     }
+    my $joinedReadMask = join("--use-bases-mask ", @readMask);
     print $scriptFh <<EOF;
 
 if [ ! -e "$rfPath/Unaligned" ]; then
@@ -426,7 +428,7 @@ $config->{BCL2FASTQ} -v 2>&1 | awk '{if(/^bcl2fastq/){print \$2}}' > $rfPath/bcl
 
 echo "Demultiplexing/Converting to FastQ"
 
-$config->{BCL2FASTQ} --input-dir '$rfPath/Data/Intensities/BaseCalls' --output-dir '$fastqPath/Unaligned' --use-bases-mask '$readMask' --barcode-mismatches '$mismatches' ${ignore} --tiles $includeTiles &> BclToFastq.log
+$config->{BCL2FASTQ} --input-dir '$rfPath/Data/Intensities/BaseCalls' --output-dir '$fastqPath/Unaligned' --use-bases-mask $joinedReadMask --barcode-mismatches '$mismatches' ${ignore} --tiles $includeTiles &> BclToFastq.log
 check_errs \$? "bcl2fastq failed in $fastqPath/Unaligned"
 
 EOF
@@ -447,7 +449,7 @@ EOF
         $excludeTiles =~ s/,/ --tiles /g;
         print $scriptFh <<EOF;
 
-$config->{BCL2FASTQ} --input-dir '$rfPath/Data/Intensities/BaseCalls' --output-dir '$fastqPath/Excluded' --use-bases-mask '$readMask' --barcode-mismatches '$mismatches' ${ignore} --tiles --tiles $excludeTiles &> $rfPath/setupBclToFastqExcluded.err
+$config->{BCL2FASTQ} --input-dir '$rfPath/Data/Intensities/BaseCalls' --output-dir '$fastqPath/Excluded' --use-bases-mask $joinedReadMask --barcode-mismatches '$mismatches' ${ignore} --tiles --tiles $excludeTiles &> $rfPath/setupBclToFastqExcluded.err
 
 if [ ! -e "$rfPath/Excluded" ]; then
    ln -s "$fastqPath/Excluded" "$rfPath/Excluded"
@@ -456,6 +458,9 @@ fi
 EOF
         } 
     } else {
+
+my $joinedReadMask = join(",", @readMask);
+
         print $scriptFh <<EOF;
 if [ ! -e "$rfPath/Unaligned" ]; then
    ln -s "$fastqPath/Unaligned" "$rfPath/Unaligned"
@@ -464,7 +469,7 @@ fi
 EOF
 
     print $scriptFh <<EOF;
-configureBclToFastq.pl --input-dir '$rfPath/Data/Intensities/BaseCalls' --output-dir '$fastqPath/Unaligned' --sample-sheet '$rfPath/SampleSheet.csv' --use-bases-mask '$readMask' --mismatches '$mismatches' ${ignore} --positions-format $posFormat --fastq-cluster-count 0 --tiles $includeTiles &> $rfPath/setupBclToFastq.err
+configureBclToFastq.pl --input-dir '$rfPath/Data/Intensities/BaseCalls' --output-dir '$fastqPath/Unaligned' --sample-sheet '$rfPath/SampleSheet.csv' --use-bases-mask '$joinedReadMask' --mismatches '$mismatches' ${ignore} --positions-format $posFormat --fastq-cluster-count 0 --tiles $includeTiles &> $rfPath/setupBclToFastq.err
 check_errs \$? "configureBclToFastq.pl failed"
 
 EOF
@@ -474,7 +479,7 @@ EOF
         print $scriptFh <<EOF;
 echo "Setting up demultiplexing of excluded tiles"
 
-configureBclToFastq.pl --input-dir '$rfPath/Data/Intensities/BaseCalls' --output-dir '$fastqPath/Excluded' --sample-sheet '$rfPath/SampleSheet.csv' --use-bases-mask '$readMask' --mismatches 1 --positions-format $posFormat --fastq-cluster-count 0 --tiles $excludeTiles &> $rfPath/setupBclToFastqExcluded.err
+configureBclToFastq.pl --input-dir '$rfPath/Data/Intensities/BaseCalls' --output-dir '$fastqPath/Excluded' --sample-sheet '$rfPath/SampleSheet.csv' --use-bases-mask '$joinedReadMask' --mismatches 1 --positions-format $posFormat --fastq-cluster-count 0 --tiles $excludeTiles &> $rfPath/setupBclToFastqExcluded.err
 check_errs \$? "configureBclToFastq.pl for excluded tiles failed"
 
 check_errs \$? "bclt2fastq failed in $fastqPath/Excluded"

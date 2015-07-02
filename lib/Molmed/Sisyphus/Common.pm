@@ -1323,6 +1323,53 @@ sub clonePath{
 
 =pod
 
+=head2 getLengthOfProvidedIndexes()
+
+ Title   : getLengthOfProvidedIndexes
+ Usage   : $sis->getLengthOfProvidedIndexes()
+ Function: parse sampleSheet and get length of used indexes
+ Example :
+ Returns : Hash {Lane_Id => {
+			I1 => number
+			I2 => number (if dual index)
+			}
+		}
+ Args    : none
+
+=cut
+
+sub getLengthOfProvidedIndexes {
+   my $self = shift;
+   my $sampleSheet = $self->readSampleSheet();
+   my $indexLength;
+   foreach my $proj (keys %{$sampleSheet}){
+       foreach my $lid (keys %{$sampleSheet->{$proj}}){
+           foreach my $tag (keys %{$sampleSheet->{$proj}->{$lid}}){
+               if(length($sampleSheet->{$proj}->{$lid}->{$tag}->{Index}) > 0) {
+                   if(!defined($indexLength->{$lid}->{I1})) {
+                       $indexLength->{$lid}->{I1} = length($sampleSheet->{$proj}->{$lid}->{$tag}->{Index});
+                   } elsif($indexLength->{$lid}->{I1} != length($sampleSheet->{$proj}->{$lid}->{$tag}->{Index})) {
+			confess "Different length of indexes, lane $lid ($sampleSheet->{$proj}->{$lid}->{$tag}->{Index})!\n";
+                   }
+	       } elsif(defined($indexLength->{$lid}->{I1})) {
+                   confess "Cannot mix single and dual index lane $lid!\n";
+               }
+	       if(defined($sampleSheet->{proj}->{$lid}->{$tag}->{Index2}) && length($sampleSheet->{proj}->{$lid}->{$tag}->{Index2}) > 0) {
+                    if(!defined($indexLength->{$lid}->{I2})) {
+                       $indexLength->{$lid}->{I2} = length($sampleSheet->{$proj}->{$lid}->{$tag}->{Index2})
+                   } elsif($indexLength->{$lid}->{I2} != length($sampleSheet->{$proj}->{$lid}->{$tag}->{Index2})) {
+                        confess "Different length of indexes, lane $lid ($sampleSheet->{$proj}->{$lid}->{$tag}->{Index2})!\n";
+                   }
+               } elsif(defined($indexLength->{$lid}->{I2})) {
+                   confess "Cannot mix single and dual index lane $lid!\n";
+               }
+           }
+       }
+   }
+
+   return $indexLength;
+}
+
 =head2 readSampleSheet()
 
  Title   : readSampleSheet
@@ -1364,7 +1411,8 @@ sub readSampleSheet{
                 for( my $i = 0; $i < $length; $i++) {
                     $columnMap->{$columns[$i]} = $i;
                 }
-                my $sampleCounter;
+                my $sampleCounter = 0;
+                my $sampleCounterHash;
                 while(<$sheet>){
                     if(/^#/){
                         next;
@@ -1376,11 +1424,9 @@ sub readSampleSheet{
                     $r[$columnMap->{'index'}] = 'unknown' if($r[$columnMap->{'index'}] !~ m/^[ACGT-]+$/); # Use 'unknown' for unspecified index tags
                     unless($r[6] =~ m/^y/i){ # Skip the controls
                         
-			if(defined($sampleCounter->{$r[$columnMap->{'Lane'}]})){
-                                $sampleCounter->{$r[$columnMap->{'Lane'}]}++;
-                        }
-                        else{
-                                 $sampleCounter->{$r[$columnMap->{'Lane'}]} = 1;
+			if(!defined($sampleCounterHash->{$r[$columnMap->{'Sample_Name'}]})){
+                                $sampleCounter++;
+                                $sampleCounterHash->{$r[$columnMap->{'Sample_Name'}]} = $sampleCounter;
                         }
 
 			#Save information in hash
@@ -1388,9 +1434,10 @@ sub readSampleSheet{
                             {'SampleID'=>$r[$columnMap->{'Sample_ID'}],
                              'SampleName'=>$r[$columnMap->{'Sample_Name'}],
                              'Index'=>$r[$columnMap->{'index'}],
+                             'Index2'=>defined($columnMap->{'index2'}) ? $r[$columnMap->{'index2'}] : "",
                              'Description'=>$r[$columnMap->{'Description'}],
                              'SampleWell'=>$r[$columnMap->{'Sample_Well'}],
-                             'SampleNumber'=>$sampleCounter->{$r[$columnMap->{'Lane'}]},
+                             'SampleNumber'=>$sampleCounterHash->{$r[$columnMap->{'Sample_Name'}]},
                              'SamplePlate'=>$r[$columnMap->{'Sample_Plate'}],
                              'Lane'=>$r[$columnMap->{'Lane'}],
                              'SampleProject'=>$r[$columnMap->{'Sample_Project'}],
@@ -1879,16 +1926,70 @@ sub reads{
 
 sub createReadMask{
     my $self = shift;
-    my @readMask;
+    my %readMask;
     my @reads = $self->reads();
+    my $indexCounter = 0;
+    my $readCounter = 0;
     foreach my $read (@reads){
-	if($read->{index} eq 'Y'){
-	    push @readMask, 'I*';
-	}else{
-	    push @readMask, 'Y*n';
-	}
+        if($read->{index} eq 'Y'){
+            if($indexCounter == 0) {
+                $readMask{I1} = $read->{last} - $read->{first} + 1;
+            } elsif($indexCounter == 1) {
+		$readMask{I2} = $read->{last} - $read->{first} + 1;
+            } else {
+                confess "Incorrect number of indexes: " + ($indexCounter + 1) . "\n";
+            }
+            $indexCounter++;
+        }else{
+            if($readCounter == 0) {
+                $readMask{R1} = 'n';
+            } elsif($readCounter == 1) {
+                $readMask{R2} = 'n';
+            } else {
+                confess "Incorrect number of reads: " + ($readCounter + 1) . "\n";
+            }
+            $readCounter++;
+        }
     }
-    return(join(',',@readMask));
+
+    my $length = $self->getLengthOfProvidedIndexes();
+    my @baseMasks;
+    if($self->machineType eq 'hiseqx') {
+        foreach my $laneId (keys %{$length}) {
+            my $baseMask = "$laneId:";
+            if(defined($readMask{R1})) {
+                $baseMask = $baseMask . "Y*" . $readMask{R1};
+            }
+            if(defined($length->{$laneId}->{I1})) {
+                if($length->{$laneId}->{I1} == $readMask{I1}) {
+                    $baseMask = $baseMask . ",I*";
+                } else {
+                    $baseMask = $baseMask . ",I" . $length->{$laneId}->{I1} . ("n" x ($readMask{I1} - $length->{$laneId}->{I1}));
+                }
+            }
+            if(defined($length->{$laneId}->{I2})) {
+                if($length->{$laneId}->{I2} == $readMask{I2}) {
+                    $baseMask = $baseMask . ",I*";
+                } else {
+                    $baseMask = $baseMask . ",I" . $length->{$laneId}->{I2} . ("n" x ($readMask{I2} - $length->{$laneId}->{I2}));
+                }
+            }
+            if(defined($readMask{R2})) {
+                $baseMask = $baseMask . ",Y*" . $readMask{R2};
+            }
+            push @baseMasks, "$baseMask ";
+        }
+    } else {
+        my @reads = $self->reads();
+        foreach my $read (@reads){
+	    if($read->{index} eq 'Y'){
+	        push @baseMasks, 'I*';
+            }else{
+	        push @baseMasks, 'Y*n';
+            }
+        }
+    }
+    return \@baseMasks;
 }
 
 =head2 qType
