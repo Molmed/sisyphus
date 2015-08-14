@@ -258,7 +258,7 @@ my $archivePath = "$aHost:$aPath";
 my $rBin = "$rPath/$rfName/Sisyphus";
 my $analysisPath = undef;
 if($miseq){
-    my $analysisPath = "$anPath/$rfName";
+    $analysisPath = "$anPath/$rfName";
 }
 
 if($debug){
@@ -692,20 +692,20 @@ processMiSeqAnalysisFolder() {
       echo -n "Checksumming files from \$miseqAnalysisPath"
 
     # List the contents of the MiSeq analysis folder, and calculate MD5 checksums
-    find '\$runfolderName' -type f | $FindBin::Bin/md5sum.pl \$runfolderName > \$runfolderPath/MD5/checksums.miseqrunfolder.md5
+    find \$runfolderName -type f | $FindBin::Bin/md5sum.pl \$runfolderName > \$runfolderPath/MD5/checksums.miseqrunfolder.md5
     check_errs \$? "FAILED"
   
     echo OK
 
     # Tarball the entire MiSeq analysis folder and move it under the runfolder
-    echo -n "Tarballing MiSeq analysis folder '\$miseqAnalysisPath'"
-    $FindBin::Bin/gzipFolder.pl '\$runfolderName' '\$runfolderPath/MD5/checksums.miseqrunfolder.md5'
+    echo -n "Tarballing MiSeq analysis folder \$miseqAnalysisPath"
+    $FindBin::Bin/gzipFolder.pl \$runfolderName \$runfolderPath/MD5/checksums.miseqrunfolder.md5
   
     check_errs \$? "FAILED"
   
     echo OK
   
-    echo -n "Move MiSeq analysis tarball to '\$runfolderPath'"
+    echo -n "Move MiSeq analysis tarball to \$runfolderPath"
     mv "\$runfolderName.tar.gz" "\$runfolderPath/MiSeq_Runfolder.tar.gz"
     check_errs \$? "FAILED"
   
@@ -717,7 +717,7 @@ processMiSeqAnalysisFolder() {
   
     # Else, the folders and arguments need to be verified
     else
-        check_errs 1 "Was expecting a MiSeq analysis runfolder: '\$miseqAnalysisPath', but did not find one"
+        check_errs 1 "Was expecting a MiSeq analysis runfolder: \$miseqAnalysisPath, but did not find one"
   
     fi
 }
