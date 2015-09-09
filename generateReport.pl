@@ -83,6 +83,7 @@ unless(defined $rfPath && -e $rfPath){
 
 # Create a new sisyphus object for common functions
 my $sisyphus = Molmed::Sisyphus::Common->new(PATH=>$rfPath, DEBUG=>$debug);
+$sisyphus->runParameters();
 $rfPath = $sisyphus->PATH;
 my $machineType = $sisyphus->machineType();
 
@@ -103,6 +104,7 @@ my $plotter = Molmed::Sisyphus::Plot->new();
 
 # Read the sample sheet
 my $sampleSheet = $sisyphus->readSampleSheet();
+$sisyphus->runParameters();
 my @projects = sort keys %{$sampleSheet};
 push @projects, 'Undetermined_indices' if(-e "$rfPath/Statistics/Project_Undetermined_indices");
 
@@ -534,16 +536,11 @@ sub sumProject{
 		$tag = 'NoIndex';
 	    }
 
-            $tag = $sisyphus->getIndexUsingSampleNumber($l, $proj, $sample, substr($tag,1), $sampleSheet) if($machineType eq "hiseqx" && $proj ne 'Undetermined_indices');
+            $tag = $sisyphus->getIndexUsingSampleNumber($l, $proj, $sample, substr($tag,1), $sampleSheet) if($proj ne 'Undetermined_indices');
 
 	    my $data;
 	    if($proj eq 'Undetermined_indices'){
-	    	if($machineType eq "hiseqx"){
-            		$data = $rtaStat->{unknown}->{$l}->{$read}->{unknown};
-            	}
-            	else{
-                	$data = $rtaStat->{$sample}->{$l}->{$read}->{Undetermined};
-            	}
+	    	$data = $rtaStat->{Undetermined}->{$l}->{$read}->{unknown};
 	    }else{
 		$data = $rtaStat->{$sample}->{$l}->{$read}->{$tag};
 	    }

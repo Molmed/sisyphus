@@ -258,7 +258,7 @@ my $archivePath = "$aHost:$aPath";
 my $rBin = "$rPath/$rfName/Sisyphus";
 my $analysisPath = undef;
 if($miseq){
-    $analysisPath = "$anPath/$rfName";
+    my $analysisPath = "$anPath/$rfName";
 }
 
 if($debug){
@@ -408,17 +408,16 @@ if(exists $config->{MISMATCH}){
     $mismatches = join ':', @mismatches;
 }
 
-if ($machineType eq "hiseqx") {
-    #$includeTiles =~ s/,/ --tiles /g;
 
-    if (-e "$fastqPath/Unaligned") {
-        print STDERR "\n\nERROR: $fastqPath/Unaligned already exists\n\n";
-        exit 1; 
-    } else {
-        mkdir "$fastqPath/Unaligned";
-    }
-    my $joinedReadMask = join("--use-bases-mask ", @readMask);
-    print $scriptFh <<EOF;
+if (-e "$fastqPath/Unaligned") {
+    print STDERR "\n\nERROR: $fastqPath/Unaligned already exists\n\n";
+    exit 1; 
+} else {
+    mkdir "$fastqPath/Unaligned";
+}
+my $joinedReadMask = join("--use-bases-mask ", @readMask);
+
+print $scriptFh <<EOF;
 
 if [ ! -e "$rfPath/Unaligned" ]; then
    ln -s "$fastqPath/Unaligned" "$rfPath/Unaligned"
@@ -433,15 +432,15 @@ check_errs \$? "bcl2fastq failed in $fastqPath/Unaligned"
 
 EOF
 
-    if(@excTiles > 0){
-        my $excludeTiles = join ',', @excTiles;
-        if (-e "$fastqPath/Excluded") {
-            print STDERR "\n\nERROR: $fastqPath/Excluded already exists\n\n";
-            exit 1; 
-        } else {
-            mkdir "$fastqPath/Excluded" unless -e "$fastqPath/Excluded";
-        }
-        print $scriptFh <<EOF;
+if(@excTiles > 0){
+	my $excludeTiles = join ',', @excTiles;
+	if (-e "$fastqPath/Excluded") {
+	    print STDERR "\n\nERROR: $fastqPath/Excluded already exists\n\n";
+	    exit 1; 
+	} else {
+	    mkdir "$fastqPath/Excluded" unless -e "$fastqPath/Excluded";
+	}
+	print $scriptFh <<EOF;
 echo "Setting up demultiplexing of excluded tiles"
 
 EOF
@@ -456,70 +455,8 @@ if [ ! -e "$rfPath/Excluded" ]; then
 fi
 
 EOF
-        } 
-    } else {
-
-my $joinedReadMask = join(",", @readMask);
-
-        print $scriptFh <<EOF;
-if [ ! -e "$rfPath/Unaligned" ]; then
-   ln -s "$fastqPath/Unaligned" "$rfPath/Unaligned"
-fi
-
-EOF
-
-    print $scriptFh <<EOF;
-configureBclToFastq.pl --input-dir '$rfPath/Data/Intensities/BaseCalls' --output-dir '$fastqPath/Unaligned' --sample-sheet '$rfPath/SampleSheet.csv' --use-bases-mask '$joinedReadMask' --mismatches '$mismatches' ${ignore} --positions-format $posFormat --fastq-cluster-count 0 --tiles $includeTiles &> $rfPath/setupBclToFastq.err
-check_errs \$? "configureBclToFastq.pl failed"
-
-EOF
-
-    if(@excTiles > 0){
-        my $excludeTiles = join ',', @excTiles;
-        print $scriptFh <<EOF;
-echo "Setting up demultiplexing of excluded tiles"
-
-configureBclToFastq.pl --input-dir '$rfPath/Data/Intensities/BaseCalls' --output-dir '$fastqPath/Excluded' --sample-sheet '$rfPath/SampleSheet.csv' --use-bases-mask '$joinedReadMask' --mismatches 1 --positions-format $posFormat --fastq-cluster-count 0 --tiles $excludeTiles &> $rfPath/setupBclToFastqExcluded.err
-check_errs \$? "configureBclToFastq.pl for excluded tiles failed"
-
-check_errs \$? "bclt2fastq failed in $fastqPath/Excluded"
-
-if [ ! -e "$rfPath/Excluded" ]; then
-   ln -s "$fastqPath/Excluded" "$rfPath/Excluded"
-fi
-
-EOF
-    }
-
-    print $scriptFh <<EOF;
-echo "Demultiplexing/Converting to FastQ"
-
-cd '$fastqPath/Unaligned'
-check_errs \$? "Failed to cd to $fastqPath/Unaligned"
-
-make -j$threads &> BclToFastq.log
-check_errs \$? "make failed in $fastqPath/Unaligned"
-
-EOF
-
-    if(@excTiles > 0){
-        print $scriptFh <<EOF;
-
-echo "Demultiplexing/Converting excluded tiles to FastQ"
-
-cd '$fastqPath/Excluded'
-check_errs \$? "Failed to cd to $fastqPath/Excluded"
-
-make -j$threads &> BclToFastq.log
-check_errs \$? "make failed in $fastqPath/Excluded"
-
-if [ ! -e "$rfPath/Excluded" ]; then
-   ln -s "$fastqPath/Excluded" "$rfPath/Excluded"
-fi
-
-EOF
-    }
 }
+    
 # Random string used for rsync dry-run.
 my $rnd = time() . '.' . rand(1);
 
@@ -692,20 +629,20 @@ processMiSeqAnalysisFolder() {
       echo -n "Checksumming files from \$miseqAnalysisPath"
 
     # List the contents of the MiSeq analysis folder, and calculate MD5 checksums
-    find \$runfolderName -type f | $FindBin::Bin/md5sum.pl \$runfolderName > \$runfolderPath/MD5/checksums.miseqrunfolder.md5
+    find '\$runfolderName' -type f | $FindBin::Bin/md5sum.pl \$runfolderName > \$runfolderPath/MD5/checksums.miseqrunfolder.md5
     check_errs \$? "FAILED"
   
     echo OK
 
     # Tarball the entire MiSeq analysis folder and move it under the runfolder
-    echo -n "Tarballing MiSeq analysis folder \$miseqAnalysisPath"
-    $FindBin::Bin/gzipFolder.pl \$runfolderName \$runfolderPath/MD5/checksums.miseqrunfolder.md5
+    echo -n "Tarballing MiSeq analysis folder '\$miseqAnalysisPath'"
+    $FindBin::Bin/gzipFolder.pl '\$runfolderName' '\$runfolderPath/MD5/checksums.miseqrunfolder.md5'
   
     check_errs \$? "FAILED"
   
     echo OK
   
-    echo -n "Move MiSeq analysis tarball to \$runfolderPath"
+    echo -n "Move MiSeq analysis tarball to '\$runfolderPath'"
     mv "\$runfolderName.tar.gz" "\$runfolderPath/MiSeq_Runfolder.tar.gz"
     check_errs \$? "FAILED"
   
@@ -717,7 +654,7 @@ processMiSeqAnalysisFolder() {
   
     # Else, the folders and arguments need to be verified
     else
-        check_errs 1 "Was expecting a MiSeq analysis runfolder: \$miseqAnalysisPath, but did not find one"
+        check_errs 1 "Was expecting a MiSeq analysis runfolder: '\$miseqAnalysisPath', but did not find one"
   
     fi
 }

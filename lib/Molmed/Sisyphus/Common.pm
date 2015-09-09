@@ -1341,6 +1341,7 @@ sub clonePath{
 sub getLengthOfProvidedIndexes {
    my $self = shift;
    my $sampleSheet = $self->readSampleSheet();
+
    my $indexLength;
    foreach my $proj (keys %{$sampleSheet}){
        foreach my $lid (keys %{$sampleSheet->{$proj}}){
@@ -1354,7 +1355,7 @@ sub getLengthOfProvidedIndexes {
 	       } elsif(defined($indexLength->{$lid}->{I1})) {
                    confess "Cannot mix single and dual index lane $lid!\n";
                }
-	       if(defined($sampleSheet->{proj}->{$lid}->{$tag}->{Index2}) && length($sampleSheet->{proj}->{$lid}->{$tag}->{Index2}) > 0) {
+	       if(defined($sampleSheet->{$proj}->{$lid}->{$tag}->{Index2}) && length($sampleSheet->{$proj}->{$lid}->{$tag}->{Index2}) > 0) {
                     if(!defined($indexLength->{$lid}->{I2})) {
                        $indexLength->{$lid}->{I2} = length($sampleSheet->{$proj}->{$lid}->{$tag}->{Index2})
                    } elsif($indexLength->{$lid}->{I2} != length($sampleSheet->{$proj}->{$lid}->{$tag}->{Index2})) {
@@ -1399,80 +1400,60 @@ sub readSampleSheet{
     }else{
 	open($sheet, '<', $sheetPath) or die "Failed to open $sheetPath: $!\n";
     }
-    if($self->machineType eq 'hiseqx') {
-        while(<$sheet>){
-            if(m/^\[Data\]/) {
-                my $row = <$sheet>;
-                chomp($row);
-                $row=~ s/[\012\015]*$//;
-                my @columns = split(/,/,$row);
-                my $length = @columns;
-                my $columnMap;
-                for( my $i = 0; $i < $length; $i++) {
-                    $columnMap->{$columns[$i]} = $i;
+    while(<$sheet>){
+        if(m/^\[Data\]/) {
+            my $row = <$sheet>;
+            chomp($row);
+            $row=~ s/[\012\015]*$//;
+            my @columns = split(/,/,$row);
+            my $length = @columns;
+            my $columnMap;
+            for( my $i = 0; $i < $length; $i++) {
+                $columnMap->{$columns[$i]} = $i;
+            }
+            my $sampleCounter = 0;
+            my $sampleCounterHash;
+            while(<$sheet>){
+                if(/^#/){
+                    next;
                 }
-                my $sampleCounter = 0;
-                my $sampleCounterHash;
-                while(<$sheet>){
-                    if(/^#/){
-                        next;
+                my $dataRow = $_;
+                chomp($dataRow);
+                $dataRow=~ s/[\012\015]*$//;
+                my @r = split /,/, $dataRow;
+                $r[$columnMap->{'index'}] = 'unknown' if($r[$columnMap->{'index'}] !~ m/^[ACGT-]+$/); # Use 'unknown' for unspecified index tags
+                unless($r[6] =~ m/^y/i){ # Skip the controls
+                      
+                    if(!defined($sampleCounterHash->{$r[$columnMap->{'Sample_Name'}]})){
+                        $sampleCounter++;
+                        $sampleCounterHash->{$r[$columnMap->{'Sample_Name'}]} = $sampleCounter;
                     }
-                    my $dataRow = $_;
-                    chomp($dataRow);
-                    $dataRow=~ s/[\012\015]*$//;
-                    my @r = split /,/, $dataRow;
-                    $r[$columnMap->{'index'}] = 'unknown' if($r[$columnMap->{'index'}] !~ m/^[ACGT-]+$/); # Use 'unknown' for unspecified index tags
-                    unless($r[6] =~ m/^y/i){ # Skip the controls
-                        
-			if(!defined($sampleCounterHash->{$r[$columnMap->{'Sample_Name'}]})){
-                                $sampleCounter++;
-                                $sampleCounterHash->{$r[$columnMap->{'Sample_Name'}]} = $sampleCounter;
-                        }
 
-			#Save information in hash
-                        $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'index'}]} =
-                            {'SampleID'=>$r[$columnMap->{'Sample_ID'}],
-                             'SampleName'=>$r[$columnMap->{'Sample_Name'}],
-                             'Index'=>$r[$columnMap->{'index'}],
-                             'Index2'=>defined($columnMap->{'index2'}) ? $r[$columnMap->{'index2'}] : "",
-                             'Description'=>$r[$columnMap->{'Description'}],
-                             'SampleWell'=>$r[$columnMap->{'Sample_Well'}],
-                             'SampleNumber'=>$sampleCounterHash->{$r[$columnMap->{'Sample_Name'}]},
-                             'SamplePlate'=>$r[$columnMap->{'Sample_Plate'}],
-                             'Lane'=>$r[$columnMap->{'Lane'}],
-                             'SampleProject'=>$r[$columnMap->{'Sample_Project'}],
-                             'Row'=>$dataRow};
-                        # Extract some extras from the description
-                        # The format used is KEY1:value1;KEY2:value2...
-                        while($r[$columnMap->{'Description'}] =~ m/([^:]*):([^;]*)[;\s]*/g){
-                           $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'index'}]}->{$1} = $2;
-                       }
+		    #Save information in hash
+                    my $index = $r[$columnMap->{'index'}];
+                    if(defined($columnMap->{'index2'}) && defined($r[$columnMap->{'index2'}])) {
+                        $r[$columnMap->{'index'}] .= "+" . $r[$columnMap->{'index2'}];
+		    }
+                    $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'index'}]} =
+                        {'SampleID'=>$r[$columnMap->{'Sample_ID'}],
+                         'SampleName'=>$r[$columnMap->{'Sample_Name'}],
+                         'Index'=>$r[$columnMap->{'index'}],
+                         'Index2'=>defined($columnMap->{'index2'}) ? $r[$columnMap->{'index2'}] : "",
+                         'Description'=>$r[$columnMap->{'Description'}],
+                         'SampleWell'=>$r[$columnMap->{'Sample_Well'}],
+                         'SampleNumber'=>$sampleCounterHash->{$r[$columnMap->{'Sample_Name'}]},
+                         'SamplePlate'=>$r[$columnMap->{'Sample_Plate'}],
+                         'Lane'=>$r[$columnMap->{'Lane'}],
+                         'SampleProject'=>$r[$columnMap->{'Sample_Project'}],
+                         'Row'=>$dataRow};
+                    # Extract some extras from the description
+                    # The format used is KEY1:value1;KEY2:value2...
+                    while($r[$columnMap->{'Description'}] =~ m/([^:]*):([^;]*)[;\s]*/g){
+                       $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'index'}]}->{$1} = $2;
                    }
                }
            }
        }
-    } else {
-        while(<$sheet>){
-           if(m/^$fcId,/i){
-               next if(m/^#/); # Skip comments
-               my $row = $_;
-               chomp($row);
-               $row=~ s/[\012\015]*$//; # Strip CR & LF
-               my @r = split /,/, $row;
-               $r[4] = 'Undetermined' unless($r[4] =~ m/\S/); # Use 'Undetermined' for unspecified index tags
-               unless($r[6] =~ m/^y/i){ # Skip the controls
-                    # Use project + lane + index tag   as keys
-                    $sampleSheet{$r[9]}->{$r[1]}->{$r[4]} = {'SampleID'=>$r[2],'SampleRef'=>$r[3],'Index'=>$r[4],
-                                                             'Description'=>$r[5],'Control'=>$r[6], 'Lane'=>$r[1],
-                                                             'SampleProject'=>$r[9], 'Row'=>$row};
-                    # Extract some extras from the description
-                    # The format used is KEY1:value1;KEY2:value2...
-                    while($r[5] =~ m/([^:]*):([^;]*)[;\s]*/g){
-                        $sampleSheet{$r[9]}->{$r[1]}->{$r[4]}->{$1} = $2;
-                   }
-                }
-            }
-        }
     }
     return(\%sampleSheet);
 }
@@ -1712,6 +1693,8 @@ sub readConfig{
 
 =pod
 
+=pod
+
 =head2 runParameters()
 
  Title   : runParameters
@@ -1930,6 +1913,7 @@ sub createReadMask{
     my @reads = $self->reads();
     my $indexCounter = 0;
     my $readCounter = 0;
+
     foreach my $read (@reads){
         if($read->{index} eq 'Y'){
             if($indexCounter == 0) {
@@ -1954,40 +1938,30 @@ sub createReadMask{
 
     my $length = $self->getLengthOfProvidedIndexes();
     my @baseMasks;
-    if($self->machineType eq 'hiseqx') {
-        foreach my $laneId (keys %{$length}) {
-            my $baseMask = "$laneId:";
-            if(defined($readMask{R1})) {
-                $baseMask = $baseMask . "Y*" . $readMask{R1};
-            }
-            if(defined($length->{$laneId}->{I1})) {
-                if($length->{$laneId}->{I1} == $readMask{I1}) {
-                    $baseMask = $baseMask . ",I*";
-                } else {
-                    $baseMask = $baseMask . ",I" . $length->{$laneId}->{I1} . ("n" x ($readMask{I1} - $length->{$laneId}->{I1}));
-                }
-            }
-            if(defined($length->{$laneId}->{I2})) {
-                if($length->{$laneId}->{I2} == $readMask{I2}) {
-                    $baseMask = $baseMask . ",I*";
-                } else {
-                    $baseMask = $baseMask . ",I" . $length->{$laneId}->{I2} . ("n" x ($readMask{I2} - $length->{$laneId}->{I2}));
-                }
-            }
-            if(defined($readMask{R2})) {
-                $baseMask = $baseMask . ",Y*" . $readMask{R2};
-            }
-            push @baseMasks, "$baseMask ";
+
+    foreach my $laneId (keys %{$length}) {
+        my $baseMask = "$laneId:";
+        if(defined($readMask{R1})) {
+            $baseMask = $baseMask . "Y*" . $readMask{R1};
         }
-    } else {
-        my @reads = $self->reads();
-        foreach my $read (@reads){
-	    if($read->{index} eq 'Y'){
-	        push @baseMasks, 'I*';
-            }else{
-	        push @baseMasks, 'Y*n';
+        if(defined($length->{$laneId}->{I1})) {
+            if($length->{$laneId}->{I1} == $readMask{I1}) {
+                $baseMask = $baseMask . ",I*";
+            } else {
+                $baseMask = $baseMask . ",I" . $length->{$laneId}->{I1} . ("n" x ($readMask{I1} - $length->{$laneId}->{I1}));
             }
         }
+        if(defined($length->{$laneId}->{I2})) {
+            if($length->{$laneId}->{I2} == $readMask{I2}) {
+                $baseMask = $baseMask . ",I*";
+            } else {
+                $baseMask = $baseMask . ",I" . $length->{$laneId}->{I2} . ("n" x ($readMask{I2} - $length->{$laneId}->{I2}));
+            }
+        }
+        if(defined($readMask{R2})) {
+            $baseMask = $baseMask . ",Y*" . $readMask{R2};
+        }
+        push @baseMasks, "$baseMask ";
     }
     return \@baseMasks;
 }
@@ -2234,11 +2208,7 @@ sub resultStats{
     }
 
     my $sampleData;
-    if($self->machineType eq 'hiseqx') {
-	$sampleData = $self->readDemultiplexStatsHiSeqX($self->{PATH} . '/Unaligned/Stats/DemultiplexingStats.xml', $self->{PATH} . '/Unaligned/Stats/ConversionStats.xml', \%nCycles, \%laneData);
-    } else {
-	$sampleData = $self->readDemultiplexStats($self->{PATH} . '/Unaligned/Basecall_Stats_' . $fc .'/Flowcell_demux_summary.xml', \%nCycles, \%laneData);
-    }
+    $sampleData = $self->readDemultiplexStatsHiSeqX($self->{PATH} . '/Unaligned/Stats/DemultiplexingStats.xml', $self->{PATH} . '/Unaligned/Stats/ConversionStats.xml', \%nCycles, \%laneData);
 
     $self->{RESULTSTATS}->{LANEDATA} = \%laneData;
     $self->{RESULTSTATS}->{SAMPLEDATA} = $sampleData;
@@ -2449,10 +2419,10 @@ sub readDemultiplexStatsHiSeqX{
                         my $tag = $barcode->{name};
                         $tag = '' if($tag eq 'NoIndex');
                         if(!($tag eq 'all')) {
-                            foreach my $lane (@{$barcode->{Lane}}){
+                            foreach my $lane (@{$barcode->{Lane}}){	
                                 my $lid = $lane->{number};
                                 foreach my $rId (keys %{$sampleData{$sampleName}->{$lid}}) {
-                                    $sampleData{$sampleName}->{$lid}->{$rId}->{$tag}->{mismatchCnt1} += $lane->{OneMismatchBarcodeCount};
+                                    $sampleData{$sampleName}->{$lid}->{$rId}->{$tag}->{mismatchCnt1} += defined($lane->{OneMismatchBarcodeCount}) ? $lane->{OneMismatchBarcodeCount} : 0;
                                 }
                             }
                         }
@@ -2928,128 +2898,61 @@ sub fixSampleSheet{
     open(my $ssfh, $sampleSheet);
     my $test = <$ssfh>;
     seek($ssfh,0,0); # Rewind filehandle again
+  
+    my $dataFound = 0;
+    open ADAPTORS, "> $rfPath/Adaptors.txt" or die "Couldn't open output file: $rfPath/Adaptors.txt\n";
 
-    if($test =~ m/^FCID/){
-	# Sample sheet already in hiseq format
-	$type = 'hiseq';
-    }
-
-    if($type eq 'hiseq'){
-	while(<$ssfh>){
-	    chomp;
-	    s/\xA0//g; # Clean up some Windows/Excel copy paste remnant
-	    $l++;
-	    # Clean up empty rows and carrige return
-	    next unless(m/\w/);
-	    s/[\s\r\n]//g; # Remove any whitespaces (incl newline)
-	    $_ .= "\n"; # Add proper newline
-	    if(m/^FCID/ && $l==1){ # Skip header
-		$output .= $_;
-	    }elsif(m/^#/){ # Skip comments
-		$output .= $_; # or should we rather delete them?
-	    }else{
-		my @r = split /,/, $_;
-		# remove unallowed characters from sample name
-		$r[2] =~ s/[\?\(\)\[\]\/\\\=\+\<\>\:\;\"\'\,\*\^\|\&\.]/_/g;
-		if($r[0] !~ m/^$fcId$/){
-		    print STDERR "Flowcell mismatch at line $l (expected '$fcId', got '$r[0]')\n";
-		    $ok=0;
-		}
-		$output .= join ',', @r;
-		$lanes{$r[1]}->{$r[4]}++;
-	    }
-	}
-	close($ssfh);
-    }elsif($type eq 'hiseqx'){
-        my $dataFound = 0;
-        open ADAPTORS, "> $rfPath/Adaptors.txt" or die "Couldn't open output file: $rfPath/Adaptors.txt\n";
-        while(<$ssfh>){
+    my $columnMap;
+    while(<$ssfh>){
+        chomp;
+        s/\xA0//g; # Clean up some Windows/Excel copy paste remnant
+        $l++;
+        # Clean up empty rows and carrige return
+        next unless(m/\w/);
+        s/[\s\r\n]//g; # Remove any whitespaces (incl newline)
+        $_ .= "\n"; # Add proper newline
+        if(m/^\[Data\]/){ # Skip header
+            $dataFound = 1;
+            $output .= $_;
+	    $_ = <$ssfh>;
+            $output .= $_;
             chomp;
-            s/\xA0//g; # Clean up some Windows/Excel copy paste remnant
-            $l++;
-            # Clean up empty rows and carrige return
-            next unless(m/\w/);
-            s/[\s\r\n]//g; # Remove any whitespaces (incl newline)
-            $_ .= "\n"; # Add proper newline
-            if(m/^\[Data\]/){ # Skip header
-                $dataFound = 1;
-                $output .= $_;
-            }elsif($dataFound != 1){ # Skip comments
-                if(/^Adapter/) {
-                    my @r = split /,/, $_;
-                    if($r[1] =~ /^[ACGT]+$/) {
-                        print ADAPTORS $r[0] . "," . $r[1] ."\n";
-                        $r[1] = "";
-                        $output .= join ',', @r;
-                    } else {
-                        $output .= $_;
-                    }
-                } else {
-                    $output .= $_; # or should we rather delete them?
-                }
-            }else{
+            my @columns = split(/,/,$_);
+            my $length = @columns;
+            for( my $i = 0; $i < $length; $i++) {
+                $columnMap->{$columns[$i]} = $i;
+            }
+
+        }elsif($dataFound != 1){ # Skip comments
+            if(/^Adapter/) {
                 my @r = split /,/, $_;
-                # remove unallowed characters from sample name
-                $r[1] =~ s/[\?\(\)\[\]\/\\\=\+\<\>\:\;\"\'\,\*\^\|\&\._]/-/g if(!($r[0] eq "Lane"));
-                $r[2] =~ s/[\?\(\)\[\]\/\\\=\+\<\>\:\;\"\'\,\*\^\|\&\._]/-/g if(!($r[0] eq "Lane"));
-		$r[1] = "Sample_" . $r[1] if($r[1] eq $r[2]);
-		$r[1] =~ s/Sample-/Sample_/;
-                $output .= join ',', @r;
-                $lanes{$r[0]}->{$r[6]}++;
+                if($r[1] =~ /^[ACGT]+$/) {
+                    print ADAPTORS $r[0] . "," . $r[1] ."\n";
+                    $r[1] = "";
+                    $output .= join ',', @r;
+                } else {
+                    $output .= $_;
+                }
+            } else {
+                $output .= $_; # or should we rather delete them?
+            }
+        }else{
+            my @r = split /,/, $_;
+            # remove unallowed characters from sample name
+            $r[1] =~ s/[\?\(\)\[\]\/\\\=\+\<\>\:\;\"\'\,\*\^\|\&\._]/-/g if(!($r[0] eq "Lane"));
+            $r[2] =~ s/[\?\(\)\[\]\/\\\=\+\<\>\:\;\"\'\,\*\^\|\&\._]/-/g if(!($r[0] eq "Lane"));
+            $r[$columnMap->{Sample_ID}] = "Sample_" . $r[$columnMap->{Sample_ID}] if($r[$columnMap->{Sample_ID}] eq $r[$columnMap->{Sample_Name}]);
+            $r[1] =~ s/Sample-/Sample_/;
+            $output .= join ',', @r;
+	    if(defined($columnMap->{index2}) && defined($r[$columnMap->{index2}])) {
+		$lanes{$r[$columnMap->{Lane}]}->{$r[$columnMap->{index}].'-'.$r[$columnMap->{index2}]}++;
+	    } else {
+                $lanes{$r[$columnMap->{Lane}]}->{$r[$columnMap->{index}]}++;
             }
         }
-        close(ADAPTORS);
-        close($ssfh);
-    }elsif($type eq 'miseq'){
-	my $dataStart=0;
-	my $projName='MiSeq';
-	my @header;
-	while(<$ssfh>){
-	    chomp;
-	    if(m/^Project Name,([^,]*),?/){
-		$projName=$1;
-	    }
-	    if(m/^\[Data\]/){
-		$dataStart = 1;
-		my $r = <$ssfh>;
-		chomp($r);
-		@header = split /,/, $r, -1;
-		# expected MiSeq header
-		#Sample_ID,Sample_Name,Sample_Plate,Sample_Well,Sample_Project,index,I7_Index_ID,Description,GenomeFolder
-
-
-
-                #Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description,Manifest,GenomeFolder
-		# Check that the columns we want to use are the ones we expect
-
-		foreach my $head (qw(Sample_ID Sample_Project index Description)){
-		    unless(grep /^$head$/, @header){
-			croak "Missing column header '$head' in SampleSheet\n";
-		    }
-		}
-		# Add the Casava compatible header to output
-		$output = "FCID,Lane,SampleID,SampleRef,Index,Description,Control,Recipe,Operator,SampleProject\n";
-		next;
-	    }
-	    next unless($dataStart);
-	    my %vals;
-	    @vals{@header} = split /,/, $_, -1;
-	    $vals{Sample_Project} = $projName unless(defined $vals{Sample_Project} && length($vals{Sample_Project})>0);
-	    # remove unallowed characters from sample name
-	    $vals{Sample_ID} =~ s/[\?\(\)\[\]\/\\\=\+\<\>\:\;\"\'\,\*\^\|\&\.]/_/g;
-
-	    if(exists $vals{index2} && defined $vals{index2}){
-		$output .= join(',', ($fcId,1,$vals{Sample_ID},'',"$vals{index}-$vals{index2}",$vals{Description},'','','',$vals{Sample_Project})) . "\n";
-		$lanes{1}->{"$vals{index}-$vals{index2}"}++;
-	    }else{
-		$output .= join(',', ($fcId,1,$vals{Sample_ID},'',$vals{index},$vals{Description},'','','',$vals{Sample_Project})) . "\n";
-		$lanes{1}->{$vals{index}}++;
-	    }
-	}
-    }else{
-	croak "Unknown instrument type";
     }
-
+    close(ADAPTORS);
+    close($ssfh);
     foreach my $lane (keys %lanes){
 	foreach my $tag (keys %{$lanes{$lane}}){
 	    if($lanes{$lane}->{$tag} > 1){
@@ -3141,14 +3044,34 @@ sub laneCount{
 
 sub machineType{
     my $self = shift;
-    my $type = "hiseq"; # Default to hiseq
-    my $runParams = $self->runParameters();
-    if($runParams->{Setup}->{ApplicationName} =~ m/miseq/i){
-	$type = "miseq";
-    } elsif($runParams->{Setup}->{ApplicationName} =~ m/HiSeq X/i) {
-        $type = "hiseqx";
+    my $config = $self->readConfig;
+    return $config->{MACHINES}->{$self->getMachineID()}->{TYPE};
+}
+
+=pod
+
+=head2 getMachineID()
+
+ Title   : getMachineID()
+ Usage   : $sis->getMachineID()
+ Function: return machine id for the used sequencer
+ Example :
+ Returns : String
+ Args    : none
+
+=cut
+
+sub getMachineID {
+    my $self = shift;
+    if(!defined $self->{RUNPARAMS}){
+        confess "RunParameters haven't been loaded\n";
+    } elsif(defined($self->{RUNPARAMS}->{ScannerID})){
+        return $self->{RUNPARAMS}->{ScannerID};
+    } elsif(defined($self->{RUNPARAMS}->{Setup}->{ScannerID})) {
+        return $self->{RUNPARAMS}->{Setup}->{ScannerID};
+    } else {
+        confess "Couldn't find ScannerId tag\n";
     }
-    return $type;
 }
 
 =pod

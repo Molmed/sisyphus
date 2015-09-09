@@ -25,6 +25,30 @@ MISMATCH:
         7: 1
         8: 1
 
+MACHINES:
+        D00457:
+              TYPE: hiseq
+        D00118:
+              TYPE: hiseq
+        D00458:
+              TYPE: hiseq
+        M00485:
+              TYPE: miseq
+        SN7001335:
+              TYPE: hiseq
+        SN866:
+              TYPE: hiseq
+        ST-E00215:
+              TYPE: hiseqx
+        ST-E00216:
+              TYPE: hiseqx
+        ST-E00274:
+              TYPE: hiseqx
+        ST-E00279:
+              TYPE: hiseqx
+        ST-E00280:
+              TYPE: hiseqx
+
 # The host on which to upload runfolder and execute sbatch jobs
 REMOTE_HOST: milou-b.uppmax.uu.se
 

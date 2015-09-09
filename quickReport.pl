@@ -133,13 +133,12 @@ foreach my $proj (keys %{$sampleSheet}){
             my $info = $sampleSheet->{$proj}->{$lid}->{$tag};
 	    my $laneId = ("0" x (3 - length($lid))) . $lid;
 	    my $fastQFilesFound = 0;
-            my $indexOrSampleCounter = $machineType eq 'hiseqx' ? $info->{SampleNumber} : $info->{Index};
+            my $indexOrSampleCounter = $info->{SampleNumber};
             foreach my $read (keys %{$files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}}){
                 foreach my $pctLane (keys %{$files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}}){
 			my $stat = Molmed::Sisyphus::QStat->new(OFFSET=>$OFFSET, DEBUG=>$debug);
-                        $samples->{$machineType eq 'hiseqx' ? $info->{SampleID} : $info->{SampleID}}->{$lid}->{$info->{Index}} = 1;
 			my $filehandle;
-
+			$samples->{$info->{SampleName}}->{$lid}->{$info->{Index}} = 1;
                         if($files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane} =~ /fastq.gz$/) {
                             open($filehandle, "zcat $files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane} |") or die "Failed to open $files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane}: $!";
 			} elsif($files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane} =~ /fastq$/) {
@@ -186,7 +185,7 @@ my $reads;
 foreach my $sample (keys %{$RtaSampleStats}){
     foreach my $lane (keys %{$RtaSampleStats->{$sample}}){
 	foreach my $barcode (keys %{$RtaSampleStats->{$sample}->{$lane}->{1}}){
-	    if($barcode eq 'Undetermined' || ($barcode eq 'unknown' && $sample eq 'unknown')){
+	    if($barcode eq 'Undetermined' || ($barcode eq 'unknown' && $sample eq 'Undetermined')){
 		$laneUnknown{$lane} = sprintf('%.1f', $RtaSampleStats->{$sample}->{$lane}->{1}->{$barcode}->{PctLane});
 	    }else{
                 if(defined($samples->{$sample}->{$lane}->{$barcode})) {
