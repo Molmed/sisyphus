@@ -149,16 +149,16 @@ sub validateSequenceRun {
 			my $qcRequirementsFound = 0;
 			foreach (@{$self->{QC_REQUIREMENT}->{'platforms'}->{'platform'}}) {
 				#Check runParameters that will be used to select QC criterias
-				if($_->{'controlSoftware'} eq $sisyphus->getApplicationName() && 
+				if($_->{'machineType'} eq $sisyphus->machineType() && 
 				   $_->{'version'} eq $sisyphus->getReagentKitVersion()) {
 					#For HiSeq the runMode should be checked
-					if(($_->{'controlSoftware'} =~ /^MiSeq|^HiSeq X/ ) || ($_->{'controlSoftware'} =~ /^HiSeq/ && 
+					if(($_->{'machineType'} =~ /^miseq$|^hiseqx$/ ) || ($_->{'machineType'} =~ /^hiseq$/ && 
 					    $_->{'mode'} eq  $sisyphus->getRunMode())) {
 						$qcRequirementsFound = 1;
 						if($self->{VERBOSE}) {
-							print STDOUT "Info: " . $_->{'controlSoftware'} . "\t" . 
+							print STDOUT "Info: " . $_->{'machineType'} . "\t" . 
 							       $_->{'version'} . 
-							       ($_->{'controlSoftware'} =~ /^HiSeq/ ? "\t".$sisyphus->getRunMode() : "") . "\n" ;
+							       ($_->{'machineType'} =~ /^hiseq/ ? "\t".$sisyphus->getRunMode() : "") . "\n" ;
 						}
 						#Validate the data with the selected QC criteria
 						my ($result,$warnings) = $self->validateResult($sisyphus,\@row,$qcResultHeaderMap,$self->{QC_REQUIREMENT},$_); 

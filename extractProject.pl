@@ -111,10 +111,11 @@ if(@skipLanes){
 
 # Create a new sisyphus object for common functions
 my $sisyphus = Molmed::Sisyphus::Common->new(PATH=>$rfPath, DEBUG=>$debug);
+$sisyphus->runParameters();
 $rfPath = $sisyphus->PATH;
 my $statDir = "$rfPath/Statistics/Project_${project}";
 my $machineType = $sisyphus->machineType();
-my $seqDir = $machineType eq "hiseqx" ? "$rfPath/Unaligned/${project}" : "$rfPath/Unaligned/Project_${project}";
+my $seqDir = "$rfPath/Unaligned/${project}";
 
 unless(defined $outDir){
     $outDir = "$rfPath/Projects/$project";
@@ -285,16 +286,12 @@ foreach my $sampleDir (readdir($sDirFh)){
             my $lane = $3;
             my $read = $4;
            $index =~ s/^S//;
-           if($machineType eq "hiseqx") {
-               push @samples, {SAMPLE=>$sample,
-                                TAG=>$sisyphus->getIndexUsingSampleNumber($lane, $project, $sample, $index, $sampleSheet),
-                                LANE=>$lane,
-                                READ=>$read,
-                                PATH=>"$statDir/$sampleDir/$statfile",
-                                SAMPLE_NUMBER=> $index };
-           } else {
-               push @samples, {SAMPLE=>$sample, TAG=>$index, LANE=>$lane, READ=>$read, PATH=>"$statDir/$sampleDir/$statfile"};
-           }
+           push @samples, {SAMPLE=>$sample,
+                           TAG=>$sisyphus->getIndexUsingSampleNumber($lane, $project, $sample, $index, $sampleSheet),
+                           LANE=>$lane,
+                           READ=>$read,
+                           PATH=>"$statDir/$sampleDir/$statfile",
+                           SAMPLE_NUMBER=> $index };
         }
     }
     closedir($saDirFh);
@@ -319,7 +316,7 @@ foreach my $sampleFile (sort sortSamples @samples){
     delete($metrics{Lane});
     my $lane = $sample->{LANE};
     my $smpl = $sample->{SAMPLE};
-    my $tag = $machineType eq "hiseqx" ? $sampleFile->{TAG} : $sample->{TAG};
+    my $tag = $sampleFile->{TAG};
     my $read = $sample->{READ};
 
     # Add the RTA/CASAVA metrics
@@ -344,8 +341,8 @@ foreach my $sampleFile (sort sortSamples @samples){
       $sampleSheet->{$project}->{$lane}->{$barcode}->{LIBRARY_NAME} : '';
 
     my $plotTitle = $sample->SAMPLE . '\n' . $sisyphus->RUNFOLDER . ', Lane ' . $sample->LANE . ', Read ' . $sample->READ . ", Tag $tag";
-    $plotTitle .= ", Sample Number S" . $sampleFile->{SAMPLE_NUMBER} if($machineType eq "hiseqx");
-    my $tagOrSampleNumber = $machineType eq "hiseqx" ? "S".$sampleFile->{SAMPLE_NUMBER} : $sample->{TAG};
+    $plotTitle .= ", Sample Number S" . $sampleFile->{SAMPLE_NUMBER};
+    my $tagOrSampleNumber = "S".$sampleFile->{SAMPLE_NUMBER};
 
     my @qplot = $plotter->plotQval($sample,"$plotDir/$smpl/$tagOrSampleNumber-L00$lane-R$read-Qscores", "Q-score distribution $plotTitle");
     ($metrics{QscorePlot} = $qplot[0]) =~ s:^$plotDir/:Plots/:;
@@ -375,7 +372,7 @@ foreach my $sampleFile (sort sortSamples @samples){
     ($metrics{QValuePerBase} = $qpbplot[0]) =~ s:^$plotDir/:Plots/:;
     ($metrics{QValuePerBaseThumb} = $qpbplot[1]) =~ s:^$plotDir/:Plots/:;
 
-    $metrics{SampleNumber} = "S" . $sampleFile->{SAMPLE_NUMBER} if($machineType eq "hiseqx");
+    $metrics{SampleNumber} = "S" . $sampleFile->{SAMPLE_NUMBER};
 
     push @{$sampleXmlDataAll->{Sample}->{$smpl}->{Tag}->{$tag}->{Lane}->{$lane}->{Read}}, \%metrics;
 
@@ -398,11 +395,7 @@ $metaData{RtaVersion} = $sisyphus->getRTAversion();
 $metaData{FlowCellVer} = $sisyphus->getFlowCellVersion();
 $metaData{FlowCellId} = $sisyphus->fcId();
 $metaData{SBSversion} = $sisyphus->getSBSversion();
-if($machineType eq "hiseqx") {
-   $metaData{Bcl2fastqVersion} = $sisyphus->getBcl2FastqVersion();
-}else {
-   $metaData{CasavaVersion} = $sisyphus->getCasavaVersion();
-}
+$metaData{Bcl2fastqVersion} = $sisyphus->getBcl2FastqVersion();
 $metaData{ClusterKitVersion} = $sisyphus->getClusterKitVersion();
 
 $metaData{Qoffset} = $offset;

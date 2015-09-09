@@ -105,7 +105,7 @@ if(@{$lane}<1){
 }
 
 my $sisyphus = Molmed::Sisyphus::Common->new(PATH=>$rfPath, DEBUG=>$debug);
-
+$sisyphus->runParameters();
 $rfPath = $sisyphus->PATH;
 my $machineType = $sisyphus->machineType();
 
@@ -145,11 +145,7 @@ srand($rseed);
 print STDERR "Using random seed $rseed based on fcId $fcid\n";
 
 my %files;
-if($machineType eq "hiseqx") {
-    find({wanted => sub{findFastqHiSeqX(\%files, $lane)}, no_chdir => 1}, $inDir);
-} else {
-    find({wanted => sub{findFastq(\%files, $lane)}, no_chdir => 1}, $inDir);
-}
+find({wanted => sub{findFastq(\%files, $lane)}, no_chdir => 1}, $inDir);
 
 my %checkSums;
 foreach my $project(keys %files){
@@ -269,24 +265,6 @@ foreach my $l (@{$lane}){
 print STDERR "Filtering complete\n";
 
 sub findFastq{
-    my $files = shift;
-    my $lanes = shift;
-    my $file = $_;
-    if($file =~ m/\.fastq(\.gz)?$/){
-	foreach my $l (@{$lanes}){
-	    if($file =~ m/_L00${l}_/){
-		my @path = split '/', $file;
-		my $project = $path[-3];
-		$project =~ s/^Project_//;
-		my $sample = $path[-2];
-		$sample =~ s/^Sample_//;
-		push @{$files{$project}->{$sample}}, $_;
-	    }
-	}
-    }
-}
-
-sub findFastqHiSeqX{
     my $files = shift;
     my $lanes = shift;
     my $file = $_;

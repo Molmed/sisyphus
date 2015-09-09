@@ -96,6 +96,7 @@ if($debug){
 }
 
 my $sisyphus = Molmed::Sisyphus::Common->new(PATH=>$rfPath, DEBUG=>$debug);
+$sisyphus->runParameters();
 $rfPath = $sisyphus->PATH;
 my $rfName = basename($rfPath);
 my $rfRoot = dirname($rfPath);

@@ -1,7 +1,7 @@
 <QCrequirements>
 	<platforms>
 		<platform>
-			<controlSoftware>HiSeq Control Software</controlSoftware>
+			<machineType>hiseq</machineType>
 			<version>HiSeq Flow Cell v3</version>
 			<mode>HighOutput</mode>
 			<unidentified>5.0</unidentified>
@@ -19,7 +19,7 @@
 			</lengths>
 		</platform>
 		<platform>
-			<controlSoftware>HiSeq Control Software</controlSoftware>
+			<machineType>hiseq</machineType>
 			<version>HiSeq Rapid Flow Cell v1</version>
 			<mode>RapidRun</mode>
 			<unidentified>5.0</unidentified>
@@ -37,7 +37,7 @@
 			</lengths>
 		</platform>
 		<platform>
-			<controlSoftware>MiSeq Control Software</controlSoftware>
+			<machineType>miseq</machineType>
 			<version>Version2</version>
 			<unidentified>5.0</unidentified>
 			<numberOfCluster>10</numberOfCluster>
@@ -58,7 +58,7 @@
 			</lengths>
 		</platform>
 		<platform>
-			<controlSoftware>MiSeq Control Software</controlSoftware>
+			<machineType>miseq</machineType>
 			<version>Version3</version>
 			<unidentified>5.0</unidentified>
 			<numberOfCluster>18</numberOfCluster>
