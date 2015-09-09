@@ -1,0 +1,128 @@
+# Example YAML-file for sisyphus configuration
+
+
+# Address for quick report
+MAIL: medsci-molmed-bioinfo@googlegroups.com
+
+# Sender address for quick report
+SENDER: seq@medsci.uu.se
+
+# CASAVA binaries
+CASAVA: /opt/CASAVA/1.8.4/bin/
+
+#Path to bcl2fastq binaries
+BCL2FASTQ: /usr/local/bin/bcl2fastq-v2.16.0.10
+
+# Demultiplex mismatches, set to 1 or 0 for each lane individually
+# Default is to allow one mismatch in all lanes
+MISMATCH:
+        1: 1
+        2: 1
+        3: 1
+        4: 1
+        5: 1
+        6: 1
+        7: 1
+        8: 1
+
+MACHINES:
+        D00457:
+              TYPE: hiseq
+        D00118:
+              TYPE: hiseq
+        D00458:
+              TYPE: hiseq
+        M00485:
+              TYPE: miseq
+        SN7001335:
+              TYPE: hiseq
+        SN866:
+              TYPE: hiseq
+        ST-E00215:
+              TYPE: hiseqx
+        ST-E00216:
+              TYPE: hiseqx
+        ST-E00274:
+              TYPE: hiseqx
+        ST-E00279:
+              TYPE: hiseqx
+        ST-E00280:
+              TYPE: hiseqx
+
+# The host on which to upload runfolder and execute sbatch jobs
+REMOTE_HOST: milou-b.uppmax.uu.se
+
+# The directory on REMOTE_HOST to put the runfolder in
+REMOTE_PATH: /proj/a2009002/private/nobackup/runfolders
+
+# Array with extra perl library paths
+# This is where non system default libraries which are not
+# included with sisyphus should be installed
+# Currently, the only required extra module on Uppmax Milou is
+# PDL (http://pdl.perl.org/) and its dependencies
+PERL5LIB:
+	- /proj/a2009002/perl/lib/perl5/
+
+# The directory on REMOTE_HOST to put the data for delivery in
+OUTBOX_PATH: DEFAULT
+
+# The host path to where data that should be processed with NGI-pipeline will be delivered.
+NGI_HOST: nestor.uppmax.uu.se
+
+# The port on which the ngi pipeline will respond on the remote host.
+NGI_PORT: 6666
+
+# The host path where NGI-pipeline data should be delivered.
+NGI_REMOTE_PATH: /proj/a2015179/archive/
+
+# The project that should have access to the data.
+NGI_PROJECT: a2015179
+
+# Change to 1 to process with NGI-pipeline
+NGI_PROCESSING: 0 
+
+# The host on which to archive the runfolder
+ARCHIVE_HOST: milou-b.uppmax.uu.se
+
+# The directory on ARCHIVE_HOST to put the runfolder in
+# sisyphus will automatically add YYYY-MM to the path
+# Default to nobackup dir as this will only be used while
+# staging the data for transfer to Swestore
+# This way we can hardlink instead of copy fastq-files
+ARCHIVE_PATH: /proj/a2009002/private/nobackup/archive-tmp
+
+# The iRODS path to SweStore archive
+SWESTORE_PATH: /ssUppnexZone/proj/a2009002
+
+# Root dir of temporary directory to use
+# (eg when verifying the archive copies)
+TEMP_PATH: /proj/a2009002/private/nobackup/tmp
+
+# The host on which to put the summaries
+SUMMARY_HOST: mm-xlas002
+
+# The directory on ARCHIVE_HOST to put the runfolder in
+SUMMARY_PATH: /mnt/Seq-Summaries/2015/
+
+# The path, relative to the runfolder, where MiSeq analysis output is deposited
+ANALYSIS_PATH: ../MiSeqAnalysis/
+
+# The UPPNEX project to use for processing
+UPPNEX_PROJECT: a2009002
+
+# The UPPNEX project qos-flag to use for high priority processing
+UPPNEX_QOS: seqver
+
+# The maximum error in a lane before filtering out bad tiles (%)
+MAX_LANE_ERROR: 2
+
+# The maximum error in a tile in a lane with too high error (%)
+MAX_TILE_ERROR: 2
+
+# Skip delivery of the following lanes
+#SKIP_LANES:
+#        - 1
+#        - 2
+
+
+# END

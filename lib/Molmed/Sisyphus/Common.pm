@@ -2883,9 +2883,6 @@ sub fixSampleSheet{
     print STDERR "Convering '$sampleSheet' to unix format.\n";
     system('dos2unix', $sampleSheet)==0 or croak "Failed to convert sample sheet to unix format.\n";
 
-    # What type of run is this
-    my $type = $self->machineType;
-
     my $output;
 
     # Check that the SampleSheet contains info about the correct flowcell
@@ -2970,10 +2967,7 @@ sub fixSampleSheet{
         }
         my $sampleSheetBak = "$sampleSheet.org.$i";
         # ..but if we have converted a miseq samplesheet, save the original under a stable name that can be used when uploading entire folder
-        if ($type eq 'miseq') {
-            ($sampleSheetBak = $sampleSheet) =~ s/\.csv/.miseq.csv/;
-        }
-	    rename($sampleSheet, $sampleSheetBak) or die "Failed to move $sampleSheet to $sampleSheetBak\n";
+        rename($sampleSheet, $sampleSheetBak) or die "Failed to move $sampleSheet to $sampleSheetBak\n";
         open(my $fhOut, '>', $sampleSheet) or die "Failed to create new samplesheet in $sampleSheet\n";
         print $fhOut $output;
         close($fhOut);
@@ -3045,6 +3039,7 @@ sub laneCount{
 sub machineType{
     my $self = shift;
     my $config = $self->readConfig;
+    die "Machine $self->getMachineID() couldn't be found in config file!" if(!defined($config->{MACHINES}->{$self->getMachineID()}->{TYPE}));
     return $config->{MACHINES}->{$self->getMachineID()}->{TYPE};
 }
 

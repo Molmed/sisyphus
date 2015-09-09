@@ -36,12 +36,16 @@ system("cp $qcFileWarning $testFolder/") == 0
   or die "Failed to copy sisyphus_override_requirement_warning_qc.xml to $testFolder/";
 system("cp $qcFileOrg $testFolder/") == 0
   or die "Failed to copy sisyphus_meet_requirement_qc.xml to $testFolder/";
+my $confFile  = $FindBin::Bin . '/../sisyphus.yml';
+system("cp $confFile $testFolder/") == 0
+  or die "Failed to copy sisyphus.yml to $testFolder/";
 
 
 
 
 #Create objects used for MiSeq QC validation
 my $sis = Molmed::Sisyphus::Common->new(PATH=>$testFolder);
+$sis->runParameters();
 isa_ok($sis, 'Molmed::Sisyphus::Common', "New sisyphus object with runfolder: " . $sis->PATH);
 #Load run parameters
 $sis->runParameters();
