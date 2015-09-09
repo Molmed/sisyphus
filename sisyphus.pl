@@ -654,7 +654,7 @@ processMiSeqAnalysisFolder() {
   
     # Else, the folders and arguments need to be verified
     else
-        check_errs 1 "Was expecting a MiSeq analysis runfolder: '\$miseqAnalysisPath', but did not find one"
+        check_errs 1 "Was expecting a MiSeq analysis runfolder: \$miseqAnalysisPath, but did not find one"
   
     fi
 }
