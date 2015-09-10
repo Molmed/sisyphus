@@ -1434,7 +1434,7 @@ sub readSampleSheet{
                     if(defined($columnMap->{'index2'}) && defined($r[$columnMap->{'index2'}])) {
                         $r[$columnMap->{'index'}] .= "+" . $r[$columnMap->{'index2'}];
 		    }
-                    $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'index'}]} =
+                    $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{defined($columnMap->{'Lane'}) ? $r[$columnMap->{'Lane'}] : 1}->{$r[$columnMap->{'index'}]} =
                         {'SampleID'=>$r[$columnMap->{'Sample_ID'}],
                          'SampleName'=>$r[$columnMap->{'Sample_Name'}],
                          'Index'=>$r[$columnMap->{'index'}],
@@ -1443,13 +1443,13 @@ sub readSampleSheet{
                          'SampleWell'=>$r[$columnMap->{'Sample_Well'}],
                          'SampleNumber'=>$sampleCounterHash->{$r[$columnMap->{'Sample_Name'}]},
                          'SamplePlate'=>$r[$columnMap->{'Sample_Plate'}],
-                         'Lane'=>$r[$columnMap->{'Lane'}],
+                         'Lane'=>defined($columnMap->{'Lane'}) ? $r[$columnMap->{'Lane'}] : 1,
                          'SampleProject'=>$r[$columnMap->{'Sample_Project'}],
                          'Row'=>$dataRow};
                     # Extract some extras from the description
                     # The format used is KEY1:value1;KEY2:value2...
                     while($r[$columnMap->{'Description'}] =~ m/([^:]*):([^;]*)[;\s]*/g){
-                       $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{$r[$columnMap->{'Lane'}]}->{$r[$columnMap->{'index'}]}->{$1} = $2;
+                       $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{defined($columnMap->{'Lane'}) ? $r[$columnMap->{'Lane'}] : 1}->{$r[$columnMap->{'index'}]}->{$1} = $2;
                    }
                }
            }
