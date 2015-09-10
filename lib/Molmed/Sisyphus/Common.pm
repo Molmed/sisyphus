@@ -2942,9 +2942,9 @@ sub fixSampleSheet{
             $r[1] =~ s/Sample-/Sample_/;
             $output .= join ',', @r;
 	    if(defined($columnMap->{index2}) && defined($r[$columnMap->{index2}])) {
-		$lanes{$r[$columnMap->{Lane}]}->{$r[$columnMap->{index}].'-'.$r[$columnMap->{index2}]}++;
+		$lanes{defined($columnMap->{Lane}) ? $r[$columnMap->{Lane}]: 1}->{$r[$columnMap->{index}].'-'.$r[$columnMap->{index2}]}++;
 	    } else {
-                $lanes{$r[$columnMap->{Lane}]}->{$r[$columnMap->{index}]}++;
+                $lanes{defined($columnMap->{Lane}) ? $r[$columnMap->{Lane}]: 1}->{$r[$columnMap->{index}]}++;
             }
         }
     }
