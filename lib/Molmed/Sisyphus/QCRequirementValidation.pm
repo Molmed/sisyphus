@@ -150,7 +150,7 @@ sub validateSequenceRun {
 			foreach (@{$self->{QC_REQUIREMENT}->{'platforms'}->{'platform'}}) {
 				#Check runParameters that will be used to select QC criterias
 				if($_->{'machineType'} eq $sisyphus->machineType() && 
-				   $_->{'version'} eq $sisyphus->getReagentKitVersion()) {
+				   ($_->{'machineType'} =~ /^hiseqx$/ || $_->{'version'} eq $sisyphus->getReagentKitVersion())) {
 					#For HiSeq the runMode should be checked
 					if(($_->{'machineType'} =~ /^miseq$|^hiseqx$/ ) || ($_->{'machineType'} =~ /^hiseq$/ && 
 					    $_->{'mode'} eq  $sisyphus->getRunMode())) {
