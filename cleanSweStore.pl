@@ -68,7 +68,7 @@ my ($help,$man) = (0,0);
 GetOptions('help|?'=>\$help,
 	   'man'=>\$man,
 	   'projectFile=s' => \$inputProjectFile, 
-           'unaligned!' => \$removeUnaligned,
+	   'unaligned!' => \$removeUnaligned,
 	   'execute!' => \$execute,
     	   'debug' => \$debug,
       	    ) or pod2usage(-verbose => 0);
