@@ -241,7 +241,7 @@ unless($verifyOnly){
 
 if($ssverify){
     chdir($srcDir);
-    chdir(..);
+    chdir("..");
 
     if(system("ssverify.sh", $rfName, "$iPath/$rfName") == 0){
         print "All files verified\n";
@@ -251,8 +251,6 @@ if($ssverify){
         print "ssverify.sh FAILED\n";
         exit 1; 
     } 
-
-
 }
 
 chdir($tmpPath);
