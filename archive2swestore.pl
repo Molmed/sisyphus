@@ -159,6 +159,12 @@ unless (defined $noemail) {
   $email = $yml->{MAIL}
 }
 
+# If not specified in config, ssverify.sh will be used
+my $ssverify = 1;
+if (defined $yml->{USE_SSVERIFY}){
+    $ssverify = $yml->{USE_SSVERIFY};
+}
+
 $tmpPath = "$tmpPath/$$";
 $tmpPath =~ s:/+:/:g;
 unless(-e $tmpPath){
@@ -232,6 +238,23 @@ unless($verifyOnly){
 }
 
 # Now verify the files in the uploaded archive
+
+if($ssverify){
+    chdir($srcDir);
+    chdir(..);
+
+    if(system("ssverify.sh", $rfName, "$iPath/$rfName") == 0){
+        print "All files verified\n";
+        exit 0;
+    }
+    else{
+        print "ssverify.sh FAILED\n";
+        exit 1; 
+    } 
+
+
+}
+
 chdir($tmpPath);
 open(my $md5fh, $md5file) or die "Failed to open $md5file: $!";
 my @seen = verifyMd5($md5fh, $iPath) or die "Failed to verify $md5file\n";
