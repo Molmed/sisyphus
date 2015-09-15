@@ -178,12 +178,13 @@ foreach my $runfolder (keys %{$dataToClean}) { # Process each runfolder
 
 	if($removeUnaligned) {
 		#Check if Unaligned folder exists
-		my $regex = "C- $swestorePath/20$year-$month/$runfolder/Unaligned";
-		my $unalignedFound = qx(ils $swestorePath/20$year-$month/$runfolder/Unaligned) =~ /\Q$regex/;
+		my $unalignedPath = "$swestorePath/20$year-$month/$runfolder/Unaligned";
+		my $regex = "C- $unalignedPath";
+		my $unalignedFound = qx(ils $unalignedPath) =~ /\Q$regex/;
 		if($unalignedFound) { #If found remove it
 			print "Removing unaligned for runfolder $runfolder\n";
 			if($execute) { #Perform deletion
-				qx(irm -rf $swestorePath/20$year-$month/$runfolder/Unaligned);
+				qx(irm -rf $unalignedPath);
 			}
 		} else { #Warn if the Unaligned folder could be found
 			print "Couldn't find unaligned for $runfolder\n";
