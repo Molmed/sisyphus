@@ -43,11 +43,15 @@ will only validate that the provided projects can be found and also
 specify if the entire runfolder will be deleted or just a subset
 of the projects.
 
+=item -unaligned
+
+Try to remove Unaligned folder for the specified flowcells.
+
 =back
 
 =cut
 
-my ($inputProjectFile, $debug, $execute);
+my ($inputProjectFile, $debug, $execute, $removeUnaligned);
 
 my $swestorePath = "/ssUppnexZone/proj/a2009002";
 
@@ -64,6 +68,7 @@ my ($help,$man) = (0,0);
 GetOptions('help|?'=>\$help,
 	   'man'=>\$man,
 	   'projectFile=s' => \$inputProjectFile, 
+	   'unaligned!' => \$removeUnaligned,
 	   'execute!' => \$execute,
     	   'debug' => \$debug,
       	    ) or pod2usage(-verbose => 0);
@@ -150,6 +155,7 @@ foreach my $runfolder (keys %{$dataToClean}) { # Process each runfolder
 			}
 		}
 	}
+
 	#Remove projects from SweStore
 	foreach my $key (keys %{$dataToClean->{$runfolder}}) {
 		if(exists($foundProjects{$key})) {
@@ -170,7 +176,20 @@ foreach my $runfolder (keys %{$dataToClean}) { # Process each runfolder
 		print $LEFTONSWESTORE "$runfolder\t$key\n";		
 	}
 
-					
+	if($removeUnaligned) {
+		#Check if Unaligned folder exists
+		my $unalignedPath = "$swestorePath/20$year-$month/$runfolder/Unaligned";
+		my $regex = "C- $unalignedPath";
+		my $unalignedFound = qx(ils $unalignedPath) =~ /\Q$regex/;
+		if($unalignedFound) { #If found remove it
+			print "Removing unaligned for runfolder $runfolder\n";
+			if($execute) { #Perform deletion
+				qx(irm -rf $unalignedPath);
+			}
+		} else { #Warn if the Unaligned folder could be found
+			print "Couldn't find unaligned for $runfolder\n";
+		}
+        }
 }
 
 
