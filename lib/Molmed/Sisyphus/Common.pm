@@ -2888,7 +2888,6 @@ sub fixSampleSheet{
     # Check that the SampleSheet contains info about the correct flowcell
     # and that no tag is present more than once in each lane
     my $rfPath = $self->PATH;
-    my $fcId = $self->fcId();
     my $ok = 1;
     my $l=0;
     my %lanes;
@@ -2950,6 +2949,9 @@ sub fixSampleSheet{
     }
     close(ADAPTORS);
     close($ssfh);
+    if (!$dataFound){
+        die "Data header not found!";
+    }
     foreach my $lane (keys %lanes){
 	foreach my $tag (keys %{$lanes{$lane}}){
 	    if($lanes{$lane}->{$tag} > 1){
