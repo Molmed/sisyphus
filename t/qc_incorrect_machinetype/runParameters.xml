@@ -44,7 +44,7 @@
       <TempFolder />
       <SendInstrumentHealthToILMN>false</SendInstrumentHealthToILMN>
     </BaseSpaceSettings>
-    <ScannerID>D00457</ScannerID>
+    <ScannerID>D00457XX</ScannerID>
     <ScanNumber>40</ScanNumber>
     <ComputerName>HWI-D00457</ComputerName>
     <FPGAVersion>7.7.2.5</FPGAVersion>

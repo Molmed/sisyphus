@@ -28,11 +28,19 @@ my $qcFileOrg  = $FindBin::Bin . '/../sisyphus_qc.xml';
 
 system("mkdir -p /tmp/sisyphus/$$/") == 0
   or die "Failed to create temporary dir /tmp/sisyphus/$$/ $!";
+my $confFile  = $FindBin::Bin . '/../sisyphus.yml';
+system("cp $confFile $testFolder/") == 0
+  or die "Failed to copy sisyphus.yml to $testFolder/";
+
 
 #Create temp folders
 system("cp -a $testFolder /tmp/sisyphus/$$") == 0
   or die "Failed to copy testdata to /tmp/sisyphus/$$/ $!";
 $testFolder = "/tmp/sisyphus/$$/" . basename($testFolder);
+my $confFile  = $FindBin::Bin . '/../sisyphus.yml';
+system("cp $confFile $testFolder/") == 0
+  or die "Failed to copy sisyphus.yml to $testFolder/";
+
 
 system("cp $qcFileNOC $testFolder/sisyphus_mNOC_qc.xml") == 0
   or die "Failed to copy sisyphus_mNOC_qc.xml to $testFolder/";
@@ -46,6 +54,7 @@ system("cp $qcFileER $testFolder/sisyphus_mER_qc.xml") == 0
 
 #Create objects used for MiSeq QC validation
 my $sis = Molmed::Sisyphus::Common->new(PATH=>$testFolder);
+$sis->runParameters();
 isa_ok($sis, 'Molmed::Sisyphus::Common', "New sisyphus object with runfolder: " . $sis->PATH);
 #Load run parameters
 $sis->runParameters();

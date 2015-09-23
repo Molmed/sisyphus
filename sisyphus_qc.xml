@@ -1,7 +1,7 @@
 <QCrequirements>
 	<platforms>
 		<platform>
-			<controlSoftware>HiSeq Control Software</controlSoftware>
+			<machineType>hiseq</machineType>
 			<version>HiSeq Flow Cell v3</version>
 			<mode>HighOutput</mode>
 			<unidentified>20.0</unidentified>
@@ -33,7 +33,7 @@
 			</warning>
 		</platform>
 		<platform>
-			<controlSoftware>HiSeq Control Software</controlSoftware>
+			<machineType>hiseq</machineType>
 			<version>HiSeq Flow Cell v4</version>
 			<mode>RapidHighOutput</mode>
 			<unidentified>20.0</unidentified>
@@ -77,7 +77,7 @@
 			</warning>
 		</platform>
 		 <platform>
-                        <controlSoftware>HiSeq X Control Software</controlSoftware>
+                        <machineType>hiseqx</machineType>
                         <version>HiSeq X HD v2</version>
                         <unidentified>25.0</unidentified>
                         <overridePoolingRequirement>0</overridePoolingRequirement>
@@ -96,7 +96,7 @@
                         </warning>
                 </platform>
 		<platform>
-			<controlSoftware>HiSeq Control Software</controlSoftware>
+			<machineType>hiseq</machineType>
 			<version>HiSeq Rapid Flow Cell v1</version>
 			<mode>RapidRun</mode>
 			<unidentified>20.0</unidentified>
@@ -120,7 +120,7 @@
 			</warning>
 		</platform>
 		<platform>
-			<controlSoftware>HiSeq Control Software</controlSoftware>
+			<machineType>hiseq</machineType>
 			<version>HiSeq Rapid Flow Cell v2</version>
 			<mode>RapidRun</mode>
 			<unidentified>20.0</unidentified>
@@ -152,7 +152,7 @@
 			</warning>
 		</platform>
 		<platform>
-			<controlSoftware>MiSeq Control Software</controlSoftware>
+			<machineType>miseq</machineType>
 			<version>Version2</version>
 			<unidentified>20.0</unidentified>
 			<overridePoolingRequirement>0</overridePoolingRequirement>
@@ -179,7 +179,7 @@
 			</warning>
 		</platform>
 		<platform>
-			<controlSoftware>MiSeq Control Software</controlSoftware>
+			<machineType>miseq</machineType>
 			<version>Version3</version>
 			<unidentified>20.0</unidentified>
 			<overridePoolingRequirement>0</overridePoolingRequirement>
