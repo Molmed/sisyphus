@@ -1432,9 +1432,9 @@ sub readSampleSheet{
 		    #Save information in hash
                     my $index = $r[$columnMap->{'index'}];
                     if(defined($columnMap->{'index2'}) && defined($r[$columnMap->{'index2'}])) {
-                        $r[$columnMap->{'index'}] .= "+" . $r[$columnMap->{'index2'}];
+                        $index .= "+" . $r[$columnMap->{'index2'}];
 		    }
-                    $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{defined($columnMap->{'Lane'}) ? $r[$columnMap->{'Lane'}] : 1}->{$r[$columnMap->{'index'}]} =
+                    $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{defined($columnMap->{'Lane'}) ? $r[$columnMap->{'Lane'}] : 1}->{$index} =
                         {'SampleID'=>$r[$columnMap->{'Sample_ID'}],
                          'SampleName'=>$r[$columnMap->{'Sample_Name'}],
                          'Index'=>$r[$columnMap->{'index'}],
