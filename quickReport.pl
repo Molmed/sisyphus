@@ -138,7 +138,7 @@ foreach my $proj (keys %{$sampleSheet}){
                 foreach my $pctLane (keys %{$files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}}){
 			my $stat = Molmed::Sisyphus::QStat->new(OFFSET=>$OFFSET, DEBUG=>$debug);
 			my $filehandle;
-			$samples->{$info->{SampleName}}->{$lid}->{$info->{Index}} = 1;
+			$samples->{$info->{SampleName}}->{$lid}->{$tag} = 1;
                         if($files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane} =~ /fastq.gz$/) {
                             open($filehandle, "zcat $files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane} |") or die "Failed to open $files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane}: $!";
 			} elsif($files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane} =~ /fastq$/) {
