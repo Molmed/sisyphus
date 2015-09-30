@@ -1432,7 +1432,7 @@ sub readSampleSheet{
 		    #Save information in hash
                     my $index = $r[$columnMap->{'index'}];
                     if(defined($columnMap->{'index2'}) && defined($r[$columnMap->{'index2'}])) {
-                        $index .= "+" . $r[$columnMap->{'index2'}];
+                        $index .= "-" . $r[$columnMap->{'index2'}];
 		    }
                     $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{defined($columnMap->{'Lane'}) ? $r[$columnMap->{'Lane'}] : 1}->{$index} =
                         {'SampleID'=>$r[$columnMap->{'Sample_ID'}],
@@ -2380,6 +2380,7 @@ sub readDemultiplexStatsHiSeqX{
                     foreach my $barcode (@{$sample->{Barcode}}){
                         my $tag = $barcode->{name};
                         $tag = '' if($tag eq 'NoIndex');
+			$tag =~ s/\+/-/g;
                         foreach my $lane (@{$barcode->{Lane}}){
                             my $lid = $lane->{number};
                             foreach my $tile (@{$lane->{Tile}}){
@@ -2418,6 +2419,7 @@ sub readDemultiplexStatsHiSeqX{
                     foreach my $barcode (@{$sample->{Barcode}}){
                         my $tag = $barcode->{name};
                         $tag = '' if($tag eq 'NoIndex');
+			$tag =~ s/\+/-/g;
                         if(!($tag eq 'all')) {
                             foreach my $lane (@{$barcode->{Lane}}){	
                                 my $lid = $lane->{number};
