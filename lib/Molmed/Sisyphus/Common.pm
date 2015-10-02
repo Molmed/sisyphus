@@ -1432,9 +1432,9 @@ sub readSampleSheet{
 		    #Save information in hash
                     my $index = $r[$columnMap->{'index'}];
                     if(defined($columnMap->{'index2'}) && defined($r[$columnMap->{'index2'}])) {
-                        $r[$columnMap->{'index'}] .= "+" . $r[$columnMap->{'index2'}];
+                        $index .= "-" . $r[$columnMap->{'index2'}];
 		    }
-                    $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{defined($columnMap->{'Lane'}) ? $r[$columnMap->{'Lane'}] : 1}->{$r[$columnMap->{'index'}]} =
+                    $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{defined($columnMap->{'Lane'}) ? $r[$columnMap->{'Lane'}] : 1}->{$index} =
                         {'SampleID'=>$r[$columnMap->{'Sample_ID'}],
                          'SampleName'=>$r[$columnMap->{'Sample_Name'}],
                          'Index'=>$r[$columnMap->{'index'}],
@@ -1449,7 +1449,7 @@ sub readSampleSheet{
                     # Extract some extras from the description
                     # The format used is KEY1:value1;KEY2:value2...
                     while($r[$columnMap->{'Description'}] =~ m/([^:]*):([^;]*)[;\s]*/g){
-                       $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{defined($columnMap->{'Lane'}) ? $r[$columnMap->{'Lane'}] : 1}->{$r[$columnMap->{'index'}]}->{$1} = $2;
+                       $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{defined($columnMap->{'Lane'}) ? $r[$columnMap->{'Lane'}] : 1}->{$index}->{$1} = $2;
                    }
                }
            }
@@ -2380,6 +2380,7 @@ sub readDemultiplexStatsHiSeqX{
                     foreach my $barcode (@{$sample->{Barcode}}){
                         my $tag = $barcode->{name};
                         $tag = '' if($tag eq 'NoIndex');
+			$tag =~ s/\+/-/g;
                         foreach my $lane (@{$barcode->{Lane}}){
                             my $lid = $lane->{number};
                             foreach my $tile (@{$lane->{Tile}}){
@@ -2418,6 +2419,7 @@ sub readDemultiplexStatsHiSeqX{
                     foreach my $barcode (@{$sample->{Barcode}}){
                         my $tag = $barcode->{name};
                         $tag = '' if($tag eq 'NoIndex');
+			$tag =~ s/\+/-/g;
                         if(!($tag eq 'all')) {
                             foreach my $lane (@{$barcode->{Lane}}){	
                                 my $lid = $lane->{number};
@@ -2941,7 +2943,7 @@ sub fixSampleSheet{
             $r[1] =~ s/Sample-/Sample_/;
             $output .= join ',', @r;
 	    if(defined($columnMap->{index2}) && defined($r[$columnMap->{index2}])) {
-		$lanes{defined($columnMap->{Lane}) ? $r[$columnMap->{Lane}]: 1}->{$r[$columnMap->{index}].'-'.$r[$columnMap->{index2}]}++;
+		$lanes{defined($columnMap->{Lane}) ? $r[$columnMap->{Lane}]: 1}->{$r[$columnMap->{index}].'+'.$r[$columnMap->{index2}]}++;
 	    } else {
                 $lanes{defined($columnMap->{Lane}) ? $r[$columnMap->{Lane}]: 1}->{$r[$columnMap->{index}]}++;
             }
