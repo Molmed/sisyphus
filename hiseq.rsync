@@ -40,7 +40,7 @@
 # Include full tree of some subdirs
 # This works if rsync is called with src dest, but not src/ dest
 + /*/Sisyphus/***
-+ /*/Unaligned/***
++ /*/Unaligned/(?!Reports)/***
 + /*/Excluded/***
 + /*/Config/***
 + /*/Diag/***
