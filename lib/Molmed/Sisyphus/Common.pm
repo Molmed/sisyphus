@@ -1346,7 +1346,7 @@ sub getLengthOfProvidedIndexes {
    foreach my $proj (keys %{$sampleSheet}){
        foreach my $lid (keys %{$sampleSheet->{$proj}}){
            foreach my $tag (keys %{$sampleSheet->{$proj}->{$lid}}){
-               if(length($sampleSheet->{$proj}->{$lid}->{$tag}->{Index}) > 0) {
+               if(length($sampleSheet->{$proj}->{$lid}->{$tag}->{Index}) > 0 && $sampleSheet->{$proj}->{$lid}->{$tag}->{Index} ne 'unknown') {
                    if(!defined($indexLength->{$lid}->{I1})) {
                        $indexLength->{$lid}->{I1} = length($sampleSheet->{$proj}->{$lid}->{$tag}->{Index});
                    } elsif($indexLength->{$lid}->{I1} != length($sampleSheet->{$proj}->{$lid}->{$tag}->{Index})) {
