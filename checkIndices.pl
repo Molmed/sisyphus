@@ -10,12 +10,11 @@ use Pod::Usage;
 use File::Basename;
 
 use Molmed::Sisyphus::Common qw(mkpath);
-use Molmed::Sisyphus::QStat;
 =pod
 
 =head1 NAME
 
-checkIndices.pl - Check if there seems to be something something wrong with the indices
+checkIndices.pl - Check if there seems to be something wrong with the indices provided
 
 =head1 SYNOPSIS
 
@@ -50,7 +49,8 @@ Print debugging information
 
 =head1 DESCRIPTION
 
-Checks if there is anything supicious about the index sequences before performing demultiplexing on all data
+Investigates if there are indices among Undetermined indices that appear significantly often (we set the threshold at 1% of all reads in lane).
+Common causes are tested.   
 
 =cut
 
@@ -85,9 +85,6 @@ if (length($DemuxSumPath)==0){
 }
 
 my $sampleSheet = $sisyphus->readSampleSheet();
-#my $machineType = $sisyphus->machineType();
-
-my $flowCellID = $sisyphus->fcId();
 my $noOfSamples = $sisyphus->samplesPerLane(); 
 my $numLanes = $sisyphus->laneCount();
 my $failedIndexCheck = 0;
@@ -95,7 +92,6 @@ my $passedIndexCheck;
 
 # Read demuxSummary files for each lane, store info in hash
 my %indexCount;
-my @numberOfIndices = 1; 
 my $LanePrefix = "DemuxSummaryF1L";
 my $indexSection;
 my @refIndices;
@@ -103,9 +99,9 @@ my @refIndices;
 foreach my $lane (1..$numLanes){
 
     $indexSection = 0;
+    
     my (@counts, @indices1, @indices2);
 
-    #Check if current read is applicable for lane
     open (my $fh, "<", "$DemuxSumPath/$LanePrefix$lane.txt") or die "Can't open the file $DemuxSumPath/$LanePrefix$lane.txt: ";
 
     while (my $line =<$fh>){
@@ -148,7 +144,7 @@ foreach my $lane (1..$numLanes){
     
             my @sigCounts = significanceTest($indexCount{$lane}{'Counts'}, $indexCount{$lane}{'Indices'}{$indexRead}, $lane);
 
-            # Number of index with significant counts
+            # Number of indices with significant counts
             my $sigCount = @sigCounts;
 
             if ($sigCount > 1){
