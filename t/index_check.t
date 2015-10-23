@@ -7,6 +7,7 @@ use Test::Exception;
 
 use File::Basename;
 use FindBin;                # Find the script location
+use File::Find;
 
 my $testfolder = $FindBin::Bin . '/index_check_files';
 
@@ -14,14 +15,25 @@ my $sisyphusPath = $FindBin::Bin;
 
 $sisyphusPath =~ s/\/t//g;
 
-my $result1 = system("$sisyphusPath/checkIndices.pl -runfolder $testfolder -demuxSummary $testfolder/Stats_ok > $testfolder/log1.txt");
-my $result2 = system("$sisyphusPath/checkIndices.pl -runfolder $testfolder -demuxSummary $testfolder/Stats_revcomp > $testfolder/log2.txt");
-my $result3 = system("$sisyphusPath/checkIndices.pl -runfolder $testfolder -demuxSummary $testfolder/Stats_switched > $testfolder/log3.txt");
-my $result4 = system("$sisyphusPath/checkIndices.pl -runfolder $testfolder -demuxSummary $testfolder/Stats_comp > $testfolder/log4.txt");
-my $result5 = system("$sisyphusPath/checkIndices.pl -runfolder $testfolder -demuxSummary $testfolder/Stats_rev > $testfolder/log5.txt");
-my $result6 = system("$sisyphusPath/checkIndices.pl -runfolder $testfolder -demuxSummary $testfolder/Stats_readerror > $testfolder/log6.txt");
-my $result7 = system("$sisyphusPath/checkIndices.pl -runfolder $testfolder -demuxSummary $testfolder/Stats_mismatch > $testfolder/log7.txt");
-my $result8 = system("$sisyphusPath/checkIndices.pl -runfolder $testfolder -demuxSummary $testfolder/Stats_switchedrevcomp > $testfolder/log8.txt");
+my $checkIndicesPath = "";
+
+find(\&pathforCheckIndices, $sisyphusPath);
+
+sub pathforCheckIndices{
+    my $file = $_;
+    if ($file =~ /checkIndices.pl/){
+        $checkIndicesPath = $File::Find::name; 
+    }
+}
+
+my $result1 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_ok > $testfolder/log1.txt");
+my $result2 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_revcomp > $testfolder/log2.txt");
+my $result3 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_switched > $testfolder/log3.txt");
+my $result4 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_comp > $testfolder/log4.txt");
+my $result5 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_rev > $testfolder/log5.txt");
+my $result6 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_readerror > $testfolder/log6.txt");
+my $result7 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_mismatch > $testfolder/log7.txt");
+my $result8 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_switchedrevcomp > $testfolder/log8.txt");
 
 sub checkLog{
     my $log = shift;
