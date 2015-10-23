@@ -13,7 +13,7 @@ my $testfolder = $FindBin::Bin . '/index_check_files';
 
 my $sisyphusPath = $FindBin::Bin;
 
-$sisyphusPath =~ s/\/t//g;
+$sisyphusPath =~ s/sisyphus\/t//g;
 
 my $checkIndicesPath = "";
 
