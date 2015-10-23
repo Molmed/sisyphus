@@ -19,12 +19,22 @@ my $checkIndicesPath = "";
 
 find(\&pathforCheckIndices, $sisyphusPath);
 
+my $perlbrew;
+
 sub pathforCheckIndices{
     my $file = $_;
     if ($file =~ /checkIndices.pl/){
         $checkIndicesPath = $File::Find::name; 
     }
+    if ($checkIndicesPath =~ /\/home\/travis/){
+        
+        $perlbrew = split(":", $ENV{'PERLBREW_PATH'})[1];
+
+        $checkIndicesPath = "$perlbrew/perl $checkIndicesPath";
+    }
 }
+
+
 
 my $result1 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_ok > $testfolder/log1.txt");
 my $result2 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_revcomp > $testfolder/log2.txt");
