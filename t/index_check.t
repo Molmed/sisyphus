@@ -27,10 +27,16 @@ sub pathforCheckIndices{
         $checkIndicesPath = $File::Find::name; 
     }
     if ($checkIndicesPath =~ /\/home\/travis/){
-        
-        $perlbrew = split(":", $ENV{'PERLBREW_PATH'})[1];
+       
+        if (defined($ENV{'PERLBREW_PATH'})){
+            print "$ENV{'PERLBREW_PATH'}\n";
+            $perlbrew = split(":", $ENV{'PERLBREW_PATH'})[1];
 
-        $checkIndicesPath = "$perlbrew/perl $checkIndicesPath";
+            $checkIndicesPath = "$perlbrew/perl $checkIndicesPath";
+        }
+        else{
+            confess "Could not find PERLBREW_PATH";
+        } 
     }
 }
 
