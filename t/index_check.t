@@ -40,7 +40,7 @@ sub pathforCheckIndices{
 }
 
 
-my $result1 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_ok > $testfolder/log1.txt");
+my $result1 = system("/home/travis/perl5/perlbrew/perls/5.10/bin/perl $checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_ok > $testfolder/log1.txt");
 my $result2 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_revcomp > $testfolder/log2.txt");
 my $result3 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_switched > $testfolder/log3.txt");
 my $result4 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_comp > $testfolder/log4.txt");
