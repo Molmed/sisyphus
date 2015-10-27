@@ -26,19 +26,18 @@ sub pathforCheckIndices{
     if ($file =~ /checkIndices.pl/){
         $checkIndicesPath = $File::Find::name; 
     }
-    if ($checkIndicesPath =~ /\/home\/travis/){
-       
-        if (defined($ENV{'PERLBREW_PATH'})){
-            @perlbrew = split(":",$ENV{'PERLBREW_PATH'});
-
-            $checkIndicesPath = "$perlbrew[1]/perl $checkIndicesPath";
-        }
-        else{
-            confess "Could not find PERLBREW_PATH";
-        } 
-    }
+#    if ($checkIndicesPath =~ /\/home\/travis/){
+#       
+#        if (defined($ENV{'PERLBREW_PATH'})){
+#            @perlbrew = split(":",$ENV{'PERLBREW_PATH'});
+#
+#            $checkIndicesPath = "$perlbrew[1]/perl $checkIndicesPath";
+#        }
+#        else{
+#            confess "Could not find PERLBREW_PATH";
+#        } 
+#    }
 }
-
 
 
 my $result1 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_ok > $testfolder/log1.txt");
