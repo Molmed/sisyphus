@@ -19,7 +19,7 @@ my $checkIndicesPath = "";
 
 find(\&pathforCheckIndices, $sisyphusPath);
 
-my $perlbrew;
+my @perlbrew;
 
 sub pathforCheckIndices{
     my $file = $_;
@@ -29,9 +29,9 @@ sub pathforCheckIndices{
     if ($checkIndicesPath =~ /\/home\/travis/){
        
         if (defined($ENV{'PERLBREW_PATH'})){
-            $perlbrew = $ENV{'PERLBREW_PATH'}[1];
+            @perlbrew = split(":",$ENV{'PERLBREW_PATH'});
 
-            $checkIndicesPath = "$perlbrew/perl $checkIndicesPath";
+            $checkIndicesPath = "$perlbrew[1]/perl $checkIndicesPath";
         }
         else{
             confess "Could not find PERLBREW_PATH";
