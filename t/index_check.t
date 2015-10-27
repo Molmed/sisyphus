@@ -29,8 +29,7 @@ sub pathforCheckIndices{
     if ($checkIndicesPath =~ /\/home\/travis/){
        
         if (defined($ENV{'PERLBREW_PATH'})){
-            print "$ENV{'PERLBREW_PATH'}\n";
-            $perlbrew = split(":", $ENV{'PERLBREW_PATH'})[1];
+            $perlbrew = $ENV{'PERLBREW_PATH'}[1];
 
             $checkIndicesPath = "$perlbrew/perl $checkIndicesPath";
         }
