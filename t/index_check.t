@@ -7,47 +7,45 @@ use Test::Exception;
 use Carp;
 use File::Basename;
 use FindBin;                # Find the script location
+use lib "$FindBin::Bin/../lib";# Add the script libdir to libs
 use File::Find;
+use Molmed::Sisyphus::Common;
+
+# Verify module can be included via "use" pragma
+BEGIN { use_ok('Molmed::Sisyphus::IndexCheck') };
+
+# Verify module can be included via "require" pragma
+require_ok( 'Molmed::Sisyphus::IndexCheck' );
 
 my $testfolder = $FindBin::Bin . '/index_check_files';
 
-my $sisyphusPath = $FindBin::Bin;
+# Create a new sisyphus object for common functions
+my $sisyphus = Molmed::Sisyphus::Common->new(PATH=>$testfolder);
 
-$sisyphusPath =~ s/sisyphus\/t/sisyphus/g;
+my $sampleSheet = $sisyphus->readSampleSheet();
+my $noOfSamples = $sisyphus->samplesPerLane();
+my $numLanes = $sisyphus->laneCount();
+my $result;
+my @testCases = ("Stats_ok", "Stats_revcomp", "Stats_switched", "Stats_comp", "Stats_rev", "Stats_readerror", "Stats_mismatch", "Stats_switchedrevcomp");
 
-my $checkIndicesPath = "";
+my @expectedResult = (0,1,1,1,1,0,0,1);
 
-find(\&pathforCheckIndices, $sisyphusPath);
+my @expectedOut = ("", "The reverse complement of index", "It appears that CTCTCTAT is present in Samplesheet among Index2",
+                    "The complement of index", "The reverse of index", "contains read errors. OK!", "is one mismatch from being a correct index", 
+                    "The reverse complement of index ATAGAGAG is present in SampleSheet among Index2.");
 
-my @perlbrew;
-
-sub pathforCheckIndices{
-    my $file = $_;
-    if ($file =~ /checkIndices.pl/){
-        $checkIndicesPath = $File::Find::name; 
-    }
-#    if ($checkIndicesPath =~ /\/home\/travis/){
-#       
-#        if (defined($ENV{'PERLBREW_PATH'})){
-#            @perlbrew = split(":",$ENV{'PERLBREW_PATH'});
-#
-#            $checkIndicesPath = "$perlbrew[1]/perl $checkIndicesPath";
-#        }
-#        else{
-#            confess "Could not find PERLBREW_PATH";
-#        } 
-#    }
+my @testDescription = ("Undetermined looks good", "Undetermined contains reverse complement of provided index",
+                        "Undetermined contains i7 index that should be i5", "Undetermined contains complement of provided index",
+                        "Undetermined contains reverse of provided index", "Undetermined contains index with read errors", 
+                        "Undetermined contains index one mismatch from being provided index", "Undetermined contains i7 index that should be i5 and is reverse complemented"); 
+                     
+for my $testNo (0 .. 7){
+    open (my $LOG, '>', "$testfolder/log.txt");
+    select $LOG;
+    $result = checkIndices($sisyphus, "$testfolder/$testCases[$testNo]", $noOfSamples, $numLanes, 0);
+    close $LOG;
+    ok($result == $expectedResult[$testNo] && checkLog("log.txt",$expectedOut[$testNo]), $testDescription[$testNo]);
 }
-
-
-my $result1 = system("/home/travis/perl5/perlbrew/perls/5.10/bin/perl $checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_ok > $testfolder/log1.txt");
-my $result2 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_revcomp > $testfolder/log2.txt");
-my $result3 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_switched > $testfolder/log3.txt");
-my $result4 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_comp > $testfolder/log4.txt");
-my $result5 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_rev > $testfolder/log5.txt");
-my $result6 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_readerror > $testfolder/log6.txt");
-my $result7 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_mismatch > $testfolder/log7.txt");
-my $result8 = system("$checkIndicesPath -runfolder $testfolder -demuxSummary $testfolder/Stats_switchedrevcomp > $testfolder/log8.txt");
 
 sub checkLog{
     my $log = shift;
@@ -64,18 +62,8 @@ sub checkLog{
     return $lineOK;
 }
 
-# Results are divided by 256 because system() returns exit value * 256
-ok($result1/256 == 0 && checkLog("log1.txt","Undetermined indices OK!"), "Undetermined looks good");
-ok($result2/256 == 1 && checkLog("log2.txt","The reverse complement of index"), "Undetermined contains reverse complement of provided index");
-ok($result3/256 == 1 && checkLog("log3.txt","It appears that CTCTCTAT is present in Samplesheet among Index2"), "Undetermined contains i7 index that should be i5");
-ok($result4/256 == 1 && checkLog("log4.txt","The complement of index"), "Undetermined contains complement of provided index");
-ok($result5/256 == 1 && checkLog("log5.txt","The reverse of index"), "Undetermined contains reverse of provided index");
-ok($result6/256 == 0 && checkLog("log6.txt","contains read errors. OK!"), "Undetermined contains index with read errors.");
-ok($result7/256 == 0 && checkLog("log7.txt","is one mismatch from being a correct index"), "Undetermined contains index one mismatch from being provided index.");
-ok($result8/256 == 1 && checkLog("log8.txt","The reverse complement of index ATAGAGAG is present in SampleSheet among Index2."), "Undetermined contains i7 index that should be i5 and is reverse complemented");
-
 END{
-    system("rm $testfolder/log*.txt");
+    system("rm $testfolder/log.txt");
 }
 
 done_testing();
