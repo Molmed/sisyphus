@@ -1,6 +1,7 @@
 package Molmed::Sisyphus::IndexCheck;
 
 use strict;
+use warnings;
 use Data::Dumper;
 use Molmed::Sisyphus::Common;
 
@@ -10,13 +11,13 @@ our @EXPORT = qw(checkIndices);
 sub checkIndices{
 
     my $sisyphus = $_[0];	
-	my $DemuxSumPath = $_[1];
+    my $DemuxSumPath = $_[1];
     my $noOfSamples = $_[2];
     my $numLanes = $_[3];
     my $debug = $_[4];
 
-	my $failedIndexCheck = 0;
-	my $passedIndexCheck;
+    my $failedIndexCheck = 0;
+    my $passedIndexCheck;
 
 	# Read demuxSummary files for each lane, store info in hash
 	my %indexCount;
@@ -40,12 +41,12 @@ sub checkIndices{
 	     				
 				    $indexSection = 1;
 			
-				    # skip header	
+				# skip header	
 		        if ($line !~ /Index_Sequence/){
 		        
 		            my($index, $count) = split("\t", $line);
 		        
-					my($index1, $index2) = split(/\Q+\E/, $index);
+				    my($index1, $index2) = split(/\Q+\E/, $index);
 
 		            push (@counts, $count);
 		            push (@indices1, $index1);
@@ -100,6 +101,8 @@ sub checkIndices{
 				foreach my $unidentifiedIndex (@sigCounts){
 		
 				    foreach my $idxRead (keys %{$indexCount{$lane}{'Indices'}}){
+
+                        my $test = $noOfSamples->{$lane}->{'Indices'}->{$idxRead};
 
 				        if (@{$noOfSamples->{$lane}->{'Indices'}->{$idxRead}}){
 
@@ -233,7 +236,6 @@ sub significanceTest{
         
     }
 
-    
     return @sigIndices;
 
 }
