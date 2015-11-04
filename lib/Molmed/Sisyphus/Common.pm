@@ -3395,6 +3395,112 @@ sub excludeLane{
     }
 }
 
+=pod
 
+=head2 samplesPerLane()
+
+ Title   : samplesPerLane
+ Usage   : $sis->samplesPerLane()
+ Function: Counts the number of samples and stores indices for each lane
+ Example :
+ Returns : hashref with lanes as primary key and number of samples and indices as secondary keys
+ Args    : none
+
+=cut
+
+sub samplesPerLane{
+
+    my $self = shift;
+
+    my $sampleSheet = $self->readSampleSheet();
+    my $numLanes = $self->laneCount();
+    my %samplesPerLane;
+    my $currentLane;
+
+    # Populate hash with lane numbers as keys 
+    foreach my $lane (1..$numLanes){
+        $samplesPerLane{$lane} = {'NoSamples' => 0, 'Indices' => {'Index1' => "", 'Index2' => "" }};
+   }
+
+    foreach my $proj (keys %{$sampleSheet}){
+        foreach my $lid (keys %{$sampleSheet->{$proj}}){
+            my @index1Array;
+            my @index2Array;
+            foreach my $tag (keys %{$sampleSheet->{$proj}->{$lid}}){
+                $currentLane = $sampleSheet->{$proj}->{$lid}->{$tag}->{'Lane'};
+                $samplesPerLane{$currentLane}{'NoSamples'}++;
+
+                push (@index1Array, $sampleSheet->{$proj}->{$lid}->{$tag}->{'Index'});
+                
+                if (length($sampleSheet->{$proj}->{$lid}->{$tag}->{'Index2'}) > 0){ 
+                    push (@index2Array, $sampleSheet->{$proj}->{$lid}->{$tag}->{'Index2'});
+                }
+
+            }
+
+            $samplesPerLane{$currentLane}{'Indices'}{'Index1'} = \@index1Array;
+            $samplesPerLane{$currentLane}{'Indices'}{'Index2'} = \@index2Array;
+        }
+    }
+
+    return(\%samplesPerLane)
+}
+
+=pod
+
+=head2 getBarcodeCount()
+
+ Title   : getBarcodeCount
+ Usage   : $sis->getBarcodeCount($lane)
+ Function: Get total barcode count for a specific lane
+ Example :
+ Returns : Total barcode count for a specific lane, numeric
+ Args    : none
+
+=cut
+
+sub getBarcodeCount{
+
+    my $self = shift;
+    my $laneNo = shift;
+    my $DemuxSumPath = shift;
+
+    my $rfPath = $self->{PATH};
+    my $Bcount = undef; 
+
+    my $xml = "$DemuxSumPath/DemultiplexingStats.xml";
+    my $DmStats;
+    if(-e $xml){
+        $DmStats = XMLin($xml, ForceArray=>['Lane','Project', 'Sample', 'Flowcell', 'Barcode'], KeyAttr => {item => 'name'}) || confess "Failed to read $xml\n";
+    }
+    
+    foreach my $flowcell (@{$DmStats->{Flowcell}}){
+        foreach my $proj (@{$flowcell->{Project}}){
+            if ($proj->{name} eq "all"){
+                foreach my $sample (@{$proj->{Sample}}){
+                    if ($sample->{name} eq "all"){
+                         foreach my $barcode (@{$sample->{Barcode}}){
+                            if ($barcode->{name} eq "all"){
+                                foreach my $lane (@{$barcode->{Lane}}){
+                                    if ($lane->{number} eq $laneNo){
+                                        $Bcount = $lane->{BarcodeCount};
+                                    }
+                                }
+                            
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }   
+                
+    if (defined($Bcount)){
+        return $Bcount;
+    }
+    else{
+        confess "Were not able find BarcodeCount for lane $laneNo";
+    }
+}
 
 1;
