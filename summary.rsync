@@ -10,8 +10,11 @@
 
 + /*/MD5/***
 + /*/InterOp/***
-+ /*/Unaligned/Basecall_Stats_*/*
+# Exclude the 'Unaligned/Reports' folder (this can contain illegal filenames)
+- /*/Unaligned/Reports/***
 + /*/Unaligned/Basecall_Stats_*/css/***
+- /*/Unaligned/Basecall_Stats_*/*/***
++ /*/Unaligned/***
 + /*/Excluded/Basecall_Stats_*/*
 + /*/Excluded/Basecall_Stats_*/css/***
 + /*/Data/Status.htm*
