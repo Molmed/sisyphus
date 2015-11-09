@@ -109,6 +109,7 @@ my $noUppmaxProcessing = 0;
 my $noSeqStatSync = 0;
 my $ngi = 0;
 my $force = 0;
+my $preIndexCheck = 0;
 our $debug = 0;
 my $threads = `cat /proc/cpuinfo |grep "^processor"|wc -l`;
 $threads = ($threads == 1) ?  1 :  int($threads/2);
@@ -238,6 +239,9 @@ if(defined $config->{ANALYSIS_PATH}){
 }
 if(defined($config->{NGI_PROCESSING})) {
     $ngi = $config->{NGI_PROCESSING};
+}
+if(defined($config->{PRE_DEMULTIPLEX_INDEX_CHECK})){
+    $preIndexCheck = $config->{PRE_DEMULTIPLEX_INDEX_CHECK};
 }
 
 # Strip trailing slashes from paths
@@ -417,6 +421,26 @@ if (-e "$fastqPath/Unaligned") {
 }
 my $joinedReadMask = join("--use-bases-mask ", @readMask);
 
+if($preIndexCheck){
+
+print $scriptFh <<EOF;
+echo "Performing index check pre-demultiplexing"
+
+if [ ! -e "$rfPath/IndexCheck" ] && [ "$rfPath" != "$fastqPath" ]; then
+    ln -s "$fastqPath/IndexCheck" "$rfPath/IndexCheck"
+fi
+
+# Only tiles ending with 5 are included
+$config->{BCL2FASTQ} --input-dir '$rfPath/Data/Intensities/BaseCalls' --output-dir '$fastqPath/IndexCheck' --use-bases-mask $joinedReadMask --barcode-mismatches '$mismatches' ${ignore} --tiles "s_[0-9]_[0-9][0-9][0-9]5" &> BclToFastq.IndexCheck.log
+check_errs \$? "bcl2fastq failed in $fastqPath/IndexCheck"
+
+checkIndices.pl -runfolder '$rfPath' -demuxSummary '$rfPath/IndexCheck/Stats' 
+check_errs \$? "IndexCheck failed"
+
+EOF
+
+}
+
 print $scriptFh <<EOF;
 
 if [ ! -e "$rfPath/Unaligned" ]; then
@@ -431,6 +455,15 @@ $config->{BCL2FASTQ} --input-dir '$rfPath/Data/Intensities/BaseCalls' --output-d
 check_errs \$? "bcl2fastq failed in $fastqPath/Unaligned"
 
 EOF
+
+unless($preIndexCheck){
+
+print $scriptFh <<EOF
+checkIndices.pl -runfolder '$rfPath'
+check_errs \$? "IndexCheck failed"
+
+EOF
+}
 
 if(@excTiles > 0){
 	my $excludeTiles = join ',', @excTiles;
@@ -447,7 +480,6 @@ EOF
 
         $excludeTiles =~ s/,/ --tiles /g;
         print $scriptFh <<EOF;
-
 $config->{BCL2FASTQ} --input-dir '$rfPath/Data/Intensities/BaseCalls' --output-dir '$fastqPath/Excluded' --use-bases-mask $joinedReadMask --barcode-mismatches '$mismatches' ${ignore} --tiles --tiles $excludeTiles &> $rfPath/setupBclToFastqExcluded.err
 
 if [ ! -e "$rfPath/Excluded" ]; then
@@ -461,7 +493,6 @@ EOF
 my $rnd = time() . '.' . rand(1);
 
 print $scriptFh <<EOF;
-
 # Copy $FindBin::Bin/ directory to the runfolder
 # Both for archiving and usage at UPPMAX
 if [ -e $rfPath/Sisyphus ]; then
