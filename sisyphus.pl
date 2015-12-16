@@ -285,9 +285,8 @@ my $complete = 0;
 until($complete||$force){
     $complete = $sisyphus->complete();
     unless($complete){
-	print STDERR "Not complete. Going to sleep\n" if $debug;
-	sleep 600;
-	print STDERR "Trying again\n" if $debug;
+	print STDERR "Not complete. Use force flag to ignore missing data.\n";
+    exit 1;    
     }
 }
 
@@ -302,14 +301,13 @@ until($complete){
     if(-e "$rfPath/SampleSheet.csv"){
 	# Check sanity of sample sheet
 	$complete = $sisyphus->fixSampleSheet("$rfPath/SampleSheet.csv");
-	print STDERR "SampleSheet has errors. Please fix it. You do not have to abort!\nJust fix the file and the script will continue after sleeping 10 minutes from now.\n" unless($complete);
+	print STDERR "SampleSheet has errors. Please fix it.\n" unless($complete);
     }else{
-	print STDERR "SampleSheet.csv is missing\n";
-	$complete=0;
+	    print STDERR "SampleSheet.csv is missing\n";
+	    $complete=0;
     }
     unless($complete) {
-      print STDERR "Sleeping for 10 minutes\n";
-      sleep 600;
+      exit 1;
     }
 }
 
@@ -328,8 +326,7 @@ if ($miseq) {
             $complete = 1;
         }
         unless($complete) {
-          print STDERR "Sleeping for 10 minutes\n";
-          sleep 600;
+          exit 1;
         }
     }
 }
@@ -358,7 +355,7 @@ my @excTiles = @{$excTilesRef};
 my $includeTiles = join ',', @incTiles;
 my $ignore = '';
 if($force){
-    $ignore = '--ignore-missing-stats --ignore-missing-bcl --ignore-missing-control ';
+    $ignore = '--ignore-missing-bcls';
 }
 
 # Create processing shellscript
