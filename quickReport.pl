@@ -130,7 +130,7 @@ sub findFastq{
     }
 }
 use File::Find;
-find({wanted => sub{findFastq(\%files)}, no_chdir => 1, follow => 1}, $rfPath);
+find({wanted => sub{findFastq(\%files)}, no_chdir => 1, follow => 1}, "$rfPath/Unaligned");
 
 my $laneQC;
 my $samples;
