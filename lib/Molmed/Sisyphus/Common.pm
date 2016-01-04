@@ -3063,8 +3063,10 @@ sub machineType{
 sub getMachineID {
     my $self = shift;
     if(!defined $self->{RUNPARAMS}){
-        confess "RunParameters haven't been loaded\n";
-    } elsif(defined($self->{RUNPARAMS}->{ScannerID})){
+        # Load runParameters
+        $self->runParameters();
+    } 
+    if(defined($self->{RUNPARAMS}->{ScannerID})){
         return $self->{RUNPARAMS}->{ScannerID};
     } elsif(defined($self->{RUNPARAMS}->{Setup}->{ScannerID})) {
         return $self->{RUNPARAMS}->{Setup}->{ScannerID};
