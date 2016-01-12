@@ -1433,7 +1433,9 @@ sub readSampleSheet{
                     if(defined($columnMap->{'index2'}) && length($r[$columnMap->{'index2'}]) > 0 && length($r[$columnMap->{'index'}]) > 0) {
                         $index .= "-" . $r[$columnMap->{'index2'}];
 		            }
-                    
+                    elsif(length($r[$columnMap->{'index'}]) < 0 && length($r[$columnMap->{'index2'}]) > 0){
+                        $index = $r[$columnMap->{'index2'}];
+                    }
 
                     # Save information to hash
                     $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{defined($columnMap->{'Lane'}) ? $r[$columnMap->{'Lane'}] : 1}->{$index} =
