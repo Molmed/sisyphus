@@ -1421,7 +1421,7 @@ sub readSampleSheet{
                 chomp($dataRow);
                 $dataRow=~ s/[\012\015]*$//;
                 my @r = split /,/, $dataRow;
-                $r[$columnMap->{'index'}] = 'unknown' if($r[$columnMap->{'index'}] !~ m/^[ACGT-]+$/); # Use 'unknown' for unspecified index tags
+                $r[$columnMap->{'index'}] = 'unknown' if($r[$columnMap->{'index'}] !~ m/^[ACGT-]+$/ && $r[$columnMap->{'index2'}] !~ m/^[ACGT-]+$/); # Use 'unknown' for unspecified index tags
                 unless($r[6] =~ m/^y/i){ # Skip the controls
                       
                     if(!defined($sampleCounterHash->{$r[$columnMap->{'Sample_Name'}]})){
@@ -1429,11 +1429,15 @@ sub readSampleSheet{
                         $sampleCounterHash->{$r[$columnMap->{'Sample_Name'}]} = $sampleCounter;
                     }
 
-		    #Save information in hash
                     my $index = $r[$columnMap->{'index'}];
-                    if(defined($columnMap->{'index2'}) && defined($r[$columnMap->{'index2'}])) {
+                    if(defined($columnMap->{'index2'}) && length($r[$columnMap->{'index2'}]) > 0 && length($r[$columnMap->{'index'}]) > 0) {
                         $index .= "-" . $r[$columnMap->{'index2'}];
-		    }
+		            }
+                    elsif(length($r[$columnMap->{'index'}]) < 0 && length($r[$columnMap->{'index2'}]) > 0){
+                        $index = $r[$columnMap->{'index2'}];
+                    }
+
+                    # Save information to hash
                     $sampleSheet{$r[$columnMap->{'Sample_Project'}]}->{defined($columnMap->{'Lane'}) ? $r[$columnMap->{'Lane'}] : 1}->{$index} =
                         {'SampleID'=>$r[$columnMap->{'Sample_ID'}],
                          'SampleName'=>$r[$columnMap->{'Sample_Name'}],
@@ -3063,8 +3067,10 @@ sub machineType{
 sub getMachineID {
     my $self = shift;
     if(!defined $self->{RUNPARAMS}){
-        confess "RunParameters haven't been loaded\n";
-    } elsif(defined($self->{RUNPARAMS}->{ScannerID})){
+        # Load runParameters
+        $self->runParameters();
+    } 
+    if(defined($self->{RUNPARAMS}->{ScannerID})){
         return $self->{RUNPARAMS}->{ScannerID};
     } elsif(defined($self->{RUNPARAMS}->{Setup}->{ScannerID})) {
         return $self->{RUNPARAMS}->{Setup}->{ScannerID};

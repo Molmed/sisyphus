@@ -106,7 +106,7 @@ TEMP_PATH: /proj/a2009002/private/nobackup/tmp
 SUMMARY_HOST: mm-xlas002
 
 # The directory on ARCHIVE_HOST to put the runfolder in
-SUMMARY_PATH: /mnt/Seq-Summaries/2015/
+SUMMARY_PATH: /mnt/Seq-Summaries/2016/
 
 # The path, relative to the runfolder, where MiSeq analysis output is deposited
 ANALYSIS_PATH: ../MiSeqAnalysis/
