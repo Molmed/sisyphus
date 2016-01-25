@@ -81,6 +81,13 @@ my $OFFSET = 33;
 # Create a new sisyphus object for common functions
 my $sisyphus = Molmed::Sisyphus::Common->new(PATH=>$rfPath, DEBUG=>$debug);
 $rfPath = $sisyphus->PATH;
+my $ignoreFastqs = 0; 
+
+my $config = $sisyphus->readConfig();
+
+if(defined($config->{IGNORE_MISSING_FASTQS})){
+    $ignoreFastqs = $config->{IGNORE_MISSING_FASTQS};
+}
 
 # Initialize the random generator and use a random seed based upon the flowcell id
 my $fcid = $sisyphus->fcId() || "ABC123CXX";
@@ -102,7 +109,7 @@ my $baseQC;
 sub findFastq{
     my $files = shift;
     my $file = $_;
-    if($file !~ /Undetermined_indices/ && $file !~ /\/Data\//){
+    if($file !~ /Undetermined_indices/ && $file !~ /\/Data\// && $file !~ /\/IndexCheck\//){
         if($file =~ m/\.fastq(\.gz)?$/){
             my @path = split '/', $file;
             my $project = $path[-3];
@@ -110,19 +117,20 @@ sub findFastq{
             my $sample = $path[-2];
             $sample =~ s/^Sample_//;
             if($file =~ m/.*\/(.+)_([ACTG]+-?[ACGT]*|NoIndex)_L(\d{3})_R(\d)_(\d{3})\.fastq\.gz$/){
-		my ($sample,$index,$laneId,$read,$segment) = ($1,$2,$3,$4,$5);
-		$index =~ s/NoIndex/Undetermined/ if($index =~ /NoIndex/);
-		$files->{$laneId}{$sample}{$index}{$read}{$segment} = $file;
-            }elsif($file =~ m/.*\/(.+)_S(\d*)_L(\d{3})_R(\d)_(\d{3})\.fastq\.gz$/){
-		my ($sample,$index,$laneId,$read,$segment) = ($1,$2,$3,$4,$5);
+                my ($sample,$index,$laneId,$read,$segment) = ($1,$2,$3,$4,$5);
+                $index =~ s/NoIndex/Undetermined/ if($index =~ /NoIndex/);
+                $files->{$laneId}{$sample}{$index}{$read}{$segment} = $file;
+            }
+            elsif($file =~ m/.*\/(.+)_S(\d*)_L(\d{3})_R(\d)_(\d{3})\.fastq\.gz$/){
+                my ($sample,$index,$laneId,$read,$segment) = ($1,$2,$3,$4,$5);
                 $sample = "Sample_" . $sample;
-		$files->{$laneId}{$sample}{$index}{$read}{$segment} = $file;
+                $files->{$laneId}{$sample}{$index}{$read}{$segment} = $file;
             }
         }
     }
 }
 use File::Find;
-find({wanted => sub{findFastq(\%files)}, no_chdir => 1, follow => 1}, $rfPath);
+find({wanted => sub{findFastq(\%files)}, no_chdir => 1, follow => 1}, "$rfPath/Unaligned");
 
 my $laneQC;
 my $samples;
@@ -131,49 +139,51 @@ foreach my $proj (keys %{$sampleSheet}){
     foreach my $lid (keys %{$sampleSheet->{$proj}}){
         foreach my $tag (keys %{$sampleSheet->{$proj}->{$lid}}){
             my $info = $sampleSheet->{$proj}->{$lid}->{$tag};
-	    my $laneId = ("0" x (3 - length($lid))) . $lid;
-	    my $fastQFilesFound = 0;
+            my $laneId = ("0" x (3 - length($lid))) . $lid;
+            my $fastQFilesFound = 0;
             my $indexOrSampleCounter = $info->{SampleNumber};
             foreach my $read (keys %{$files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}}){
                 foreach my $pctLane (keys %{$files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}}){
-			my $stat = Molmed::Sisyphus::QStat->new(OFFSET=>$OFFSET, DEBUG=>$debug);
-			my $filehandle;
-			$samples->{$info->{SampleName}}->{$lid}->{$tag} = 1;
-                        if($files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane} =~ /fastq.gz$/) {
-                            open($filehandle, "zcat $files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane} |") or die "Failed to open $files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane}: $!";
-			} elsif($files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane} =~ /fastq$/) {
-                            open($filehandle,'-|', "grep fastq.gz $files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane}") or die "Failed to open $files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane}: $!";
-			} 
-			
-			$fastQFilesFound = 1;
-			my $seq = "";
-			my $qual = "";
-			my $counter = 0;
+                    my $stat = Molmed::Sisyphus::QStat->new(OFFSET=>$OFFSET, DEBUG=>$debug);
+                    my $filehandle;
+                    $samples->{$info->{SampleName}}->{$lid}->{$tag} = 1;
+                    if($files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane} =~ /fastq.gz$/) {
+                        open($filehandle, "zcat $files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane} |") or die "Failed to open $files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane}: $!";
+                    } elsif($files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane} =~ /fastq$/) {
+                        open($filehandle,'-|', "grep fastq.gz $files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane}") or die "Failed to open $files{$laneId}{$info->{SampleID}}{$indexOrSampleCounter}{$read}{$pctLane}: $!";
+                    } 
 
-			FASTQ: while(<$filehandle>) {
-				$seq = <$filehandle>;
-				chomp($seq);
-				<$filehandle>;
-				$qual = <$filehandle>;
-				chomp($qual);
-				if(rand() < $stat->{SAMPLING_DENSITY}) {
-					$counter = $counter + 1;
-					$stat->addQValuePerBaseAndPosition($seq,$qual);
-					last FASTQ if($counter > $stat->{SAMPLING_COUNTER});
-				}
-			}
-			close($filehandle);
-                        $baseQC->{$info->{SampleID}}->{$lid}->{$read}->{$indexOrSampleCounter} = $stat->calculateQValuePerBase();
-			if(!defined($laneQC->{$lid}->{$read})) {
-				$laneQC->{$lid}->{$read} = Molmed::Sisyphus::QStat->new(OFFSET=>$OFFSET, DEBUG=>$debug);	
-			}
-			$laneQC->{$lid}->{$read} = $laneQC->{$lid}->{$read}->add($stat);
-		}
-	    }
-	    if($fastQFilesFound == 0) {
-		print "Couldn't find fastq files(s) for lane $laneId, $info->{SampleID}\n";
-		exit 1;
-	    }
+                    $fastQFilesFound = 1;
+                    my $seq = "";
+                    my $qual = "";
+                    my $counter = 0;
+
+                    FASTQ: while(<$filehandle>) {
+                        $seq = <$filehandle>;
+                        chomp($seq);
+                        <$filehandle>;
+                        $qual = <$filehandle>;
+                        chomp($qual);
+                        if(rand() < $stat->{SAMPLING_DENSITY}) {
+                            $counter = $counter + 1;
+                            $stat->addQValuePerBaseAndPosition($seq,$qual);
+                            last FASTQ if($counter > $stat->{SAMPLING_COUNTER});
+                        }
+                    }
+                    close($filehandle);
+                    $baseQC->{$info->{SampleID}}->{$lid}->{$read}->{$indexOrSampleCounter} = $stat->calculateQValuePerBase();
+                    if(!defined($laneQC->{$lid}->{$read})) {
+                        $laneQC->{$lid}->{$read} = Molmed::Sisyphus::QStat->new(OFFSET=>$OFFSET, DEBUG=>$debug);	
+                    }
+                    $laneQC->{$lid}->{$read} = $laneQC->{$lid}->{$read}->add($stat);
+                }
+            }
+            if($fastQFilesFound == 0) {
+                print "Couldn't find fastq files(s) for lane $laneId, $info->{SampleID}\n";
+                unless($ignoreFastqs){ 
+                    exit 1;
+                }
+            }
         }
     }
 }
@@ -184,14 +194,15 @@ my $reads;
 
 foreach my $sample (keys %{$RtaSampleStats}){
     foreach my $lane (keys %{$RtaSampleStats->{$sample}}){
-	foreach my $barcode (keys %{$RtaSampleStats->{$sample}->{$lane}->{1}}){
-	    if($barcode eq 'Undetermined' || ($barcode eq 'unknown' && $sample eq 'Undetermined')){
-		$laneUnknown{$lane} = sprintf('%.1f', $RtaSampleStats->{$sample}->{$lane}->{1}->{$barcode}->{PctLane});
-	    }else{
+        foreach my $barcode (keys %{$RtaSampleStats->{$sample}->{$lane}->{1}}){
+            if($barcode eq 'Undetermined' || ($barcode eq 'unknown' && $sample eq 'Undetermined')){
+                $laneUnknown{$lane} = sprintf('%.1f', $RtaSampleStats->{$sample}->{$lane}->{1}->{$barcode}->{PctLane});
+            }
+            else{
                 if(defined($samples->{$sample}->{$lane}->{$barcode})) {
                     push @{$laneFrac{$lane}}, sprintf(' %.1f:%s', $RtaSampleStats->{$sample}->{$lane}->{1}->{$barcode}->{PctLane}, $sample);
-                }
-	    }
+            }
+            }
         }
     }
 }
@@ -200,11 +211,12 @@ open(my $repFh, '>', "$rfPath/quickReport.txt");
 print $repFh join("\t", "Lane", "Read", "ReadsPF (M)", "Yield Q30 (G)", "ErrRate", "Excluded", "Q per base (A/C/G/T)", "Sample Fractions", "Unidentified"), "\n";
 foreach my $lane (sort {$a<=>$b} keys %{$RtaLaneStats}){
     foreach my $read (sort {$a<=>$b} keys %{$RtaLaneStats->{$lane}}){
-	print $repFh join("\t", $lane, $read,
-			  sprintf('%.0f', (defined($RtaLaneStats->{$lane}->{$read}->{PF}) ? $RtaLaneStats->{$lane}->{$read}->{PF} : 0)/1e6),
-			  sprintf('%.1f', (defined($RtaLaneStats->{$lane}->{$read}->{YieldQ30}) ? $RtaLaneStats->{$lane}->{$read}->{YieldQ30} : 0)/1e9),
-			  defined($RtaLaneStats->{$lane}->{$read}->{ErrRate}) ? $RtaLaneStats->{$lane}->{$read}->{ErrRate} : '-',
-			  $RtaLaneStats->{$lane}->{$read}->{ExcludedTiles});
+        print $repFh join("\t", $lane, $read,
+            sprintf('%.0f', (defined($RtaLaneStats->{$lane}->{$read}->{PF}) ? $RtaLaneStats->{$lane}->{$read}->{PF} : 0)/1e6),
+            sprintf('%.1f', (defined($RtaLaneStats->{$lane}->{$read}->{YieldQ30}) ? $RtaLaneStats->{$lane}->{$read}->{YieldQ30} : 0)/1e9),
+            defined($RtaLaneStats->{$lane}->{$read}->{ErrRate}) ? $RtaLaneStats->{$lane}->{$read}->{ErrRate} : '-',
+            $RtaLaneStats->{$lane}->{$read}->{ExcludedTiles});
+
         my @fractionSorted = defined($laneFrac{$lane}) ? sort({sortLaneFrac($a,$b)} @{$laneFrac{$lane}}) : ('-');
 
         if(defined($laneQC->{$lane}) && defined($laneQC->{$lane}->{$read})) {
@@ -232,17 +244,17 @@ if(defined $mail && $mail =~ m/\w\@\w/){
     my $msg = '<html><body><table>' . "\n";
     my $i=0;
     while(<$repFh>){
-	$i++;
-	s:\t:</td><td>:g;
-	s:,:<br />:g;
-	if($i==1){
-	    s/td/th/g;
-	    $msg .= '<tr><th>' . $_ . '</tr>';
-	}elsif($i%2 > 0){
-	    $msg .= '<tr><td>' . $_ . '</tr>';
-	}else{
-	    $msg .= '<tr bgcolor="#dddddd"><td>' . $_ . '</tr>';
-	}
+        $i++;
+        s:\t:</td><td>:g;
+        s:,:<br />:g;
+        if($i==1){
+            s/td/th/g;
+            $msg .= '<tr><th>' . $_ . '</tr>';
+        }elsif($i%2 > 0){
+            $msg .= '<tr><td>' . $_ . '</tr>';
+        }else{
+        $msg .= '<tr bgcolor="#dddddd"><td>' . $_ . '</tr>';
+        }
     }
     $msg .= '</table>'. "\n";
     $msg .= '</body></html>';
