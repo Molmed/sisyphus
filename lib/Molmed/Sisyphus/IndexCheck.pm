@@ -96,13 +96,11 @@ sub checkIndices{
 
 				}
 
-				$passedIndexCheck = 0;        
-
 				foreach my $unidentifiedIndex (@sigCounts){
-		
+	
+                    $passedIndexCheck = 0;
+	
 				    foreach my $idxRead (keys %{$indexCount{$lane}{'Indices'}}){
-
-                        my $test = $noOfSamples->{$lane}->{'Indices'}->{$idxRead};
 
 				        if (@{$noOfSamples->{$lane}->{'Indices'}->{$idxRead}}){
 
@@ -119,7 +117,7 @@ sub checkIndices{
 				                }
 				                else{
 				        
-				                    print "It appears that $unidentifiedIndex is present in Samplesheet among $idxRead. ";
+				                    print "It appears that $unidentifiedIndex is present in Samplesheet among $idxRead.\n";
 				            
 				                }
 
@@ -135,12 +133,12 @@ sub checkIndices{
 				                }
 				                else{
 				          
-				                    print "Index $unidentifiedIndex is one mismatch from being a correct index among $idxRead. ";
+				                    print "Index $unidentifiedIndex is one mismatch from being a correct index among $idxRead.\n";
 				                
 				                }
 
 				            }
-				            elsif ($unidentifiedIndex =~ /N\.*N/ ){
+				            elsif ($unidentifiedIndex =~ /N.*N/ ){
 
 				                print "Index $unidentifiedIndex contains read errors. OK!\n";
 
@@ -151,12 +149,12 @@ sub checkIndices{
 
 				                if ($idxRead eq $indexRead){
 
-				                    print "The reverse of index $unidentifiedIndex is present in SampleSheet among $indexRead. ";
+				                    print "The reverse of index $unidentifiedIndex is present in SampleSheet among $indexRead.\n";
 				                
 				                }
 				                else{
 				                
-				                    print "The reverse of index $unidentifiedIndex is present in SampleSheet among $idxRead. ";
+				                    print "The reverse of index $unidentifiedIndex is present in SampleSheet among $idxRead.\n";
 
 				                }
 
@@ -165,12 +163,12 @@ sub checkIndices{
 
 				                if ($idxRead eq $indexRead){
 				        
-				                    print "The complement of index $unidentifiedIndex is present in SampleSheet among $indexRead. ";
+				                    print "The complement of index $unidentifiedIndex is present in SampleSheet among $indexRead.\n";
 
 				                }
 				                else{
 
-				                    print "The complement of index $unidentifiedIndex is present in SampleSheet among $idxRead. ";
+				                    print "The complement of index $unidentifiedIndex is present in SampleSheet among $idxRead.\n";
 
 				                }
 
@@ -179,12 +177,12 @@ sub checkIndices{
 
 				                if ($idxRead eq $indexRead){
 
-				                    print "The reverse complement of index $unidentifiedIndex is present in SampleSheet among $indexRead. ";
+				                    print "The reverse complement of index $unidentifiedIndex is present in SampleSheet among $indexRead.\n";
 
 				                }
 				                else{
 
-				                    print "The reverse complement of index $unidentifiedIndex is present in SampleSheet among $idxRead. ";
+				                    print "The reverse complement of index $unidentifiedIndex is present in SampleSheet among $idxRead.\n";
 				            
 				                }
 				            }
@@ -194,9 +192,9 @@ sub checkIndices{
 				    }
 				    unless ($passedIndexCheck){
 
-				    print "Please investigate index $unidentifiedIndex.\n";
+				        print "Please investigate index $unidentifiedIndex.\n";
 
-				    $failedIndexCheck = 1; 
+				        $failedIndexCheck = 1; 
 
 				    }
 			 
