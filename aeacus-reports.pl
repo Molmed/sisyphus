@@ -273,7 +273,12 @@ unless($iPath =~ m/201\d-[0123]\d$/){
     }
 }
 
-$archJob->addCommand("$FindBin::Bin/archive.pl -runfolder $rfPath -outdir '$aPath' -swestore $debugFlag", "archive.pl on $rfPath FAILED");
+my $swestoreFlag = "-swestore";
+if ($sisyphus->machineType() eq 'hiseqx'){
+    $swestoreFlag = "";
+}
+
+$archJob->addCommand("$FindBin::Bin/archive.pl -runfolder $rfPath -outdir '$aPath' $swestoreFlag $debugFlag", "archive.pl on $rfPath FAILED");
 print STDERR "Submitting Arch-$rfShort\t";
 $archJob->submit({queue=>1});
 print STDERR $archJob->jobId(), "\n";
