@@ -1684,12 +1684,9 @@ sub complete{
 
 sub readConfig{
     my $self = shift;
-    until(-e $self->PATH . '/sisyphus.yml'){
-	print STDERR "Waiting for config file " . $self->PATH . "/sisyphus.yml\n";
-	if(-e $self->PATH . '/sisyphus.yml.gz'){
-	    system('gunzip' , '-N',  $self->PATH . '/sisyphus.yml.gz');
-	}
-	sleep 5;
+    if(-e $self->PATH . '/sisyphus.yml.gz'){
+        system('gunzip' , '-N',  $self->PATH . '/sisyphus.yml.gz');
+        sleep 5;
     }
     my $conf = YAML::Tiny->read($self->PATH . '/sisyphus.yml') || confess "Failed to read '" . $self->PATH . "/sisyphus.yml'\n";
     return $conf->[0];

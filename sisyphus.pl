@@ -432,7 +432,8 @@ $config->{BCL2FASTQ} --input-dir '$rfPath/Data/Intensities/BaseCalls' --output-d
 check_errs \$? "bcl2fastq failed in $fastqPath/IndexCheck"
 
 checkIndices.pl -runfolder '$rfPath' -demuxSummary '$rfPath/IndexCheck/Stats' 
-check_errs \$? "IndexCheck failed"
+check_errs \$? "IndexCheck FAILED"
+
 
 EOF
 
@@ -457,7 +458,9 @@ unless($preIndexCheck){
 
 print $scriptFh <<EOF
 checkIndices.pl -runfolder '$rfPath'
-check_errs \$? "IndexCheck failed"
+
+# Save return value for later use
+INDEXCHECK_RETURN_VAL=\$?
 
 EOF
 }
@@ -534,6 +537,12 @@ check_errs \$? "FAILED QC"
 EOF
 }
 }
+
+print $scriptFh <<EOF;
+
+# Now check if indexCheck was successful
+check_errs \$INDEXCHECK_RETURN_VAL "IndexCheck FAILED"
+EOF
 
 unless($noUppmaxProcessing) {
 print $scriptFh <<EOF;
