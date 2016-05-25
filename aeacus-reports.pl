@@ -275,6 +275,7 @@ unless($iPath =~ m/201\d-[0123]\d$/){
 }
 
 my $swestoreFlag = "-swestore";
+
 if (hostname() =~ 'irma'){
     $swestoreFlag = "";
 }
