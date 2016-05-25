@@ -360,10 +360,10 @@ sub gzip{
     }else{
 	print STDERR "gzipping '$file'\n" if($self->{DEBUG});
 	my @stat = stat($file);
-	my $pig = system("pigz -n -T -p $self->{THREADS} -c '$file'> '$file.gz'");
+	my $pig = system("pigz -f -n -T -p $self->{THREADS} -c '$file'> '$file.gz'");
 	if($pig){ # pigz failed
 	    unlink("$file.gz") if(! $self->{DEBUG} && -e "$file.gz" && -e "$file");
-	    system("gzip -n -c '$file'> '$file.gz'")==0 or confess "Failed to gzip $file\n";
+	    system("gzip -n -c -f '$file'> '$file.gz'")==0 or confess "Failed to gzip $file\n";
 	}
     }
 
@@ -1685,7 +1685,7 @@ sub complete{
 sub readConfig{
     my $self = shift;
     if(-e $self->PATH . '/sisyphus.yml.gz'){
-        system('gunzip' , '-N',  $self->PATH . '/sisyphus.yml.gz');
+        system('gunzip','-f','-N',  $self->PATH . '/sisyphus.yml.gz');
         sleep 5;
     }
     my $conf = YAML::Tiny->read($self->PATH . '/sisyphus.yml') || confess "Failed to read '" . $self->PATH . "/sisyphus.yml'\n";
