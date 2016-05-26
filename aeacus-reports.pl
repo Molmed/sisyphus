@@ -9,6 +9,7 @@ use Getopt::Long;
 use Pod::Usage;
 use Cwd qw(abs_path cwd);
 use File::Basename;
+use Sys::Hostname;
 
 use Molmed::Sisyphus::Uppmax::SlurmJob;
 use Molmed::Sisyphus::Common;
@@ -273,8 +274,9 @@ unless($iPath =~ m/201\d-[0123]\d$/){
     }
 }
 
+# Do not upload to SweStore on Irma
 my $swestoreFlag = "-swestore";
-if ($sisyphus->machineType() eq 'hiseqx'){
+if (hostname() eq 'irma'){
     $swestoreFlag = "";
 }
 
