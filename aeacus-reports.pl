@@ -276,7 +276,7 @@ unless($iPath =~ m/201\d-[0123]\d$/){
 
 # Do not upload to SweStore on Irma
 my $swestoreFlag = "-swestore";
-if (hostname() eq 'irma'){
+if (hostname() =~ /irma/){
     $swestoreFlag = "";
 }
 
