@@ -1684,7 +1684,8 @@ sub complete{
 
 sub readConfig{
     my $self = shift;
-    if(-e $self->PATH . '/sisyphus.yml.gz'){
+    # Only unzip if an uncompressed config does not exist
+    if (-e $self->PATH . '/sisyphus.yml.gz' && ! -e $self->PATH . '/sisyphus.yml' ){
         system('gunzip' , '-N',  $self->PATH . '/sisyphus.yml.gz');
         sleep 5;
     }
