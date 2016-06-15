@@ -9,6 +9,7 @@ use Getopt::Long;
 use Pod::Usage;
 use Cwd qw(abs_path cwd);
 use File::Basename;
+use Sys::Hostname;
 
 use Molmed::Sisyphus::Uppmax::SlurmJob;
 use Molmed::Sisyphus::Common;
@@ -168,16 +169,17 @@ foreach my $proj (keys %{$sampleSheet}){
     # Create a slurm job handler
     my $projJob =
       Molmed::Sisyphus::Uppmax::SlurmJob->new(
-					       DEBUG=>$debug,         # bool
-					       SCRIPTDIR=>$scriptDir, # Directory for writing the script
-					       EXECDIR=>$rfPath,      # Directory from which to run the script
-					       NAME=>"$proj-$rfShort",# Name of job, also used in script name
-					       PROJECT=>$uProj,       # project for resource allocation
-					       TIME=>"0-06:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
-					       QOS=>$uQos,            # High priority
-					       PARTITION=>'core',      # core or node (or devel));
-                 MAIL_USER=>$email,
-                 MAIL_TYPE=>'FAIL'
+                            DEBUG=>$debug,         # bool
+                            SCRIPTDIR=>$scriptDir, # Directory for writing the script
+                            EXECDIR=>$rfPath,      # Directory from which to run the script
+                            NAME=>"$proj-$rfShort",# Name of job, also used in script name
+                            PROJECT=>$uProj,       # project for resource allocation
+                            TIME=>"0-15:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
+                            QOS=>$uQos,            # High priority
+                            PARTITION=>'core',      # core or node (or devel));
+                            CORES=>'2',
+                            MAIL_USER=>$email,
+                            MAIL_TYPE=>'FAIL'
 					      );
     foreach my $lane (keys (%{$sampleSheet->{$proj}})){
 	$projJob->addDep($ffJobs{$lane}) if exists($ffJobs{$lane});
@@ -213,10 +215,10 @@ my $repJob =
                                            EXECDIR=>$rfPath,      # Directory from which to run the script
                                            NAME=>"Rep-$rfShort", # Name of job, also used in script name
                                            PROJECT=>$uProj,       # project for resource allocation
-                                           TIME=>"0-10:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
+                                           TIME=>"0-20:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
                                            QOS=>$uQos,            # High priority
                                            PARTITION=>'core',     # core or node (or devel));
-                                           CORES=>'2',
+                                           CORES=>'4',
                                            MAIL_USER=>$email,
                                            MAIL_TYPE=>'FAIL'
                                           );
@@ -273,8 +275,9 @@ unless($iPath =~ m/201\d-[0123]\d$/){
     }
 }
 
+# Do not upload to SweStore on Irma
 my $swestoreFlag = "-swestore";
-if ($sisyphus->machineType() eq 'hiseqx'){
+if (hostname() =~ /irma/){
     $swestoreFlag = "";
 }
 
