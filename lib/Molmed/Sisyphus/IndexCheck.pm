@@ -5,6 +5,7 @@ use warnings;
 use Data::Dumper;
 use Molmed::Sisyphus::Common;
 
+
 use base 'Exporter';
 our @EXPORT = qw(checkIndices);
 
@@ -80,10 +81,10 @@ sub checkIndices{
 
 			if (@{$indexCount{$lane}{'Indices'}{$indexRead}}){
 			
-				my @sigCounts = significanceTest($indexCount{$lane}{'Counts'}, $indexCount{$lane}{'Indices'}{$indexRead}, $lane, $sisyphus, $DemuxSumPath);
+				my %sigCounts = significanceTest($indexCount{$lane}{'Counts'}, $indexCount{$lane}{'Indices'}{$indexRead}, $lane, $sisyphus, $DemuxSumPath);
 
 				# Number of indices with significant counts
-				my $sigCount = @sigCounts;
+				my $sigCount = keys %sigCounts;
 
 				if ($sigCount > 1){
 				
@@ -96,7 +97,7 @@ sub checkIndices{
 
 				}
 
-				foreach my $unidentifiedIndex (@sigCounts){
+				foreach my $unidentifiedIndex (keys %sigCounts){
 	
 					$passedIndexCheck = 0;
 	
@@ -192,7 +193,8 @@ sub checkIndices{
 					}
 					unless ($passedIndexCheck){
 
-						print "Please investigate index $unidentifiedIndex.\n";
+						my $rounded = sprintf("%.3f", $sigCounts{$unidentifiedIndex});
+						print "Please investigate index $unidentifiedIndex. ($rounded% of all reads in lane $lane)\n";
 
 						$failedIndexCheck = 1; 
 
@@ -217,7 +219,7 @@ sub significanceTest{
 	
 	my $total = $sisyphus->getBarcodeCount($lane, $DemuxSumPath);
 
-	my @sigIndices;
+	my %sigIndices;
 
 	my $counter = 0;
 
@@ -226,7 +228,7 @@ sub significanceTest{
 
 	while ($count >= 0.01*$total){
 
-		push ( @sigIndices, $indexArray[$counter] );
+		$sigIndices{$indexArray[$counter]} = $count/$total*100;
 
 		$counter++;
 
@@ -234,7 +236,7 @@ sub significanceTest{
 		
 	}
 
-	return @sigIndices;
+	return %sigIndices;
 
 }
 
