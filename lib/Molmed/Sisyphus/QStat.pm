@@ -9,6 +9,7 @@ use Archive::Zip qw( :ERROR_CODES :CONSTANTS );
 use File::Basename;
 use Molmed::Sisyphus::Common qw(mkpath);
 use Storable 'dclone';
+$PDL::toolongtoprint = 10000000;
 
 our $AUTOLOAD;
 
