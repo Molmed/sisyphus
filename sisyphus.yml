@@ -79,7 +79,7 @@ NGI_PROCESSING: 0
 PRE_DEMULTIPLEX_INDEX_CHECK: 0 
 
 # Change to 1 to ignore missing fastqs
-IGNORE_MISSING_FASTQS: 0
+IGNORE_MISSING_FASTQS: 1
 
 # Change to 0 to not use ssverify.sh for archive verification and instead use 
 # sisyphus own verfication procedure 
