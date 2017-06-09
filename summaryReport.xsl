@@ -469,12 +469,12 @@
 	  <tr >
 	    <td>Q-Score Offset</td>
 	    <td><xsl:value-of select="MetaData/@Qoffset"/></td>
-      </tr>
+          </tr>
 
-      <tr >
-        <td>bcl2fastq Version</td>
-        <td><xsl:value-of select="MetaData/@bcl2fastqVersion"/></td>
-      </tr>    
+          <tr >
+            <td>bcl2fastq Version</td>
+            <td><xsl:value-of select="MetaData/@bcl2fastqVersion"/></td>
+          </tr>    
 
 	</table>
 	</div>

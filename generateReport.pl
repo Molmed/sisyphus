@@ -114,14 +114,6 @@ my($RtaLaneStats,$RtaSampleStats) = $sisyphus->resultStats();
 # assume the same offset for all files (set in the loop below)
 my $offset = 0;
 
-#Read the bcl2fastq version file
-open my $bcl2fastqfile, '<', "$rfPath/bcl2fastq_version";
-my $firstLine_bcl2fastq = <$bcl2fastqfile>;
-close $bcl2fastqfile;
-
-my @name_version = split(' v', $firstLine_bcl2fastq);
-my $bcl2fastqVersion = $name_version[1];
-
 # Read all stats from the project dirs
 my %dumps;
 foreach my $project (@projects){
@@ -379,7 +371,7 @@ $metaData{RtaVersion} = $sisyphus->getRTAversion();
 $metaData{FlowCellId} = $sisyphus->fcId();
 $metaData{ClusterKitVersion} = $sisyphus->getClusterKitVersion();
 $metaData{Qoffset} = $offset;
-$metaData{bcl2fastqVersion} = $bcl2fastqVersion;
+$metaData{bcl2fastqVersion} = $sisyphus->getBcl2FastqVersion();
 # metaData information only available for HiSeq
 if($sisyphus->machineType() ne 'miseq'){
    $metaData{FlowCellVer} = $sisyphus->getFlowCellVersion();
