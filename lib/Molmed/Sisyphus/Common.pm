@@ -934,15 +934,20 @@ sub getBcl2FastqVersion{
     if(defined $self->{BCL2FASTQVERSION}){
 	return $self->{BCL2FASTQVERSION};
     }
-    
-    open my $bcl2fastqfile, '<', "$rfPath/bcl2fastq_version";
-    my $firstLine_bcl2fastq = <$bcl2fastqfile>;
-    close $bcl2fastqfile;
+    if(-e "$rfPath/bcl2fastq_version"){ 
+        open my $bcl2fastqfile, '<', "$rfPath/bcl2fastq_version";
+        my $firstLine_bcl2fastq = <$bcl2fastqfile>;
+        close $bcl2fastqfile;
 
-    my @name_version = split(' v', $firstLine_bcl2fastq);
-    my $bcl2fastqVersion = $name_version[1];
+        my @name_version = split(' v', $firstLine_bcl2fastq);
+        my $bcl2fastqVersion = $name_version[1];
 
-    $self->{BCL2FASTQVERSION} = $bcl2fastqVersion;
+        $self->{BCL2FASTQVERSION} = $bcl2fastqVersion;
+    }else{
+        $self->{BCL2FASTQVERSION} = "";
+        print STDERR "No bcl2fastq version will be written to report. File bcl2fastq_version not found.\n"
+        
+    }    
     return $self->{BCL2FASTQVERSION};
 }
 
