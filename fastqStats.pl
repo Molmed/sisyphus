@@ -11,6 +11,7 @@ use File::Find;
 use PerlIO::gzip;
 use File::Basename;
 use Digest::MD5;
+use warnings;
 
 
 use Molmed::Sisyphus::QStat;
@@ -145,7 +146,7 @@ srand($rseed);
 print STDERR "Using random seed $rseed based on fcId $fcid\n";
 
 my %files;
-find({wanted => sub{findFastq(\%files, $lane)}, no_chdir => 1}, $inDir);
+find({wanted => sub{findFastq(\%files, $lane)}, no_chdir => 1, follow => 1}, $inDir);
 
 my %checkSums;
 foreach my $project(keys %files){

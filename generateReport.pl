@@ -371,6 +371,7 @@ $metaData{RtaVersion} = $sisyphus->getRTAversion();
 $metaData{FlowCellId} = $sisyphus->fcId();
 $metaData{ClusterKitVersion} = $sisyphus->getClusterKitVersion();
 $metaData{Qoffset} = $offset;
+$metaData{bcl2fastqVersion} = $sisyphus->getBcl2FastqVersion();
 # metaData information only available for HiSeq
 if($sisyphus->machineType() ne 'miseq'){
    $metaData{FlowCellVer} = $sisyphus->getFlowCellVersion();
