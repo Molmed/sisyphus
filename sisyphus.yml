@@ -79,7 +79,7 @@ NGI_PROCESSING: 0
 PRE_DEMULTIPLEX_INDEX_CHECK: 0 
 
 # Change to 1 to ignore missing fastqs
-IGNORE_MISSING_FASTQS: 0
+IGNORE_MISSING_FASTQS: 1
 
 # Change to 0 to not use ssverify.sh for archive verification and instead use 
 # sisyphus own verfication procedure 
@@ -112,10 +112,10 @@ SUMMARY_PATH: /mnt/Seq-Summaries/2016/
 ANALYSIS_PATH: ../MiSeqAnalysis/
 
 # The UPPNEX project to use for processing
-UPPNEX_PROJECT: a2009002
+UPPNEX_PROJECT: ngi2016001
 
 # The UPPNEX project qos-flag to use for high priority processing
-UPPNEX_QOS: seqver
+#UPPNEX_QOS: seqver
 
 # The maximum error in a lane before filtering out bad tiles (%)
 MAX_LANE_ERROR: 2

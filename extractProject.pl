@@ -395,7 +395,7 @@ $metaData{RtaVersion} = $sisyphus->getRTAversion();
 $metaData{FlowCellVer} = $sisyphus->getFlowCellVersion();
 $metaData{FlowCellId} = $sisyphus->fcId();
 $metaData{SBSversion} = $sisyphus->getSBSversion();
-$metaData{Bcl2fastqVersion} = $sisyphus->getBcl2FastqVersion();
+$metaData{bcl2fastqVersion} = $sisyphus->getBcl2FastqVersion();
 $metaData{ClusterKitVersion} = $sisyphus->getClusterKitVersion();
 
 $metaData{Qoffset} = $offset;
