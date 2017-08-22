@@ -256,7 +256,7 @@ my $archJob =
 					   PARTITION=>'core',      # core or node (or devel))
 					   CORES=>'2',
              MAIL_USER=>$email,
-             MAIL_TYPE=>'FAIL'
+             MAIL_TYPE=>'NONE'
 					  );
 $archJob->addDep($repJob);
 $archJob->addCommand("module load uppmax");
