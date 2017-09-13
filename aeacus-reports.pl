@@ -226,7 +226,7 @@ foreach my $job (values %projJobs){
     $repJob->addDep($job);
 }
 $repJob->addCommand("module load uppmax");
-$repJob->addCommand("module load gnuplot");
+$repJob->addCommand("module load gnuplot/system");
 $repJob->addCommand("umask 007");
 $repJob->addCommand("$FindBin::Bin/generateReport.pl -runfolder $rfPath $debugFlag", "generateReport.pl on $rfPath FAILED");
 print STDERR "Submitting Rep-$rfShort\t";
