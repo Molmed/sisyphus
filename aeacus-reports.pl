@@ -185,7 +185,7 @@ foreach my $proj (keys %{$sampleSheet}){
 	$projJob->addDep($ffJobs{$lane}) if exists($ffJobs{$lane});
     }
     $projJob->addCommand("module load uppmax");
-    $projJob->addCommand("module load gnuplot");
+    $projJob->addCommand("module load gnuplot/system");
     $projJob->addCommand("umask 007");
     my $cmd = "$FindBin::Bin/extractProject.pl -runfolder $rfPath -project '$proj' -outdir '$oPath/$proj' $debugFlag";
     foreach my $lane (@{$skipLanes}){
