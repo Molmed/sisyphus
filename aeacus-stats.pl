@@ -157,8 +157,9 @@ for(my $i=1; $i<=$numLanes; $i++){
 					      TIME=>"1-00:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
 					      QOS=>$uQos,            # High priority
 					      PARTITION=>'core',     # core or node (or devel));
-                MAIL_USER=>$email,
-                MAIL_TYPE=>'FAIL'
+                                              CORES=>'4',            # number of cores
+                                              MAIL_USER=>$email,
+                                              MAIL_TYPE=>'FAIL'
 					     );
     $ffJob->addCommand("$FindBin::Bin/fastqStats.pl -runfolder $rfPath -lane $i $debugFlag", "fastqStats.pl on lane $i FAILED");
     $ffJobs{$i} = $ffJob;
