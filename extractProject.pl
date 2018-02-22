@@ -179,7 +179,11 @@ foreach my $sampleDir (readdir($pDirFh)){
     foreach my $fastq (grep /fastq.gz$/, readdir($seqDirFh)){
         if($fastq =~ m/L00(\d)_R\d_001.fastq/){
             next if($skipLanes{$1});
-        }else{
+        }elsif($fastq =~ m/L00(\d)_I\d_001.fastq/){
+            print "Skipping index fastq: $fastq\n" if($debug);
+            next;
+        }
+        else{
             die "Failed to extract lane from fastq name '$fastq'";
         }
         mkpath("$outDir/$sampleDir/",2770) unless(-e "$outDir/$sampleDir/");
