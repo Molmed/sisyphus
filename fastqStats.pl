@@ -269,13 +269,14 @@ sub findFastq{
     my $files = shift;
     my $lanes = shift;
     my $file = $_;
-    if($file =~ m/\.fastq(\.gz)?$/){
+    # Only match read fastqs
+    if($file =~ m/R\d_001\.fastq(\.gz)?$/){
         foreach my $l (@{$lanes}){
             if($file =~ m/.+\/(.+)_\w+_L00${l}_/){
                 my @path = split '/', $file;
                 my $shiftIndex = $path[-3] eq 'Unaligned' ?  1 : $path[-2] eq 'Unaligned' ? 2 : 0;
                 my $sample = $1;
-		my $project = $shiftIndex != 2 ? $path[-3 + $shiftIndex] : $sample eq 'Undetermined' ? 'Undetermined_indices' : $sample;
+                my $project = $shiftIndex != 2 ? $path[-3 + $shiftIndex] : $sample eq 'Undetermined' ? 'Undetermined_indices' : $sample;
                 push @{$files{$project}->{$sample}}, $_;
             }
         }
