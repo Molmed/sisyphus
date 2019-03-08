@@ -242,56 +242,58 @@ $sisyphus->saveMd5($scriptFile, $sisyphus->getMd5($scriptFile, -noCache=>1));
 
 
 
-# Archive
-# Depend on report generation
-# Create a slurm job handler
-my $archJob =
-  Molmed::Sisyphus::Uppmax::SlurmJob->new(
-					   DEBUG=>$debug,         # bool
-					   SCRIPTDIR=>$scriptDir, # Directory for writing the script
-					   EXECDIR=>$rfPath,      # Directory from which to run the script
-                                           NAME=>"Arch-$rfShort", # Name of job, also used in script name
-					   PROJECT=>$uProj,       # project for resource allocation
-					   TIME=>"2-00:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
-					   PARTITION=>'core',      # core or node (or devel))
-					   CORES=>'2',
-             MAIL_USER=>$email,
-             MAIL_TYPE=>'NONE'
-					  );
-$archJob->addDep($repJob);
-$archJob->addCommand("module load uppmax");
-$archJob->addCommand("module load irods/swestore");
-$archJob->addCommand("umask 007");
 
-# Add year and month to outdir if not already included
-unless($aPath =~ m/201\d-[0123]\d$/){
-    if($sisyphus->RUNFOLDER =~ m/(1\d)([01]\d)[0123]\d_/){
-	$aPath .= "/20$1-$2";
+unless (hostname() =~ /irma/){
+    # Archive
+    # Depend on report generation
+    # Create a slurm job handler
+    my $archJob =
+      Molmed::Sisyphus::Uppmax::SlurmJob->new(
+    					   DEBUG=>$debug,         # bool
+    					   SCRIPTDIR=>$scriptDir, # Directory for writing the script
+    					   EXECDIR=>$rfPath,      # Directory from which to run the script
+                                               NAME=>"Arch-$rfShort", # Name of job, also used in script name
+    					   PROJECT=>$uProj,       # project for resource allocation
+    					   TIME=>"2-00:00:00",    # Maximum runtime, formatted as d-hh:mm:ss
+    					   PARTITION=>'core',      # core or node (or devel))
+    					   CORES=>'2',
+                 MAIL_USER=>$email,
+                 MAIL_TYPE=>'NONE'
+    					  );
+    $archJob->addDep($repJob);
+    $archJob->addCommand("module load uppmax");
+    $archJob->addCommand("module load irods/swestore");
+    $archJob->addCommand("umask 007");
+
+    # Add year and month to outdir if not already included
+    unless($aPath =~ m/201\d-[0123]\d$/){
+        if($sisyphus->RUNFOLDER =~ m/(1\d)([01]\d)[0123]\d_/){
+    	$aPath .= "/20$1-$2";
+        }
     }
-}
-unless($iPath =~ m/201\d-[0123]\d$/){
-    if($sisyphus->RUNFOLDER =~ m/(1\d)([01]\d)[0123]\d_/){
-	$iPath .= "/20$1-$2";
+    unless($iPath =~ m/201\d-[0123]\d$/){
+        if($sisyphus->RUNFOLDER =~ m/(1\d)([01]\d)[0123]\d_/){
+    	$iPath .= "/20$1-$2";
+        }
     }
+
+    # Do not upload to SweStore on Irma
+    my $swestoreFlag = "-swestore";
+    if (hostname() =~ /irma/){
+        $swestoreFlag = "";
+    }
+
+    $archJob->addCommand("$FindBin::Bin/archive.pl -runfolder $rfPath -outdir '$aPath' $swestoreFlag $debugFlag", "archive.pl on $rfPath FAILED");
+    print STDERR "Submitting Arch-$rfShort\t";
+    $archJob->submit({queue=>1});
+    print STDERR $archJob->jobId(), "\n";
+    # Make sure to get the script md5 into the sisyphus cache,
+    # otherwise any old checksum from a failed run might fail the
+    # archiving
+    $scriptFile = $archJob->scriptFile();
+    print STDERR "$scriptFile\n";
+    # If an old script was created the MD5 might be saved, so make sure to overwrite that
+    $sisyphus->saveMd5($scriptFile, $sisyphus->getMd5($scriptFile, -noCache=>1));
 }
-
-# Do not upload to SweStore on Irma
-my $swestoreFlag = "-swestore";
-if (hostname() =~ /irma/){
-    $swestoreFlag = "";
-}
-
-$archJob->addCommand("$FindBin::Bin/archive.pl -runfolder $rfPath -outdir '$aPath' $swestoreFlag $debugFlag", "archive.pl on $rfPath FAILED");
-print STDERR "Submitting Arch-$rfShort\t";
-$archJob->submit({queue=>1});
-print STDERR $archJob->jobId(), "\n";
-# Make sure to get the script md5 into the sisyphus cache,
-# otherwise any old checksum from a failed run might fail the
-# archiving
-$scriptFile = $archJob->scriptFile();
-print STDERR "$scriptFile\n";
-# If an old script was created the MD5 might be saved, so make sure to overwrite that
-$sisyphus->saveMd5($scriptFile, $sisyphus->getMd5($scriptFile, -noCache=>1));
-
 
 print STDERR "Done\n";
