@@ -155,43 +155,9 @@ my($RtaLaneStats,$RtaSampleStats) = $sisyphus->resultStats();
 
 my %checksums;
 
-# Fix the output path
-$outDir =~ s(/$)();
-$outDir .= '/' . $sisyphus->RUNFOLDER;
-if(-e $outDir){
-    my $t = time();
-    rename($outDir,"$outDir.old.$t") or die "Failed to rename old outdir $outDir: $!\n";
-}
-mkpath($outDir,2770) || die "Failed to create $outDir: $!\n";
-
-$outDir = abs_path($outDir);
-print STDERR "Output directory: $outDir\n" if($debug);
-
 my $plotter = Molmed::Sisyphus::Plot->new();
 my $plotDir = $sisyphus->tmpdir(5e7); # Require 50MB free space
 $plotDir .= '/Plots';
-
-# Link all fastq-files
-opendir(my $pDirFh, $seqDir) or die "Failed to open '$seqDir': $!\n";
-foreach my $sampleDir (readdir($pDirFh)){
-    next unless (-d "$seqDir/$sampleDir" && !($sampleDir eq ".."));
-    opendir(my $seqDirFh, "$seqDir/$sampleDir") or die "Failed to open '$seqDir/$sampleDir': $!\n";
-    foreach my $fastq (grep /fastq.gz$/, readdir($seqDirFh)){
-        if($fastq =~ m/L00(\d)_R\d_001.fastq/){
-            next if($skipLanes{$1});
-        }elsif($fastq =~ m/L00(\d)_I\d_001.fastq/){
-            print "Skipping index fastq: $fastq\n" if($debug);
-            next;
-        }
-        else{
-            die "Failed to extract lane from fastq name '$fastq'";
-        }
-        mkpath("$outDir/$sampleDir/",2770) unless(-e "$outDir/$sampleDir/");
-        link("$seqDir/$sampleDir/$fastq", "$outDir/$sampleDir/$fastq") || die "Failed to link '$seqDir/$sampleDir/$fastq' to '$outDir/$sampleDir/$fastq': $!\n";
-        $checksums{"$sampleDir/$fastq"} = $sisyphus->getMd5("$seqDir/$sampleDir/$fastq");
-    }
-}
-closedir($pDirFh);
 
 #if($debug){
 #    foreach my $stat (@sampleStats){
@@ -461,19 +427,6 @@ print $htmlFhDel
 
 close($htmlFhDel);
 
-# Link the report to the outdir & calc checksums
-link("$statDir/reportDel.xml", "$outDir/report.xml") || die "Failed to link '$statDir/reportDel.xml' to '$outDir/report.xml': $!\n";
-$checksums{"report.xml"} = $sisyphus->getMd5("$statDir/reportDel.xml", -noCache=>1);
-$sisyphus->saveMd5("$statDir/reportDel.xml", $checksums{"report.xml"});
-
-link("$statDir/report.xsl", "$outDir/report.xsl") || die "Failed to link '$statDir/report.xsl' to '$outDir/report.xsl': $!\n";
-$checksums{"report.xsl"} = $sisyphus->getMd5("$statDir/report.xsl", -noCache=>1);
-$sisyphus->saveMd5("$statDir/report.xsl", $checksums{"report.xsl"});
-
-link("$statDir/reportDel.html", "$outDir/report.html") || die "Failed to link '$statDir/reportDel.html' to '$outDir/report.html': $!\n";
-$checksums{"report.html"} = $sisyphus->getMd5("$statDir/reportDel.html", -noCache=>1);
-$sisyphus->saveMd5("$statDir/reportDel.html", $checksums{"report.html"});
-
 # Copy the plots from temporary dir into Stats dir
 if(-e "$statDir/Plots"){
   $plotter->sysWrap(0, 'rm', '-rf', "$statDir/Plots")==0 or die "Failed to remove old $statDir/Plots";
@@ -497,48 +450,8 @@ foreach my $sample (grep /^[^\.]/, readdir($plotDirFh1)){
     }
 }
 
-
-# Link the graphs & calc checksums
-mkpath("$outDir/Plots",2770) or die "Failed to create '$outDir/Plots': $!\n";
-opendir(my $plotDirFh, "$statDir/Plots") or die "Failed to open dir '$statDir/Plots': $!\n";
-foreach my $sample (grep /^[^\.]/, readdir($plotDirFh)){
-    # Only link plots for the delivered data
-    next unless(exists $sampleXmlDataDel->{Sample}->{$sample}||$sample eq 'LanePlots');
-    mkpath("$outDir/Plots/$sample",2770) or die "Failed to create '$outDir/Plots/$sample': $!\n";
-    opendir(my $samplePlotDirFh, "$statDir/Plots/$sample") or die "Failed to open dir '$statDir/Plots/$sample': $!\n";
-    foreach my $plot (grep /^[^\.]/, readdir($samplePlotDirFh)){
-	# Only link plots for the delivered lanes
-	if($sample eq 'LanePlots' && $plot =~ m/^L00(\d)/){
-	    next if($skipLanes{$1});
-	}
-	my $linkTry = 0;
-	my $linkSuccess = 0;
-	until( $linkSuccess = link("$statDir/Plots/$sample/$plot", "$outDir/Plots/$sample/$plot") || $linkTry>10){
-	    $linkTry++;
-	    unless($linkSuccess){
-		print STDERR "Failed to link Plots/$sample/$plot (try $linkTry)\n";
-		sleep(60);
-	    }
-	}
-	die "Failed to link '$statDir/Plots/$sample/$plot' to '$outDir/Plots/$sample/$plot': $!\n" unless($linkSuccess);
-
-	$sisyphus->saveMd5("$outDir/Plots/$sample/$plot", $checksumCache{"Plots/$sample/$plot"});
-	$checksums{"Plots/$sample/$plot"} = $checksumCache{"Plots/$sample/$plot"};
-    }
-}
-
-# Write out the checksums
-my $rfName = $sisyphus->RUNFOLDER;
-open(my $fhMd5, ">", "$outDir/checksums.md5") or die "Failed to create '$outDir/checksums.md5': $!\n";
-foreach my $file (sort keys %checksums){
-    print $fhMd5 "$checksums{$file}  $rfName/$file\n";
-}
-close($fhMd5);
-$sisyphus->saveMd5("$outDir/checksums.md5", $sisyphus->getMd5("$outDir/checksums.md5", -noCache=>1));
-
 # Copy the README
 cp("$FindBin::Bin/README.1", "$statDir/README") or die "Failed to copy '$FindBin::Bin/README.1' to '$statDir/README': $!\n";
-link("$statDir/README", "$outDir/README") || die "Failed to link '$statDir/README' to '$outDir/README': $!\n";
 
 # Calculate all checksums in the statdir, just to make sure there are no old cached checksums
 $sisyphus->md5Dir($statDir, -noCache=>1, -save=>1);
