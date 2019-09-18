@@ -28,6 +28,8 @@ MACHINES:
               TYPE: hiseq
         M00485:
               TYPE: miseq
+        M06455:
+              TYPE: miseq
         SN7001335:
               TYPE: hiseq
         SN866:
